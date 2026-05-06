@@ -15,7 +15,7 @@ export interface User {
 export type LeadStatus =
   | "New"
   | "Contacted"
-  | "Follow-up"
+  | "Follow-Up"
   | "Registered"
   | "Lost";
 

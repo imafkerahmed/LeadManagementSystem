@@ -1,16 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, LogOut, X } from "lucide-react";
 import { createPocketBaseClient } from "@/lib/pocketbase";
-
-interface CommentEntry {
-  date: string;
-  author: string;
-  status: string;
-  text: string;
-}
 
 interface Lead {
   id: string;
@@ -37,6 +30,43 @@ interface HistoryEntry {
   created: string;
 }
 
+type LeadRecord = {
+  id: string;
+  leadId?: string;
+  studentName?: string;
+  mobileNo?: string;
+  email?: string;
+  courseName?: string;
+  leadStatus?: string;
+  latestComment?: string;
+  created?: string;
+  updated?: string;
+  lastModified?: string;
+  assignedTo?: string;
+};
+
+type HistoryRecord = {
+  id: string;
+  eventType?: string;
+  changedBy?: string;
+  oldValue?: string;
+  newValue?: string;
+  comment?: string;
+  created?: string;
+  expand?: {
+    changedBy?: {
+      name?: string;
+      email?: string;
+    };
+    studentName?: {
+      studentName?: string;
+    };
+    leadId?: {
+      studentName?: string;
+    };
+  };
+};
+
 interface UserLookupItem {
   id: string;
   name: string;
@@ -47,14 +77,19 @@ const PAGE_SIZE = 8;
 
 export default function CounselorPage() {
   const router = useRouter();
-
-  const [counselorId, setCounselorId] = useState("");
-  const [counselorName, setCounselorName] = useState("Unknown Counselor");
+  const pb = createPocketBaseClient();
+  const authUser = pb.authStore.model as {
+    id?: string;
+    name?: string;
+    role?: string;
+  } | null;
+  const counselorId = authUser?.id || "";
+  const counselorName = authUser?.name || "Student Counsellor";
+  const isCounselorValid =
+    pb.authStore.isValid && authUser?.role === "student-counsellor";
 
   const [tab, setTab] = useState<"followup" | "addlead">("followup");
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [leadHistory, setLeadHistory] = useState<HistoryEntry[]>([]);
   const [userLookup, setUserLookup] = useState<Record<string, string>>({});
@@ -76,29 +111,10 @@ export default function CounselorPage() {
   const [toastType, setToastType] = useState<"success" | "error">("success");
 
   useEffect(() => {
-    const pb = createPocketBaseClient();
-    const authUser = pb.authStore.model as {
-      id?: string;
-      name?: string;
-      role?: string;
-    } | null;
-
-    if (!pb.authStore.isValid || authUser?.role !== "student-counsellor") {
+    if (!isCounselorValid) {
       router.replace("/");
-      return;
     }
-
-    setCounselorId(authUser.id || "");
-    setCounselorName(authUser.name || "Student Counsellor");
-  }, [router]);
-
-  useEffect(() => {
-    if (!counselorId) {
-      return;
-    }
-
-    fetchLeads(counselorId);
-  }, [counselorId]);
+  }, [isCounselorValid, router]);
 
   useEffect(() => {
     const loadUserLookup = async () => {
@@ -127,68 +143,81 @@ export default function CounselorPage() {
     loadUserLookup();
   }, []);
 
-  const fetchLeads = async (userId: string, selectedLeadId?: string) => {
-    try {
-      setIsLoading(true);
-      const pb = createPocketBaseClient();
-      const safeUserId = userId.replaceAll('"', '\\"');
-      const safeCounselorName = counselorName.replaceAll('"', '\\"');
-      const assignedFilter = safeCounselorName
-        ? `(assignedTo = "${safeUserId}" || assignedTo = "${safeCounselorName}")`
-        : `assignedTo = "${safeUserId}"`;
-      const records = await pb.collection("leads").getFullList({
-        filter: `${assignedFilter} && (leadStatus = "New" || leadStatus = "Contacted" || leadStatus = "Follow-up")`,
-        sort: "-created",
-      });
-
-      const nextLeads = records.map((lead: any) => ({
-        id: lead.id,
-        leadId: lead.leadId,
-        name: lead.studentName,
-        mobile: lead.mobileNo,
-        email: lead.email || "",
-        course: lead.courseName,
-        status: lead.leadStatus,
-        comments: lead.latestComment || "",
-        created: lead.created,
-        updated: lead.lastModified || lead.updated || lead.created,
-        assignedTo: lead.assignedTo,
-      }));
-
-      setLeads(nextLeads);
-
-      if (nextLeads.length > 0) {
-        const nextIndex = selectedLeadId
-          ? nextLeads.findIndex((lead) => lead.id === selectedLeadId)
-          : 0;
-        const safeIndex = nextIndex >= 0 ? nextIndex : 0;
-        setSelectedLeadId(nextLeads[safeIndex].id);
-        setSelectedLead(nextLeads[safeIndex]);
-        setStatusSelect(nextLeads[safeIndex].status);
-      } else {
-        setSelectedLeadId(null);
-        setSelectedLead(null);
-        setStatusSelect("");
-      }
-    } catch (error) {
-      console.error("Error fetching leads:", error);
-      showToast(
-        error instanceof Error ? error.message : "Failed to load leads",
-        "error",
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const showToast = (msg: string, type: "success" | "error") => {
     setToastMsg(msg);
     setToastType(type);
     setTimeout(() => setToastMsg(""), 3000);
   };
 
+  const fetchLeads = useCallback(
+    async (userId: string, selectedLeadId?: string) => {
+      try {
+        const pb = createPocketBaseClient();
+        const safeUserId = userId.replaceAll('"', '\\"');
+        const safeCounselorName = counselorName.replaceAll('"', '\\"');
+        const assignedFilter = safeCounselorName
+          ? `(assignedTo = "${safeUserId}" || assignedTo = "${safeCounselorName}")`
+          : `assignedTo = "${safeUserId}"`;
+        const records = (await pb.collection("leads").getFullList({
+          filter: `${assignedFilter} && (leadStatus = "New" || leadStatus = "Contacted" || leadStatus = "Follow-Up")`,
+          sort: "-created",
+        })) as LeadRecord[];
+
+        const nextLeads = records.map((lead) => ({
+          id: lead.id,
+          leadId: lead.leadId || "",
+          name: lead.studentName || "",
+          mobile: lead.mobileNo || "",
+          email: lead.email || "",
+          course: lead.courseName || "",
+          status: lead.leadStatus || "",
+          comments: lead.latestComment || "",
+          created: lead.created || "",
+          updated: lead.lastModified || lead.updated || lead.created || "",
+          assignedTo: lead.assignedTo || "",
+        }));
+
+        setLeads(nextLeads);
+
+        if (nextLeads.length > 0) {
+          const nextIndex = selectedLeadId
+            ? nextLeads.findIndex((lead) => lead.id === selectedLeadId)
+            : 0;
+          const safeIndex = nextIndex >= 0 ? nextIndex : 0;
+          setSelectedLead(nextLeads[safeIndex]);
+          setStatusSelect(nextLeads[safeIndex].status);
+        } else {
+          setSelectedLead(null);
+          setStatusSelect("");
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message.includes("aborted")) {
+          // Request was cancelled, don't show error
+          console.debug("Leads request cancelled");
+        } else {
+          console.error("Error fetching leads:", error);
+          showToast(
+            error instanceof Error ? error.message : "Failed to load leads",
+            "error",
+          );
+        }
+      } finally {
+        // No loading state needed here yet.
+      }
+    },
+    [counselorName],
+  );
+
+  useEffect(() => {
+    if (!counselorId) {
+      return;
+    }
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchLeads(counselorId);
+  }, [counselorId, fetchLeads]);
+
   const openLeadDetails = async (lead: Lead) => {
-    setSelectedLeadId(lead.id);
     setModalOpen(true);
     setTimelineOpen(false);
     setHistoryLoading(true);
@@ -213,16 +242,16 @@ export default function CounselorPage() {
 
       setSelectedLead(nextLead);
       setStatusSelect(nextLead.status);
-      const history = await pb.collection("leadHistory").getFullList({
+      const history = (await pb.collection("leadHistory").getFullList({
         filter: `leadId = "${lead.id}"`,
         sort: "-created",
         expand: "leadId,studentName,changedBy",
-      });
+      })) as HistoryRecord[];
 
       setLeadHistory(
-        history.map((entry: any) => ({
+        history.map((entry) => ({
           id: entry.id,
-          eventType: entry.eventType,
+          eventType: entry.eventType || "",
           changedBy:
             entry.expand?.changedBy?.name ||
             entry.expand?.changedBy?.email ||
@@ -235,7 +264,7 @@ export default function CounselorPage() {
           oldValue: entry.oldValue,
           newValue: entry.newValue,
           comment: entry.comment,
-          created: entry.created,
+          created: entry.created || "",
         })),
       );
     } catch (error) {
@@ -283,7 +312,7 @@ export default function CounselorPage() {
       } else {
         showToast(result.error, "error");
       }
-    } catch (error) {
+    } catch {
       showToast("Error updating lead", "error");
     } finally {
       setIsUpdating(false);
@@ -291,8 +320,18 @@ export default function CounselorPage() {
   };
 
   const handleAddLead = async () => {
-    if (!newName || !newMobile || !newCourse) {
-      showToast("Please fill in required fields", "error");
+    const trimmedName = newName.trim();
+    const trimmedMobile = newMobile.trim();
+    const trimmedCourse = newCourse.trim();
+    const trimmedEmail = newEmail.trim();
+
+    if (!counselorId) {
+      showToast("Missing counselor identity", "error");
+      return;
+    }
+
+    if (!trimmedName || !trimmedMobile || !trimmedCourse) {
+      showToast("Name, mobile, and course are required", "error");
       return;
     }
 
@@ -302,10 +341,10 @@ export default function CounselorPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          studentName: newName,
-          mobile: newMobile,
-          email: newEmail,
-          course: newCourse,
+          studentName: trimmedName,
+          mobile: trimmedMobile,
+          email: trimmedEmail || undefined,
+          course: trimmedCourse,
           leadSource: newLeadSource,
           counselorName,
           counselorId,
@@ -313,34 +352,24 @@ export default function CounselorPage() {
       });
 
       const result = await response.json();
-      if (result.success) {
-        showToast("Lead created successfully!", "success");
+      if (response.ok && result.success) {
+        showToast("Lead created", "success");
         setNewName("");
         setNewMobile("");
         setNewEmail("");
         setNewCourse("");
         setNewLeadSource("Direct");
         setTab("followup");
-        await fetchLeads(counselorId, result.recordId || result.leadId);
+        await fetchLeads(counselorId);
       } else {
-        showToast(result.error, "error");
+        showToast(result.error || "Failed to create lead", "error");
       }
-    } catch (error) {
-      showToast("Error creating lead", "error");
+    } catch {
+      showToast("Failed to create lead", "error");
     } finally {
       setIsUpdating(false);
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <p className="text-gray-500 mb-4">Loading leads...</p>
-        </div>
-      </div>
-    );
-  }
 
   const totalPages = Math.max(1, Math.ceil(leads.length / PAGE_SIZE));
   const currentPage = Math.min(tablePage, totalPages);
@@ -686,7 +715,7 @@ export default function CounselorPage() {
                         {[
                           "New",
                           "Contacted",
-                          "Follow-up",
+                          "Follow-Up",
                           "Registered",
                           "Lost",
                         ].map((status) => (

@@ -3,13 +3,14 @@
 /**
  * PocketBase Collection Setup Script
  * Run this script to create all required collections for the Lead Management System
- * 
+ *
  * Usage: node scripts/setup-pocketbase.js
  */
 
 import PocketBase from "pocketbase";
 
-const POCKETBASE_URL = process.env.NEXT_PUBLIC_POCKETBASE_URL || "https://amazoncrm-db.codix.site";
+const POCKETBASE_URL =
+  process.env.NEXT_PUBLIC_POCKETBASE_URL || "https://amazoncrm-db.codix.site";
 const ADMIN_EMAIL = process.env.POCKETBASE_ADMIN_EMAIL || "";
 const ADMIN_PASSWORD = process.env.POCKETBASE_ADMIN_PASSWORD || "";
 
@@ -93,34 +94,37 @@ async function setupCollections() {
 
     try {
       // Check if collection already exists
-      const existing = await pb.collections.getOne(collection.name);
+      await pb.collections.getOne(collection.name);
       console.log(`   ⚠️  Collection already exists, skipping...`);
     } catch {
       // Collection doesn't exist, create it
       try {
-        const schema = collection.fields.map((field) => ({
-          name: field.name,
-          type: field.type,
-          required: field.required || false,
-          ...((field as any).options && { options: (field as any).options }),
-        }));
+        const schema = collection.fields.map((field) => {
+          const base = {
+            name: field.name,
+            type: field.type,
+            required: field.required || false,
+          };
+          return field.options ? { ...base, options: field.options } : base;
+        });
 
-        const result = await pb.collections.create({
+        await pb.collections.create({
           name: collection.name,
           type: "base",
           schema,
         });
 
         console.log(`   ✅ Created successfully`);
-      } catch (error: any) {
-        console.error(`   ❌ Failed to create:`, error.message || error);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`   ❌ Failed to create:`, message);
       }
     }
   }
 
   console.log("\n✨ Collection setup complete!");
   console.log(
-    "📝 Next steps: You can now start using the Lead Management System"
+    "📝 Next steps: You can now start using the Lead Management System",
   );
 }
 

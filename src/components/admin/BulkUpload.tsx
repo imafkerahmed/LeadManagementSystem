@@ -16,6 +16,13 @@ interface BulkUploadProps {
   operatorLabel: string;
 }
 
+type UploadResult = {
+  success: boolean;
+  message: string;
+  uploaded?: number;
+  failed?: number;
+};
+
 export default function BulkUpload({
   operatorId,
   operatorLabel,
@@ -26,7 +33,7 @@ export default function BulkUpload({
   >("roundRobin");
   const [singleCounselor, setSingleCounselor] = useState("");
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState<any>(null);
+  const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
 
   const handleFileUpload = async (file: File) => {
     try {
@@ -51,7 +58,7 @@ export default function BulkUpload({
       }
 
       setLeads(uploadedLeads);
-    } catch (error) {
+    } catch {
       alert("Error reading file");
     }
   };
@@ -84,7 +91,7 @@ export default function BulkUpload({
 
       const result = await response.json();
       setUploadResult(result);
-    } catch (error) {
+    } catch {
       setUploadResult({ success: false, message: "Upload failed" });
     } finally {
       setIsUploading(false);

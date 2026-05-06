@@ -1,7 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Search } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import {
+  Search,
+  Plus,
+  X,
+  Trash2,
+  MessageSquare,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import { createPocketBaseClient } from "@/lib/pocketbase";
 
 interface Lead {
   id: string;
@@ -13,8 +22,66 @@ interface Lead {
   leadSource: string;
   status: string;
   assignedTo: string;
+  assignedToId: string;
   comments: string;
 }
+
+interface TimelineEntry {
+  id: string;
+  eventType: string;
+  changedBy: string;
+  comment?: string;
+  oldValue?: string;
+  newValue?: string;
+  created: string;
+}
+
+type LeadRecord = {
+  id: string;
+  leadId?: string;
+  studentName?: string;
+  mobileNo?: string;
+  email?: string;
+  courseName?: string;
+  leadSource?: string;
+  leadStatus?: string;
+  assignedTo?: string;
+  latestComment?: string;
+  expand?: {
+    assignedTo?: {
+      id?: string;
+      name?: string;
+      email?: string;
+    };
+  };
+};
+
+type HistoryRecord = {
+  id: string;
+  eventType?: string;
+  changedBy?: string;
+  comment?: string;
+  oldValue?: string;
+  newValue?: string;
+  created?: string;
+  expand?: {
+    changedBy?: {
+      name?: string;
+      email?: string;
+    };
+  };
+};
+
+type CreateLeadPayload = {
+  studentName: string;
+  mobile: string;
+  email?: string;
+  course: string;
+  leadSource?: string;
+  assignee?: string;
+};
+
+const PAGE_SIZE = 10;
 
 export default function AdminLeads() {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -24,115 +91,441 @@ export default function AdminLeads() {
   const [statusFilter, setStatusFilter] = useState("");
   const [counselorFilter, setCounselorFilter] = useState("");
   const [counselors, setCounselors] = useState<string[]>([]);
+
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarMode, setSidebarMode] = useState<"view" | "new">("view");
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [draftStatus, setDraftStatus] = useState("");
+  const [draftAssignedToId, setDraftAssignedToId] = useState("");
+  const [draftComment, setDraftComment] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const [draftMobile, setDraftMobile] = useState("");
+  const [draftEmail, setDraftEmail] = useState("");
+  const [draftCourse, setDraftCourse] = useState("");
+  const [draftLeadSource, setDraftLeadSource] = useState("");
+  const [usersLookup, setUsersLookup] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [timelineOpen, setTimelineOpen] = useState(false);
+
+  const mapLead = (record: LeadRecord): Lead => ({
+    id: record.id,
+    leadId: record.leadId || "",
+    studentName: record.studentName || "",
+    mobile: record.mobileNo || "",
+    email: record.email || "",
+    course: record.courseName || "",
+    leadSource: record.leadSource || "",
+    status: record.leadStatus || "",
+    assignedTo:
+      record.expand?.assignedTo?.name ||
+      record.expand?.assignedTo?.email ||
+      record.assignedTo ||
+      "",
+    assignedToId: record.expand?.assignedTo?.id || record.assignedTo || "",
+    comments: record.latestComment || "",
+  });
+
+  const syncDraftFromLead = (lead: Lead | null) => {
+    if (!lead) {
+      setDraftStatus("");
+      setDraftAssignedToId("");
+      setDraftComment("");
+      setDraftName("");
+      setDraftMobile("");
+      setDraftEmail("");
+      setDraftCourse("");
+      setDraftLeadSource("");
+      return;
+    }
+
+    setDraftStatus(lead.status);
+    setDraftAssignedToId(lead.assignedToId);
+    setDraftComment(lead.comments);
+    setDraftName(lead.studentName);
+    setDraftMobile(lead.mobile);
+    setDraftEmail(lead.email);
+    setDraftCourse(lead.course);
+    setDraftLeadSource(lead.leadSource);
+  };
 
   useEffect(() => {
-    fetchLeads();
-  }, [statusFilter, counselorFilter, searchTerm]);
+    const loadUsers = async () => {
+      try {
+        const res = await fetch("/api/users/lookup");
+        if (!res.ok) return;
+        const data = await res.json();
+        setUsersLookup(data || []);
+      } catch (e) {
+        console.error("Failed to load users lookup", e);
+      }
+    };
 
-  const fetchLeads = async () => {
-    try {
+    loadUsers();
+  }, []);
+
+  const fetchLeads = useCallback(
+    async (pageToLoad = 1) => {
       setIsLoading(true);
-      const params = new URLSearchParams();
-      if (statusFilter) params.append("status", statusFilter);
-      if (counselorFilter) params.append("counselor", counselorFilter);
-      if (searchTerm) params.append("search", searchTerm);
+      try {
+        const pb = createPocketBaseClient();
+        const list = await pb
+          .collection("leads")
+          .getList(pageToLoad, PAGE_SIZE, {
+            sort: "-created",
+            expand: "assignedTo",
+          });
 
-      const response = await fetch(`/api/admin/leads?${params.toString()}`);
-      const data = await response.json();
-      setLeads(data.items || []);
-      setFilteredLeads(data.items || []);
+        const rawItems = (list.items || []) as LeadRecord[];
+        const items: Lead[] = rawItems.map((record) => mapLead(record));
 
-      // Extract unique counselors
-      const uniqueCounselors = [
-        ...new Set((data.items || []).map((l: Lead) => l.assignedTo)),
-      ];
-      setCounselors(uniqueCounselors);
-    } catch (error) {
-      console.error("Error fetching leads:", error);
-    } finally {
-      setIsLoading(false);
+        let next = items;
+        if (statusFilter) next = next.filter((l) => l.status === statusFilter);
+        if (counselorFilter)
+          next = next.filter((l) => l.assignedTo === counselorFilter);
+        if (searchTerm) {
+          const q = searchTerm.toLowerCase();
+          next = next.filter(
+            (l) =>
+              l.studentName.toLowerCase().includes(q) ||
+              (l.mobile || "").toLowerCase().includes(q) ||
+              (l.email || "").toLowerCase().includes(q),
+          );
+        }
+
+        setLeads(items);
+        setFilteredLeads(next);
+        setTotalPages(
+          Math.max(1, Math.ceil((list.totalItems || 0) / PAGE_SIZE)),
+        );
+        setPage(pageToLoad);
+
+        const uniqueCounselors = [
+          ...new Set(items.map((l) => l.assignedTo)),
+        ].filter(Boolean);
+        setCounselors(uniqueCounselors);
+      } catch (error) {
+        if (error instanceof Error && error.message.includes("aborted")) {
+          // Request was cancelled, don't show error
+          console.debug("Request cancelled");
+        } else {
+          console.error("Error fetching leads:", error);
+          setLeads([]);
+          setFilteredLeads([]);
+          setTotalPages(1);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [statusFilter, counselorFilter, searchTerm],
+  );
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchLeads(page);
+  }, [page, fetchLeads]);
+
+  const openSidebarFor = async (
+    lead: Lead | null,
+    mode: "view" | "new" = "view",
+  ) => {
+    setSidebarMode(mode);
+    setSelectedLead(lead);
+    syncDraftFromLead(lead);
+    setIsEditing(false);
+    setTimelineOpen(false);
+    setSidebarOpen(true);
+
+    if (lead && mode === "view") {
+      try {
+        const pb = createPocketBaseClient();
+        const latestLead = await pb.collection("leads").getOne(lead.id, {
+          expand: "assignedTo",
+        });
+        const hydratedLead = mapLead(latestLead);
+        setSelectedLead(hydratedLead);
+        syncDraftFromLead(hydratedLead);
+
+        const history = await pb.collection("leadHistory").getFullList({
+          filter: `leadId = "${lead.id}"`,
+          sort: "-created",
+          expand: "changedBy,studentName,leadId",
+        });
+        setTimeline(
+          (history as HistoryRecord[]).map((h) => ({
+            id: h.id,
+            eventType: h.eventType || "",
+            changedBy:
+              h.expand?.changedBy?.name ||
+              h.expand?.changedBy?.email ||
+              h.changedBy ||
+              "Unknown",
+            comment: h.comment,
+            oldValue: h.oldValue,
+            newValue: h.newValue,
+            created: h.created || "",
+          })),
+        );
+      } catch (e) {
+        console.error("Failed to load timeline", e);
+        setTimeline([]);
+      }
+    } else {
+      setTimeline([]);
     }
   };
 
-  const statuses = ["New", "Contacted", "Follow-up", "Registered", "Lost"];
+  const closeSidebar = () => {
+    setSidebarOpen(false);
+    setSelectedLead(null);
+    setTimeline([]);
+  };
+
+  const handleDelete = async (leadId: string) => {
+    if (!confirm("Delete this lead? This cannot be undone.")) return;
+    try {
+      const pb = createPocketBaseClient();
+      await pb.collection("leads").delete(leadId);
+      await fetchLeads(page);
+      closeSidebar();
+    } catch (e) {
+      console.error("Delete failed", e);
+      alert("Failed to delete lead");
+    }
+  };
+
+  const handleLeadUpdate = async () => {
+    if (!selectedLead) {
+      return;
+    }
+
+    const nextStatus = draftStatus;
+    const nextAssignedToId = draftAssignedToId;
+    const nextComment = draftComment.trim();
+    const nextName = draftName.trim();
+    const nextMobile = draftMobile.trim();
+    const nextEmail = draftEmail.trim();
+    const nextCourse = draftCourse.trim();
+    const nextLeadSource = draftLeadSource.trim();
+
+    const statusChanged = nextStatus !== selectedLead.status;
+    const assigneeChanged = nextAssignedToId !== selectedLead.assignedToId;
+    const commentChanged = nextComment !== selectedLead.comments.trim();
+    const nameChanged = nextName !== selectedLead.studentName;
+    const mobileChanged = nextMobile !== selectedLead.mobile;
+    const emailChanged = nextEmail !== selectedLead.email;
+    const courseChanged = nextCourse !== selectedLead.course;
+    const leadSourceChanged = nextLeadSource !== selectedLead.leadSource;
+
+    if (
+      !statusChanged &&
+      !assigneeChanged &&
+      !commentChanged &&
+      !nameChanged &&
+      !mobileChanged &&
+      !emailChanged &&
+      !courseChanged &&
+      !leadSourceChanged
+    ) {
+      alert("No changes to update");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const pb = createPocketBaseClient();
+      const payload: Record<string, unknown> = {
+        lastModified: new Date().toISOString(),
+      };
+
+      if (statusChanged) payload.leadStatus = nextStatus;
+      if (assigneeChanged) payload.assignedTo = nextAssignedToId;
+      if (commentChanged) payload.latestComment = nextComment;
+      if (nameChanged) payload.studentName = nextName;
+      if (mobileChanged) payload.mobileNo = nextMobile;
+      if (emailChanged) payload.email = nextEmail;
+      if (courseChanged) payload.courseName = nextCourse;
+      if (leadSourceChanged) payload.leadSource = nextLeadSource;
+
+      await pb.collection("leads").update(selectedLead.id, payload);
+
+      if (statusChanged) {
+        await pb.collection("leadHistory").create({
+          timeStamp: new Date().toISOString(),
+          leadId: selectedLead.id,
+          eventType: "Status Updated",
+          changedBy: pb.authStore.model?.id || "",
+          oldValue: selectedLead.status,
+          newValue: nextStatus,
+          comment: nextComment,
+        });
+      }
+
+      if (assigneeChanged) {
+        await pb.collection("leadHistory").create({
+          timeStamp: new Date().toISOString(),
+          leadId: selectedLead.id,
+          eventType: "Assignee Changed",
+          changedBy: pb.authStore.model?.id || "",
+          oldValue: selectedLead.assignedTo,
+          newValue:
+            usersLookup.find((user) => user.id === nextAssignedToId)?.name ||
+            nextAssignedToId ||
+            "Unassigned",
+        });
+      }
+
+      if (commentChanged && !statusChanged) {
+        await pb.collection("leadHistory").create({
+          timeStamp: new Date().toISOString(),
+          leadId: selectedLead.id,
+          eventType: "Comment Updated",
+          changedBy: pb.authStore.model?.id || "",
+          oldValue: selectedLead.comments,
+          newValue: nextComment,
+          comment: nextComment,
+        });
+      }
+
+      if (
+        nameChanged ||
+        mobileChanged ||
+        emailChanged ||
+        courseChanged ||
+        leadSourceChanged
+      ) {
+        await pb.collection("leadHistory").create({
+          timeStamp: new Date().toISOString(),
+          leadId: selectedLead.id,
+          eventType: "Lead Details Updated",
+          changedBy: pb.authStore.model?.id || "",
+          comment:
+            `Updated: ${nameChanged ? "Name, " : ""}${mobileChanged ? "Mobile, " : ""}${emailChanged ? "Email, " : ""}${courseChanged ? "Course, " : ""}${leadSourceChanged ? "Lead Source" : ""}`.replace(
+              /, $/,
+              "",
+            ),
+        });
+      }
+
+      await fetchLeads(page);
+      const updated = await pb.collection("leads").getOne(selectedLead.id, {
+        expand: "assignedTo",
+      });
+      const updatedLead = mapLead(updated);
+      setSelectedLead(updatedLead);
+      syncDraftFromLead(updatedLead);
+      setIsEditing(false);
+      await openSidebarFor(updatedLead, "view");
+    } catch (e) {
+      console.error("Lead update failed", e);
+      alert("Failed to update lead");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCreateLead = async (payload: CreateLeadPayload) => {
+    setIsSaving(true);
+    try {
+      const pb = createPocketBaseClient();
+      const now = new Date().toISOString();
+      const createPayload: Record<string, unknown> = {
+        studentName: payload.studentName,
+        mobileNo: payload.mobile,
+        courseName: payload.course,
+        leadSource: payload.leadSource || "Manual",
+        leadStatus: "New",
+        assignedTo: payload.assignee || "",
+        latestComment: "Created manually",
+        addedDate: now,
+        lastModified: now,
+      };
+      if (payload.email) createPayload.email = payload.email;
+      const created = await pb.collection("leads").create(createPayload);
+      await pb.collection("leadHistory").create({
+        timeStamp: now,
+        leadId: created.id,
+        eventType: "Lead Created",
+        changedBy: pb.authStore.model?.id || "",
+        newValue: "New",
+        comment: "Created manually",
+      });
+      await fetchLeads(1);
+      setPage(1);
+      setSidebarOpen(false);
+    } catch (e) {
+      console.error("Create failed", e);
+      alert("Failed to create lead");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const statuses = ["New", "Contacted", "Follow-Up", "Registered", "Lost"];
   const statusColors: Record<string, string> = {
     New: "bg-blue-100 text-blue-800",
     Contacted: "bg-yellow-100 text-yellow-800",
-    "Follow-up": "bg-orange-100 text-orange-800",
+    "Follow-Up": "bg-orange-100 text-orange-800",
     Registered: "bg-green-100 text-green-800",
     Lost: "bg-red-100 text-red-800",
   };
 
   return (
     <div className="space-y-6">
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Search
-            </label>
-            <div className="relative">
-              <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Name, mobile, email..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+      {/* Top Bar with Search & New Button */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 flex-1">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Name, mobile, email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
           </div>
+          <button
+            onClick={() => openSidebarFor(null, "new")}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            <Plus className="w-4 h-4" />
+            New Lead
+          </button>
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Status
-            </label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Statuses</option>
-              {statuses.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="flex gap-2">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          >
+            <option value="">All Statuses</option>
+            {statuses.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Counselor
-            </label>
-            <select
-              value={counselorFilter}
-              onChange={(e) => setCounselorFilter(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Counselors</option>
-              {counselors.map((counselor) => (
-                <option key={counselor} value={counselor}>
-                  {counselor}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-end">
-            <button
-              onClick={() => {
-                setSearchTerm("");
-                setStatusFilter("");
-                setCounselorFilter("");
-              }}
-              className="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition"
-            >
-              Clear Filters
-            </button>
-          </div>
+          <select
+            value={counselorFilter}
+            onChange={(e) => setCounselorFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          >
+            <option value="">All Counselors</option>
+            {counselors.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -199,7 +592,7 @@ export default function AdminLeads() {
                   </td>
                   <td className="px-6 py-3 text-sm">
                     <button
-                      onClick={() => setSelectedLead(lead)}
+                      onClick={() => openSidebarFor(lead, "view")}
                       className="text-blue-600 hover:text-blue-800 font-medium"
                     >
                       View
@@ -212,73 +605,423 @@ export default function AdminLeads() {
         )}
       </div>
 
-      {/* Lead Detail Modal */}
-      {selectedLead && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-gray-900">
-                {selectedLead.studentName}
+      {/* Pagination */}
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-gray-600">
+          Page {page} of {totalPages} ({leads.length} leads)
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="inline-flex items-center gap-1 px-3 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Prev
+          </button>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="inline-flex items-center gap-1 px-3 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+          >
+            Next
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Sidebar Drawer */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-50 flex">
+          <div className="flex-1 bg-black/30" onClick={closeSidebar} />
+          <div className="w-full max-w-md bg-white border-l border-gray-200 shadow-2xl overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">
+                {sidebarMode === "new" ? "New Lead" : selectedLead?.studentName}
               </h2>
               <button
-                onClick={() => setSelectedLead(null)}
-                className="text-gray-500 hover:text-gray-700 text-2xl"
+                onClick={closeSidebar}
+                className="p-1 rounded hover:bg-gray-100"
               >
-                ×
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div>
-                <p className="text-sm text-gray-600">Lead ID</p>
-                <p className="font-mono text-lg font-medium">
-                  {selectedLead.leadId}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Status</p>
-                <span
-                  className={`inline-block px-2 py-1 rounded text-sm font-medium ${statusColors[selectedLead.status]}`}
-                >
-                  {selectedLead.status}
-                </span>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Mobile</p>
-                <p className="font-medium">{selectedLead.mobile}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Email</p>
-                <p className="font-medium">{selectedLead.email}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Course</p>
-                <p className="font-medium">{selectedLead.course}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Assigned To</p>
-                <p className="font-medium">{selectedLead.assignedTo}</p>
-              </div>
-            </div>
+            <div className="p-6 space-y-4">
+              {sidebarMode === "new" ? (
+                <NewLeadForm
+                  users={usersLookup}
+                  onCreate={handleCreateLead}
+                  saving={isSaving}
+                  onCancel={closeSidebar}
+                />
+              ) : selectedLead ? (
+                <>
+                  {/* Details Section */}
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-600 uppercase">
+                        Lead ID
+                      </p>
+                      <p className="font-mono text-sm font-medium">
+                        {selectedLead.leadId}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-600 uppercase">
+                        Name
+                      </p>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={draftName}
+                          onChange={(e) => setDraftName(e.target.value)}
+                          disabled={isSaving}
+                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                        />
+                      ) : (
+                        <p className="text-sm font-medium">
+                          {selectedLead.studentName}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-600 uppercase">
+                        Mobile
+                      </p>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={draftMobile}
+                          onChange={(e) => setDraftMobile(e.target.value)}
+                          disabled={isSaving}
+                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                        />
+                      ) : (
+                        <p className="text-sm">{selectedLead.mobile}</p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-600 uppercase">
+                        Email
+                      </p>
+                      {isEditing ? (
+                        <input
+                          type="email"
+                          value={draftEmail}
+                          onChange={(e) => setDraftEmail(e.target.value)}
+                          disabled={isSaving}
+                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                        />
+                      ) : (
+                        <p className="text-sm">{selectedLead.email || "—"}</p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-600 uppercase">
+                        Course
+                      </p>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={draftCourse}
+                          onChange={(e) => setDraftCourse(e.target.value)}
+                          disabled={isSaving}
+                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                        />
+                      ) : (
+                        <p className="text-sm">{selectedLead.course}</p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-600 uppercase">
+                        Lead Source
+                      </p>
+                      {isEditing ? (
+                        <select
+                          value={draftLeadSource}
+                          onChange={(e) => setDraftLeadSource(e.target.value)}
+                          disabled={isSaving}
+                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                        >
+                          <option value="">Select Lead Source</option>
+                          <option value="Direct">Direct</option>
+                          <option value="Referral">Referral</option>
+                          <option value="Website">Website</option>
+                          <option value="Social Media">Social Media</option>
+                          <option value="Email">Email</option>
+                          <option value="Phone">Phone</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      ) : (
+                        <p className="text-sm">
+                          {selectedLead.leadSource || "—"}
+                        </p>
+                      )}
+                    </div>
 
-            <div>
-              <p className="text-sm text-gray-600 mb-2">Comments</p>
-              <p className="text-gray-800 bg-gray-50 p-3 rounded">
-                {selectedLead.comments || "No comments"}
-              </p>
-            </div>
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        onClick={() => {
+                          setIsEditing((current) => !current);
+                          syncDraftFromLead(selectedLead);
+                        }}
+                        className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm"
+                      >
+                        {isEditing ? "Cancel Edit" : "Edit"}
+                      </button>
+                      <button
+                        onClick={() => handleDelete(selectedLead.id)}
+                        className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 text-sm"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete
+                      </button>
+                    </div>
+                  </div>
 
-            <div className="mt-6 flex gap-3">
-              <button
-                onClick={() => setSelectedLead(null)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
-              >
-                Close
-              </button>
+                  <div className="border-t pt-4">
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-xs font-semibold text-gray-600 uppercase mb-2">
+                          Status
+                        </p>
+                        <select
+                          value={draftStatus}
+                          onChange={(e) => setDraftStatus(e.target.value)}
+                          disabled={!isEditing || isSaving}
+                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm disabled:bg-gray-50"
+                        >
+                          {statuses.map((s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-semibold text-gray-600 uppercase mb-2">
+                          Assigned To
+                        </p>
+                        <select
+                          value={draftAssignedToId}
+                          onChange={(e) => setDraftAssignedToId(e.target.value)}
+                          disabled={!isEditing || isSaving}
+                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm disabled:bg-gray-50"
+                        >
+                          <option value="">Unassigned</option>
+                          {usersLookup.map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-semibold text-gray-600 uppercase mb-2">
+                          Latest Comment
+                        </p>
+                        <textarea
+                          value={draftComment}
+                          onChange={(e) => setDraftComment(e.target.value)}
+                          disabled={!isEditing || isSaving}
+                          className="w-full min-h-24 px-3 py-2 border border-gray-300 rounded text-sm disabled:bg-gray-50"
+                          placeholder="Add a note"
+                        />
+                      </div>
+
+                      {isEditing && (
+                        <button
+                          onClick={handleLeadUpdate}
+                          disabled={isSaving}
+                          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm disabled:opacity-50"
+                        >
+                          {isSaving ? "Updating..." : "Update"}
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() =>
+                          window.open(
+                            `https://wa.me/${(selectedLead.mobile || "").replace(/\D/g, "")}?text=${encodeURIComponent("Hi " + selectedLead.studentName)}`,
+                            "_blank",
+                          )
+                        }
+                        className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                        WhatsApp
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+                      <button
+                        onClick={() => setTimelineOpen((current) => !current)}
+                        className="flex w-full items-center justify-between border-b border-slate-200 px-4 py-3 text-left"
+                      >
+                        <h3 className="text-sm font-semibold text-slate-900">
+                          Timeline
+                        </h3>
+                        <span className="text-xs font-medium text-slate-500">
+                          {timelineOpen ? "Hide" : "Show"}
+                        </span>
+                      </button>
+                      {timelineOpen && (
+                        <div className="space-y-4 px-4 py-4 max-h-96 overflow-y-auto">
+                          {timeline.length === 0 ? (
+                            <p className="text-sm text-slate-500">
+                              No events yet
+                            </p>
+                          ) : (
+                            timeline.map((t) => (
+                              <div key={t.id} className="relative pl-5">
+                                <span className="absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full bg-slate-900" />
+                                <div className="flex flex-col gap-1 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                                    <span className="font-medium text-slate-700">
+                                      {t.eventType}
+                                    </span>
+                                    <span>
+                                      {new Date(t.created).toLocaleString()}
+                                    </span>
+                                    <span>By {t.changedBy}</span>
+                                  </div>
+                                  {t.newValue && (
+                                    <p className="text-sm text-slate-700">
+                                      Changed to {t.newValue}
+                                    </p>
+                                  )}
+                                  {t.comment && (
+                                    <p className="text-sm text-slate-700">
+                                      {t.comment}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : null}
             </div>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function NewLeadForm({
+  users,
+  onCreate,
+  saving,
+  onCancel,
+}: {
+  users: Array<{ id: string; name: string }>;
+  onCreate: (payload: CreateLeadPayload) => Promise<void>;
+  saving: boolean;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [mobile, setMobile] = useState("");
+  const [email, setEmail] = useState("");
+  const [course, setCourse] = useState("");
+  const [assignee, setAssignee] = useState("");
+
+  const submit = () => {
+    if (!name || !mobile || !course) {
+      alert("Please fill required fields: Name, Mobile, Course");
+      return;
+    }
+    onCreate({ studentName: name, mobile, email, course, assignee });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="text-xs font-semibold text-gray-600 uppercase">
+          Name *
+        </label>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Student name"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+        />
+      </div>
+      <div>
+        <label className="text-xs font-semibold text-gray-600 uppercase">
+          Mobile *
+        </label>
+        <input
+          value={mobile}
+          onChange={(e) => setMobile(e.target.value)}
+          placeholder="Phone number"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+        />
+      </div>
+      <div>
+        <label className="text-xs font-semibold text-gray-600 uppercase">
+          Email
+        </label>
+        <input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email address"
+          type="email"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+        />
+      </div>
+      <div>
+        <label className="text-xs font-semibold text-gray-600 uppercase">
+          Course *
+        </label>
+        <input
+          value={course}
+          onChange={(e) => setCourse(e.target.value)}
+          placeholder="Course name"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+        />
+      </div>
+      <div>
+        <label className="text-xs font-semibold text-gray-600 uppercase">
+          Assign To
+        </label>
+        <select
+          value={assignee}
+          onChange={(e) => setAssignee(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+        >
+          <option value="">Unassigned</option>
+          {users.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="flex gap-2 pt-4">
+        <button
+          onClick={submit}
+          disabled={saving}
+          className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+        >
+          {saving ? "Creating..." : "Create Lead"}
+        </button>
+        <button
+          onClick={onCancel}
+          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium"
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }

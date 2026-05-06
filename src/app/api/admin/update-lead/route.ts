@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     const now = new Date();
     const trimmedComment = adminComment?.trim();
 
-    const updates: any = {
+    const updates: Record<string, unknown> = {
       lastModified: now,
     };
 

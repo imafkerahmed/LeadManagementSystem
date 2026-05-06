@@ -1,14 +1,30 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createPocketBaseClient } from "@/lib/pocketbase";
 
-export async function GET(request: NextRequest) {
+type LeadRecord = {
+  status?: string;
+  assignedTo?: string;
+};
+
+type HistoryRecord = {
+  eventType?: string;
+  leadId?: string;
+  studentName?: string;
+  changedBy?: string;
+  oldValue?: string;
+  newValue?: string;
+  comment?: string;
+  created?: string;
+};
+
+export async function GET() {
   try {
     const pb = createPocketBaseClient();
 
     // Get all leads
-    const allLeads = await pb.collection("leads").getFullList({
+    const allLeads = (await pb.collection("leads").getFullList({
       sort: "-created",
-    });
+    })) as LeadRecord[];
 
     // Calculate stats
     const stats = {
@@ -24,7 +40,7 @@ export async function GET(request: NextRequest) {
         newCount: number;
         contactedCount: number;
       }>,
-      recentActivity: [] as any[],
+      recentActivity: [] as HistoryRecord[],
     };
 
     // Count by status
@@ -33,7 +49,7 @@ export async function GET(request: NextRequest) {
       { total: number; new: number; contacted: number }
     >();
 
-    allLeads.forEach((lead: any) => {
+    allLeads.forEach((lead) => {
       switch (lead.status) {
         case "New":
           stats.newLeads++;
@@ -53,11 +69,12 @@ export async function GET(request: NextRequest) {
       }
 
       // Count by counselor
-      if (!counselorMap.has(lead.assignedTo)) {
-        counselorMap.set(lead.assignedTo, { total: 0, new: 0, contacted: 0 });
+      const counselorKey = lead.assignedTo || "Unassigned";
+      if (!counselorMap.has(counselorKey)) {
+        counselorMap.set(counselorKey, { total: 0, new: 0, contacted: 0 });
       }
 
-      const counselorData = counselorMap.get(lead.assignedTo)!;
+      const counselorData = counselorMap.get(counselorKey)!;
       counselorData.total++;
 
       if (lead.status === "New") counselorData.new++;
@@ -75,12 +92,12 @@ export async function GET(request: NextRequest) {
     });
 
     // Get recent activity
-    const recentHistory = await pb.collection("leadHistory").getFullList({
+    const recentHistory = (await pb.collection("leadHistory").getFullList({
       sort: "-created",
       limit: 10,
-    });
+    })) as HistoryRecord[];
 
-    stats.recentActivity = recentHistory.map((h: any) => ({
+    stats.recentActivity = recentHistory.map((h) => ({
       eventType: h.eventType,
       leadId: h.leadId,
       studentName: h.studentName,

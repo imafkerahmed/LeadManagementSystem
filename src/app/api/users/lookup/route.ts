@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { getPocketBaseAdminClient } from "@/lib/pocketbase";
 
+type UserRecord = {
+  id: string;
+  name?: string;
+  email?: string;
+};
+
 export async function GET() {
   try {
     const pb = await getPocketBaseAdminClient();
@@ -9,7 +15,7 @@ export async function GET() {
     });
 
     return NextResponse.json(
-      users.map((user: any) => ({
+      users.map((user: UserRecord) => ({
         id: user.id,
         name: user.name,
         email: user.email,

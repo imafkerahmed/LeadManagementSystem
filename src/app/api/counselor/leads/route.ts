@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createPocketBaseClient } from "@/lib/pocketbase";
 
+type LeadRecord = {
+  leadId?: string;
+  studentName?: string;
+  mobileNo?: string;
+  email?: string;
+  courseName?: string;
+  leadStatus?: string;
+  latestComment?: string;
+};
+
 export async function GET(request: NextRequest) {
   try {
     const pb = createPocketBaseClient();
@@ -18,12 +28,12 @@ export async function GET(request: NextRequest) {
 
     const assignedValue = counselorId || counselorName;
 
-    const leads = await pb.collection("leads").getFullList({
-      filter: `assignedTo = "${assignedValue}" && (leadStatus = "New" || leadStatus = "Contacted" || leadStatus = "Follow-up")`,
+    const leads = (await pb.collection("leads").getFullList({
+      filter: `assignedTo = "${assignedValue}" && (leadStatus = "New" || leadStatus = "Contacted" || leadStatus = "Follow-Up")`,
       sort: "-created",
-    });
+    })) as LeadRecord[];
 
-    const formattedLeads = leads.map((lead: any) => ({
+    const formattedLeads = leads.map((lead) => ({
       leadId: lead.leadId,
       name: lead.studentName,
       mobile: lead.mobileNo,

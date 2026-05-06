@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createPocketBaseClient } from "@/lib/pocketbase";
 
+type LeadRecord = {
+  id: string;
+  leadId?: string;
+  studentName?: string;
+  mobile?: string;
+  email?: string;
+  course?: string;
+  leadSource?: string;
+  status?: string;
+  assignedTo?: string;
+  comments?: string;
+  created?: string;
+  updated?: string;
+};
+
 export async function GET(request: NextRequest) {
   try {
     const pb = createPocketBaseClient();
@@ -40,7 +55,7 @@ export async function GET(request: NextRequest) {
         sort: "-created",
       });
 
-    const formattedLeads = leads.items.map((lead: any) => ({
+    const formattedLeads = leads.items.map((lead: LeadRecord) => ({
       id: lead.id,
       leadId: lead.leadId,
       studentName: lead.studentName,

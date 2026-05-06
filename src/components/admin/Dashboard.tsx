@@ -1,7 +1,41 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { TrendingUp } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { createPocketBaseClient } from "@/lib/pocketbase";
+
+type LeadRecord = {
+  leadStatus?: string;
+  assignedTo?:
+    | string
+    | {
+        name?: string;
+      };
+};
+
+type HistoryRecord = {
+  eventType?: string;
+  changedBy?: string;
+  created?: string;
+  expand?: {
+    studentName?: {
+      studentName?: string;
+    };
+    leadId?: {
+      studentName?: string;
+    };
+    changedBy?: {
+      name?: string;
+      email?: string;
+    };
+  };
+};
+
+type RecentActivityItem = {
+  studentName: string;
+  eventType: string;
+  changedBy: string;
+  created: string;
+};
 
 interface DashboardStats {
   totalLeads: number;
@@ -16,25 +50,104 @@ interface DashboardStats {
     newCount: number;
     contactedCount: number;
   }>;
-  recentActivity: any[];
+  recentActivity: RecentActivityItem[];
 }
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       setIsLoading(true);
-      const response = await fetch("/api/admin/stats");
-      const data = await response.json();
+      const pb = createPocketBaseClient();
+      const leads = (await pb
+        .collection("leads")
+        .getFullList({ sort: "-created" })) as LeadRecord[];
 
-      // Handle error responses
-      if (data.error || !data.counselorStats) {
+      const totalLeads = leads.length;
+      const newLeads = leads.filter((lead) => lead.leadStatus === "New").length;
+      const contactedLeads = leads.filter(
+        (lead) => lead.leadStatus === "Contacted",
+      ).length;
+      const followUpLeads = leads.filter(
+        (lead) => lead.leadStatus === "Follow-Up",
+      ).length;
+      const registeredLeads = leads.filter(
+        (lead) => lead.leadStatus === "Registered",
+      ).length;
+      const lostLeads = leads.filter(
+        (lead) => lead.leadStatus === "Lost",
+      ).length;
+
+      const grouped: Record<
+        string,
+        {
+          name: string;
+          leadCount: number;
+          newCount: number;
+          contactedCount: number;
+        }
+      > = {};
+      leads.forEach((lead) => {
+        const name =
+          (lead.assignedTo &&
+            (typeof lead.assignedTo === "string"
+              ? lead.assignedTo
+              : lead.assignedTo.name)) ||
+          (typeof lead.assignedTo === "string" ? lead.assignedTo : undefined) ||
+          "Unassigned";
+        if (!grouped[name])
+          grouped[name] = {
+            name,
+            leadCount: 0,
+            newCount: 0,
+            contactedCount: 0,
+          };
+        grouped[name].leadCount += 1;
+        if (lead.leadStatus === "New") grouped[name].newCount += 1;
+        if (lead.leadStatus === "Contacted") grouped[name].contactedCount += 1;
+      });
+
+      const counselorStats = Object.values(grouped);
+
+      // recent activity from leadHistory collection
+      const history = (await pb.collection("leadHistory").getFullList({
+        sort: "-created",
+        expand: "changedBy,studentName,leadId",
+      })) as HistoryRecord[];
+      const recentActivity = history.slice(0, 20).map((h) => ({
+        studentName:
+          h.expand?.studentName?.studentName ||
+          h.expand?.leadId?.studentName ||
+          "Unknown",
+        eventType: h.eventType || "update",
+        changedBy:
+          h.expand?.changedBy?.name ||
+          h.expand?.changedBy?.email ||
+          h.changedBy ||
+          "Unknown",
+        created: h.created || "",
+      }));
+
+      const data: DashboardStats = {
+        totalLeads,
+        newLeads,
+        contactedLeads,
+        followUpLeads,
+        registeredLeads,
+        lostLeads,
+        counselorStats,
+        recentActivity,
+      };
+
+      setStats(data);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("aborted")) {
+        // Request was cancelled, don't show error
+        console.debug("Stats request cancelled");
+      } else {
+        console.error("Error fetching stats:", error);
         const defaultStats: DashboardStats = {
           totalLeads: 0,
           newLeads: 0,
@@ -46,26 +159,16 @@ export default function AdminDashboard() {
           recentActivity: [],
         };
         setStats(defaultStats);
-      } else {
-        setStats(data);
       }
-    } catch (error) {
-      console.error("Error fetching stats:", error);
-      const defaultStats: DashboardStats = {
-        totalLeads: 0,
-        newLeads: 0,
-        contactedLeads: 0,
-        followUpLeads: 0,
-        registeredLeads: 0,
-        lostLeads: 0,
-        counselorStats: [],
-        recentActivity: [],
-      };
-      setStats(defaultStats);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchStats();
+  }, [fetchStats]);
 
   if (isLoading) {
     return <div className="text-center py-12">Loading dashboard...</div>;
@@ -83,7 +186,7 @@ export default function AdminDashboard() {
     { label: "Total Leads", value: stats.totalLeads, color: "blue" },
     { label: "New", value: stats.newLeads, color: "blue" },
     { label: "Contacted", value: stats.contactedLeads, color: "yellow" },
-    { label: "Follow-up", value: stats.followUpLeads, color: "orange" },
+    { label: "Follow-Up", value: stats.followUpLeads, color: "orange" },
     { label: "Registered", value: stats.registeredLeads, color: "green" },
     { label: "Lost", value: stats.lostLeads, color: "red" },
   ];

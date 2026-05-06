@@ -8,30 +8,15 @@ function generateLeadId(lastNum: number): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const {
-      studentName,
-      mobile,
-      email,
-      course,
-      leadSource,
-      counselorName,
-      counselorId,
-    } = body;
+    const { studentName, mobile, email, course, leadSource, counselorId } =
+      body;
 
-    if (
-      !studentName ||
-      !mobile ||
-      !course ||
-      (!counselorId && !counselorName)
-    ) {
+    if (!studentName || !mobile || !course || !counselorId) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 },
       );
     }
-
-    const assignedTo = counselorId || counselorName;
-    const actorId = counselorId || counselorName;
 
     const pb = await getPocketBaseAdminClient();
 
@@ -50,7 +35,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const now = new Date();
+    const now = new Date().toISOString();
     const leadPayload: Record<string, unknown> = {
       leadId: nextLeadId,
       studentName,
@@ -58,7 +43,7 @@ export async function POST(request: NextRequest) {
       courseName: course,
       leadSource,
       leadStatus: "New",
-      assignedTo,
+      assignedTo: counselorId,
       latestComment: "Lead created",
       addedDate: now,
       lastModified: now,
@@ -79,12 +64,15 @@ export async function POST(request: NextRequest) {
         leadId: newLead.id,
         studentName: newLead.id,
         eventType: "Lead Created",
-        changedBy: actorId,
+        changedBy: counselorId,
         newValue: "New",
         comment: `Source: ${leadSource}`,
       });
     } catch (historyError) {
-      console.warn("Lead history log skipped:", historyError);
+      console.error("Lead history creation error:", historyError);
+      throw new Error(
+        `Failed to log history: ${historyError instanceof Error ? historyError.message : String(historyError)}`,
+      );
     }
 
     return NextResponse.json({

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { CheckCircle2, AlertCircle, Loader } from "lucide-react";
 
 export default function SetupPage() {
@@ -133,12 +134,12 @@ export default function SetupPage() {
 
             {/* Navigation */}
             <div className="border-t pt-6 flex gap-3">
-              <a
+              <Link
                 href="/"
                 className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition font-medium text-center"
               >
                 Back to Home
-              </a>
+              </Link>
               <a
                 href="https://amazoncrm-db.codix.site/_/"
                 target="_blank"

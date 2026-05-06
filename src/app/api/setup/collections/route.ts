@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getPocketBaseAdminClient } from "@/lib/pocketbase";
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const pb = await getPocketBaseAdminClient();
 
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
             type: "select",
             required: true,
             options: {
-              values: ["New", "Contacted", "Follow-up", "Registered", "Lost"],
+              values: ["New", "Contacted", "Follow-Up", "Registered", "Lost"],
               maxSelect: 1,
             },
           },
