@@ -1,78 +1,18 @@
-import PocketBase from "pocketbase";
+import { NextRequest, NextResponse } from "next/server";
+import { getPocketBaseAdminClient } from "@/lib/pocketbase";
 
-const defaultPocketBaseUrl = "https://amazoncrm-db.codix.site";
-
-export const pocketBaseUrl = (
-  process.env.NEXT_PUBLIC_POCKETBASE_URL ?? defaultPocketBaseUrl
-).replace(/\/$/, "");
-
-const ADMIN_EMAIL = process.env.POCKETBASE_ADMIN_EMAIL || "";
-const ADMIN_PASSWORD = process.env.POCKETBASE_ADMIN_PASSWORD || "";
-
-let pbClientInstance: PocketBase | null = null;
-let pbAdminInstance: PocketBase | null = null;
-
-export function createPocketBaseClient() {
-  if (!pbClientInstance) {
-    pbClientInstance = new PocketBase(pocketBaseUrl);
-  }
-  return pbClientInstance;
-}
-
-export async function getPocketBaseAdminClient() {
-  if (!pbAdminInstance) {
-    pbAdminInstance = new PocketBase(pocketBaseUrl);
-  }
-
-  if (!pbAdminInstance.authStore.isValid) {
-    try {
-      await pbAdminInstance.admins.authWithPassword(
-        ADMIN_EMAIL,
-        ADMIN_PASSWORD,
-      );
-    } catch (error) {
-      console.error("Failed to authenticate as admin:", error);
-      throw error;
-    }
-  }
-
-  return pbAdminInstance;
-}
-
-export async function checkPocketBaseHealth() {
-  const healthUrl = new URL("/api/health", pocketBaseUrl).toString();
-
+export async function POST(request: NextRequest) {
   try {
-    const response = await fetch(healthUrl, {
-      cache: "no-store",
-    });
+    const pb = await getPocketBaseAdminClient();
 
-    const body = await response.text();
+    console.log("Setting up PocketBase collections...");
 
-    return {
-      ok: response.ok,
-      status: response.status,
-      healthUrl,
-      body,
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      status: null as number | null,
-      healthUrl,
-      body: error instanceof Error ? error.message : "Unknown PocketBase error",
-    };
-  }
-}
-
-export async function setupPocketBaseCollections(): Promise<void> {
-  const pb = await getPocketBaseAdminClient();
-
-  try {
-    // Create Users collection if not exists
+    // 1. Create Users collection
     try {
       await pb.collections.getOne("users");
+      console.log("Users collection already exists");
     } catch {
+      console.log("Creating users collection...");
       await pb.collections.create({
         name: "users",
         type: "base",
@@ -83,16 +23,22 @@ export async function setupPocketBaseCollections(): Promise<void> {
             name: "role",
             type: "select",
             required: true,
-            options: { values: ["admin", "counselor"] },
+            options: {
+              values: ["admin", "counselor"],
+              maxSelect: 1,
+            },
           },
         ],
       });
+      console.log("✅ Users collection created");
     }
 
-    // Create Leads collection
+    // 2. Create Leads collection
     try {
       await pb.collections.getOne("leads");
+      console.log("Leads collection already exists");
     } catch {
+      console.log("Creating leads collection...");
       await pb.collections.create({
         name: "leads",
         type: "base",
@@ -109,6 +55,7 @@ export async function setupPocketBaseCollections(): Promise<void> {
             required: true,
             options: {
               values: ["New", "Contacted", "Follow-up", "Registered", "Lost"],
+              maxSelect: 1,
             },
           },
           { name: "assignedTo", type: "text", required: true },
@@ -117,12 +64,15 @@ export async function setupPocketBaseCollections(): Promise<void> {
           { name: "lastModified", type: "date" },
         ],
       });
+      console.log("✅ Leads collection created");
     }
 
-    // Create LeadHistory collection
+    // 3. Create LeadHistory collection
     try {
       await pb.collections.getOne("leadHistory");
+      console.log("LeadHistory collection already exists");
     } catch {
+      console.log("Creating leadHistory collection...");
       await pb.collections.create({
         name: "leadHistory",
         type: "base",
@@ -167,11 +117,21 @@ export async function setupPocketBaseCollections(): Promise<void> {
           { name: "comment", type: "text" },
         ],
       });
+      console.log("✅ LeadHistory collection created");
     }
 
-    console.log("PocketBase collections setup completed!");
+    return NextResponse.json({
+      success: true,
+      message: "PocketBase collections setup completed successfully!",
+    });
   } catch (error) {
-    console.error("Error setting up PocketBase collections:", error);
-    throw error;
+    console.error("Error setting up collections:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    );
   }
 }

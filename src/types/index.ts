@@ -1,0 +1,112 @@
+// User roles
+export type UserRole = "admin" | "counselor";
+
+// User model
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  created: string;
+  updated: string;
+}
+
+// Lead status types
+export type LeadStatus =
+  | "New"
+  | "Contacted"
+  | "Follow-up"
+  | "Registered"
+  | "Lost";
+
+// Lead model
+export interface Lead {
+  id: string;
+  leadId: string; // e.g., AMZ/LEAD/0001
+  studentName: string;
+  mobile: string;
+  email?: string;
+  course: string;
+  leadSource: string;
+  status: LeadStatus;
+  assignedTo: string; // counselor name or ID
+  comments: string;
+  created: string;
+  updated: string;
+  lastModified: string;
+}
+
+// Comment entry in comment log
+export interface CommentEntry {
+  date: string;
+  author: string;
+  status: LeadStatus;
+  text: string;
+}
+
+// Lead history (audit trail)
+export interface LeadHistory {
+  id: string;
+  timeStamp?: string;
+  leadId: string;
+  studentName: string;
+  eventType: string; // "Status Change", "Comment", "Reassign", "Created"
+  changedBy: string;
+  oldValue?: string;
+  newValue?: string;
+  comment?: string;
+  created: string;
+}
+
+// Dashboard stats
+export interface DashboardStats {
+  totalLeads: number;
+  newLeads: number;
+  contactedLeads: number;
+  followUpLeads: number;
+  registeredLeads: number;
+  lostLeads: number;
+  counselorStats: Array<{
+    name: string;
+    leadCount: number;
+    newCount: number;
+    contactedCount: number;
+  }>;
+  recentActivity: LeadHistory[];
+}
+
+// Counselor data
+export interface Counselor {
+  id: string;
+  name: string;
+  email: string;
+  leadCount: number;
+}
+
+// Filter params
+export interface LeadFilterParams {
+  status?: LeadStatus;
+  assignedTo?: string;
+  courseFilter?: string;
+  searchTerm?: string;
+  page?: number;
+  limit?: number;
+}
+
+// Bulk upload lead
+export interface BulkUploadLead {
+  studentName: string;
+  mobile: string;
+  email?: string;
+  course: string;
+  leadSource: string;
+}
+
+// Bulk upload result
+export interface BulkUploadResult {
+  success: boolean;
+  uploaded: number;
+  failed: number;
+  message: string;
+  errors?: Array<{ row: number; message: string }>;
+}

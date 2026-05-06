@@ -1,93 +1,147 @@
-import { checkPocketBaseHealth, pocketBaseUrl } from "@/lib/pocketbase";
+"use client";
 
-export default async function Home() {
-  const pocketBase = await checkPocketBaseHealth();
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createPocketBaseClient } from "@/lib/pocketbase";
+
+type LoginFormState = {
+  email: string;
+  password: string;
+};
+
+export default function Home() {
+  const router = useRouter();
+  const [form, setForm] = useState<LoginFormState>({ email: "", password: "" });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const pb = createPocketBaseClient();
+    const authUser = pb.authStore.model as { role?: string } | null;
+
+    if (!pb.authStore.isValid || !authUser?.role) {
+      return;
+    }
+
+    if (authUser.role === "admin") {
+      router.replace("/admin");
+      return;
+    }
+
+    if (authUser.role === "student-counsellor") {
+      router.replace("/counselor");
+    }
+  }, [router]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const pb = createPocketBaseClient();
+      await pb
+        .collection("users")
+        .authWithPassword(form.email.trim(), form.password);
+
+      const authUser = pb.authStore.model as { role?: string } | null;
+
+      if (!authUser?.role) {
+        pb.authStore.clear();
+        setError(
+          "Unable to determine your role. Please contact an administrator.",
+        );
+        return;
+      }
+
+      if (authUser.role === "admin") {
+        router.replace("/admin");
+        return;
+      }
+
+      if (authUser.role === "student-counsellor") {
+        router.replace("/counselor");
+        return;
+      }
+
+      pb.authStore.clear();
+      setError("This account role is not allowed to access the system.");
+    } catch {
+      setError("Invalid email or password.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.18),_transparent_34%),linear-gradient(135deg,_#09121f_0%,_#0f1b2d_48%,_#111827_100%)] text-slate-100">
-      <section className="mx-auto flex min-h-screen w-full max-w-6xl items-center px-6 py-16 sm:px-10 lg:px-12">
-        <div className="grid w-full gap-8 lg:grid-cols-[1.35fr_0.9fr] lg:gap-10">
-          <div className="space-y-8">
-            <div className="inline-flex items-center rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-sm font-medium text-emerald-200">
-              PocketBase connected to the app layer
-            </div>
-
-            <div className="max-w-2xl space-y-5">
-              <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-6xl">
-                Lead management, now wired to your PocketBase backend.
-              </h1>
-              <p className="max-w-xl text-base leading-7 text-slate-300 sm:text-lg">
-                This Next.js app is configured to talk to your PocketBase
-                instance at{" "}
-                <span className="font-medium text-white">{pocketBaseUrl}</span>.
-                You can now start building auth, leads, notes, and activity
-                screens on top of the backend.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-3 text-sm">
-              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-sm">
-                <div className="text-slate-400">Backend URL</div>
-                <div className="mt-1 font-medium text-white">
-                  {pocketBaseUrl}
-                </div>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-sm">
-                <div className="text-slate-400">Health check</div>
-                <div className="mt-1 font-medium text-white">/api/health</div>
-              </div>
-            </div>
+    <main className="min-h-screen bg-white px-4 py-8 text-slate-900 sm:px-6 sm:py-10">
+      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md items-center justify-center">
+        <div className="w-full rounded-lg border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+          <div className="mb-6 space-y-2 text-center">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Amazon College Lead Management
+            </p>
+            <h1 className="text-2xl font-semibold tracking-tight">Login</h1>
+            <p className="text-sm text-slate-600">
+              Enter your PocketBase email and password.
+            </p>
           </div>
 
-          <aside className="rounded-[2rem] border border-white/10 bg-slate-950/55 p-6 shadow-2xl shadow-black/30 backdrop-blur-xl sm:p-8">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm uppercase tracking-[0.24em] text-slate-400">
-                  Connection status
-                </p>
-                <h2 className="mt-2 text-2xl font-semibold text-white">
-                  PocketBase endpoint
-                </h2>
-              </div>
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] ${
-                  pocketBase.ok
-                    ? "bg-emerald-400/15 text-emerald-300"
-                    : "bg-amber-400/15 text-amber-200"
-                }`}
-              >
-                {pocketBase.ok ? "Healthy" : "Check needed"}
-              </span>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">
+                Email
+              </label>
+              <input
+                type="email"
+                autoComplete="email"
+                value={form.email}
+                onChange={(e) =>
+                  setForm((current) => ({
+                    ...current,
+                    email: e.target.value,
+                  }))
+                }
+                placeholder="name@college.com"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              />
             </div>
 
-            <div className="mt-8 space-y-4">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-sm text-slate-400">Request URL</div>
-                <div className="mt-2 break-all font-mono text-sm text-slate-100">
-                  {pocketBase.healthUrl}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-sm text-slate-400">Response</div>
-                <div className="mt-2 text-sm leading-6 text-slate-200">
-                  {pocketBase.ok
-                    ? `PocketBase responded with HTTP ${pocketBase.status}.`
-                    : `PocketBase could not be reached. ${pocketBase.body}`}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4">
-                <div className="text-sm text-slate-400">Next step</div>
-                <div className="mt-2 text-sm leading-6 text-slate-200">
-                  Add collections for leads, contacts, activities, and notes,
-                  then read and write them through the PocketBase client.
-                </div>
-              </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">
+                Password
+              </label>
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={form.password}
+                onChange={(e) =>
+                  setForm((current) => ({
+                    ...current,
+                    password: e.target.value,
+                  }))
+                }
+                placeholder="Your password"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              />
             </div>
-          </aside>
+
+            {error && (
+              <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full rounded-md bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isLoading ? "Signing in..." : "Sign In"}
+            </button>
+          </form>
         </div>
-      </section>
+      </div>
     </main>
   );
 }
