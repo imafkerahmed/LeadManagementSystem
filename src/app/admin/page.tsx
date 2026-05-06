@@ -14,15 +14,8 @@ export default function AdminPage() {
   const [currentTab, setCurrentTab] = useState<
     "dashboard" | "leads" | "bulk" | "settings"
   >("dashboard");
-  const pb = createPocketBaseClient();
-  const authUser = pb.authStore.model as {
-    id?: string;
-    name?: string;
-    email?: string;
-    role?: string;
-  } | null;
-  const adminId = authUser?.id || "";
-  const adminLabel = authUser?.email || authUser?.name || "Admin";
+  const [adminId, setAdminId] = useState("");
+  const [adminLabel, setAdminLabel] = useState("Admin");
 
   useEffect(() => {
     const effectPb = createPocketBaseClient();
@@ -35,7 +28,13 @@ export default function AdminPage() {
 
     if (!effectPb.authStore.isValid || effectAuthUser?.role !== "admin") {
       router.replace("/");
+      return;
     }
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAdminId(effectAuthUser?.id || "");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAdminLabel(effectAuthUser?.email || effectAuthUser?.name || "Admin");
   }, [router]);
 
   const tabs = [
