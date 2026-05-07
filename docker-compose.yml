@@ -1,0 +1,12 @@
+services:
+  app:
+    image: afkerahmed/lead-management-app:latest
+    container_name: lead-management-app
+    ports:
+      - "${APP_PORT:-8082}:3000"
+    environment:
+      - NEXT_PUBLIC_POCKETBASE_URL=${NEXT_PUBLIC_POCKETBASE_URL}
+      - POCKETBASE_ADMIN_EMAIL=${POCKETBASE_ADMIN_EMAIL}
+      - POCKETBASE_ADMIN_PASSWORD=${POCKETBASE_ADMIN_PASSWORD}
+      - NODE_ENV=production
+    restart: unless-stopped
