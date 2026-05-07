@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut, BarChart3, Users, Upload, Settings } from "lucide-react";
 import AdminDashboard from "@/components/admin/Dashboard";
@@ -14,28 +14,40 @@ export default function AdminPage() {
   const [currentTab, setCurrentTab] = useState<
     "dashboard" | "leads" | "bulk" | "settings"
   >("dashboard");
-  const [adminId, setAdminId] = useState("");
-  const [adminLabel, setAdminLabel] = useState("Admin");
+
+  const adminAuthSnapshot = useSyncExternalStore(
+    () => () => {},
+    () => {
+      const pb = createPocketBaseClient();
+      const authUser = pb.authStore.model as {
+        id?: string;
+        name?: string;
+        email?: string;
+        role?: string;
+      } | null;
+
+      const isValid = pb.authStore.isValid && authUser?.role === "admin";
+      const adminId = isValid ? authUser?.id || "" : "";
+      const adminLabel = isValid
+        ? authUser?.email || authUser?.name || "Admin"
+        : "Admin";
+
+      return `${isValid ? "1" : "0"}|${adminId}|${adminLabel}`;
+    },
+    () => "0||Admin",
+  );
+
+  const [authFlag, adminId, adminLabel] = adminAuthSnapshot.split("|");
 
   useEffect(() => {
-    const effectPb = createPocketBaseClient();
-    const effectAuthUser = effectPb.authStore.model as {
-      id?: string;
-      name?: string;
-      email?: string;
-      role?: string;
-    } | null;
-
-    if (!effectPb.authStore.isValid || effectAuthUser?.role !== "admin") {
+    if (authFlag !== "1") {
       router.replace("/");
-      return;
     }
+  }, [authFlag, router]);
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setAdminId(effectAuthUser?.id || "");
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setAdminLabel(effectAuthUser?.email || effectAuthUser?.name || "Admin");
-  }, [router]);
+  if (authFlag !== "1") {
+    return null;
+  }
 
   const tabs = [
     { id: "dashboard", label: "📊 Dashboard", icon: BarChart3 },
@@ -52,7 +64,9 @@ export default function AdminPage() {
             <h1 className="text-lg font-semibold tracking-tight sm:text-xl">
               Amazon College
             </h1>
-            <p className="text-sm text-slate-500">{adminLabel}</p>
+            <p className="text-sm text-slate-500" suppressHydrationWarning>
+              {adminLabel}
+            </p>
           </div>
           <button
             onClick={() => {
