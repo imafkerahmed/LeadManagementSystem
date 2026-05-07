@@ -4,6 +4,8 @@ services:
     container_name: lead-management-app
     ports:
       - "${APP_PORT:-8082}:3000"
+    env_file:
+      - .env
     environment:
       - NEXT_PUBLIC_POCKETBASE_URL=${NEXT_PUBLIC_POCKETBASE_URL}
       - POCKETBASE_ADMIN_EMAIL=${POCKETBASE_ADMIN_EMAIL}
