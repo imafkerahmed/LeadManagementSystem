@@ -83,7 +83,13 @@ export async function setupPocketBaseCollections(): Promise<void> {
             name: "role",
             type: "select",
             required: true,
-            options: { values: ["admin", "counselor"] },
+            options: { values: ["admin", "student-counsellor"] },
+          },
+          {
+            name: "accountStatus",
+            type: "select",
+            required: true,
+            options: { values: ["active", "disabled"] },
           },
         ],
       });

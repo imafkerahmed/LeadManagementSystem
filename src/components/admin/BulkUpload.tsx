@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Upload } from "lucide-react";
+import { useEffect, useState } from "react";
+import Papa from "papaparse";
+import { Upload, X } from "lucide-react";
 
 interface Lead {
   studentName: string;
@@ -9,6 +10,16 @@ interface Lead {
   email: string;
   course: string;
   leadSource: string;
+}
+
+type CsvField = keyof Lead;
+
+type MappingState = Record<CsvField, string>;
+
+interface CounselorOption {
+  id: string;
+  name: string;
+  email?: string;
 }
 
 interface BulkUploadProps {
@@ -21,6 +32,7 @@ type UploadResult = {
   message: string;
   uploaded?: number;
   failed?: number;
+  errors?: Array<{ row: number; message: string }>;
 };
 
 export default function BulkUpload({
@@ -28,39 +40,196 @@ export default function BulkUpload({
   operatorLabel,
 }: BulkUploadProps) {
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [csvRows, setCsvRows] = useState<Array<Record<string, string>>>([]);
+  const [mappingOpen, setMappingOpen] = useState(false);
+  const [pendingFileName, setPendingFileName] = useState("");
+  const [fieldMapping, setFieldMapping] = useState<MappingState>({
+    studentName: "",
+    mobile: "",
+    email: "",
+    course: "",
+    leadSource: "",
+  });
   const [assignmentMethod, setAssignmentMethod] = useState<
-    "roundRobin" | "singleCounselor"
-  >("roundRobin");
-  const [singleCounselor, setSingleCounselor] = useState("");
+    "equalSplit" | "roundRobin"
+  >("equalSplit");
+  const [counselors, setCounselors] = useState<CounselorOption[]>([]);
+  const [selectedCounselorIds, setSelectedCounselorIds] = useState<string[]>(
+    [],
+  );
   const [isUploading, setIsUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
 
-  const handleFileUpload = async (file: File) => {
-    try {
-      const text = await file.text();
-      const rows = text.split("\n").filter((row) => row.trim());
+  const csvFieldLabels: Record<CsvField, string> = {
+    studentName: "Student Name",
+    mobile: "Mobile",
+    email: "Email",
+    course: "Course",
+    leadSource: "Lead Source",
+  };
 
-      const headers = rows[0].split(",").map((h) => h.trim().toLowerCase());
-      const uploadedLeads: Lead[] = [];
-
-      for (let i = 1; i < rows.length; i++) {
-        const values = rows[i].split(",").map((v) => v.trim());
-        const lead: Lead = {
-          studentName: values[headers.indexOf("studentname")] || "",
-          mobile: values[headers.indexOf("mobile")] || "",
-          email: values[headers.indexOf("email")] || "",
-          course: values[headers.indexOf("course")] || "",
-          leadSource: values[headers.indexOf("leadsource")] || "Bulk Upload",
-        };
-        if (lead.studentName && lead.mobile && lead.course) {
-          uploadedLeads.push(lead);
+  useEffect(() => {
+    const loadCounselors = async () => {
+      try {
+        const response = await fetch("/api/users/lookup");
+        if (!response.ok) {
+          return;
         }
-      }
 
-      setLeads(uploadedLeads);
-    } catch {
-      alert("Error reading file");
+        const data = (await response.json()) as CounselorOption[];
+        const nextCounselors = Array.isArray(data) ? data : [];
+        setCounselors(nextCounselors);
+        setSelectedCounselorIds(
+          nextCounselors.map((counselor) => counselor.id),
+        );
+      } catch {
+        setCounselors([]);
+        setSelectedCounselorIds([]);
+      }
+    };
+
+    loadCounselors();
+  }, []);
+
+  const normalizeHeader = (value: string) =>
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "");
+
+  const buildDefaultMapping = (headers: string[]): MappingState => {
+    const normalizedHeaders = headers.map((header) => ({
+      original: header,
+      normalized: normalizeHeader(header),
+    }));
+
+    const findHeader = (...candidates: string[]) => {
+      const match = normalizedHeaders.find((header) =>
+        candidates.includes(header.normalized),
+      );
+      return match?.original || "";
+    };
+
+    return {
+      studentName: findHeader("studentname", "name", "student"),
+      mobile: findHeader("mobile", "mobilenumber", "phone", "phonenumber"),
+      email: findHeader("email", "mail"),
+      course: findHeader("course", "coursename"),
+      leadSource: findHeader("leadsource", "source", "leadsource"),
+    };
+  };
+
+  const getCellValue = (row: Record<string, string>, headerName: string) => {
+    if (!headerName) return "";
+    const targetNorm = normalizeHeader(headerName);
+    const key = Object.keys(row).find((k) => normalizeHeader(k) === targetNorm);
+    return String(row[key ?? ""] ?? "").trim();
+  };
+
+  const selectedCounselors = counselors.filter((counselor) =>
+    selectedCounselorIds.includes(counselor.id),
+  );
+
+  const getAssignmentBreakdown = () => {
+    if (leads.length === 0 || selectedCounselors.length === 0) {
+      return [] as Array<{ id: string; name: string; count: number }>;
     }
+
+    const counts = new Map<string, number>();
+    selectedCounselors.forEach((counselor) => counts.set(counselor.id, 0));
+
+    if (assignmentMethod === "roundRobin") {
+      leads.forEach((_, index) => {
+        const counselor = selectedCounselors[index % selectedCounselors.length];
+        counts.set(counselor.id, (counts.get(counselor.id) || 0) + 1);
+      });
+    } else {
+      const baseCount = Math.floor(leads.length / selectedCounselors.length);
+      const remainder = leads.length % selectedCounselors.length;
+
+      selectedCounselors.forEach((counselor, index) => {
+        counts.set(counselor.id, baseCount + (index < remainder ? 1 : 0));
+      });
+    }
+
+    return selectedCounselors.map((counselor) => ({
+      id: counselor.id,
+      name: counselor.name,
+      count: counts.get(counselor.id) || 0,
+    }));
+  };
+
+  const handleFileUpload = (file: File) => {
+    setUploadResult(null);
+
+    Papa.parse<Record<string, string>>(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        const headers = (results.meta.fields || []).map((header) =>
+          header.trim(),
+        );
+        const dataRows = (results.data || []).filter((row) =>
+          Object.values(row).some((value) => String(value ?? "").trim()),
+        );
+
+        if (headers.length === 0 || dataRows.length === 0) {
+          alert("CSV needs a header row and at least one data row");
+          return;
+        }
+
+        setCsvHeaders(headers);
+        setCsvRows(dataRows);
+        setFieldMapping(buildDefaultMapping(headers));
+        setPendingFileName(file.name);
+        setMappingOpen(true);
+      },
+      error: (error) => {
+        alert(`Error reading file: ${error.message}`);
+      },
+    });
+  };
+
+  const applyMapping = () => {
+    const mappedLeads = csvRows
+      .map((row) => {
+        const resolveValue = (field: CsvField) => {
+          const header = fieldMapping[field];
+          if (!header) return field === "leadSource" ? "Bulk Upload" : "";
+          return (
+            getCellValue(row, header) ||
+            (field === "leadSource" ? "Bulk Upload" : "")
+          );
+        };
+
+        return {
+          studentName: resolveValue("studentName"),
+          mobile: resolveValue("mobile"),
+          email: resolveValue("email"),
+          course: resolveValue("course"),
+          leadSource: resolveValue("leadSource") || "Bulk Upload",
+        };
+      })
+      .filter((lead) => lead.studentName && lead.mobile && lead.course);
+
+    if (mappedLeads.length === 0) {
+      // Helpful feedback when mapping didn't produce any valid leads
+      alert(
+        "No valid leads found with the current mapping. Ensure Student Name, Mobile and Course are mapped to the correct CSV columns.",
+      );
+      return;
+    }
+
+    setLeads(mappedLeads);
+    setMappingOpen(false);
+  };
+
+  const cancelMapping = () => {
+    setMappingOpen(false);
+    setPendingFileName("");
+    setCsvHeaders([]);
+    setCsvRows([]);
   };
 
   const handleUpload = async () => {
@@ -69,8 +238,8 @@ export default function BulkUpload({
       return;
     }
 
-    if (assignmentMethod === "singleCounselor" && !singleCounselor) {
-      alert("Please select a counselor");
+    if (selectedCounselorIds.length === 0) {
+      alert("Please select at least one counselor");
       return;
     }
 
@@ -82,8 +251,7 @@ export default function BulkUpload({
         body: JSON.stringify({
           leads,
           assignmentMethod,
-          singleCounselor:
-            assignmentMethod === "singleCounselor" ? singleCounselor : null,
+          selectedCounselorIds,
           performedBy: operatorId,
           performedByLabel: operatorLabel,
         }),
@@ -129,6 +297,153 @@ export default function BulkUpload({
         </div>
       </div>
 
+      {mappingOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-200 p-6">
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900">
+                  Map CSV Columns
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {pendingFileName} - match CSV columns to PocketBase lead
+                  fields.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={cancelMapping}
+                className="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                aria-label="Close mapping dialog"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid gap-4 p-6">
+              {(Object.keys(csvFieldLabels) as CsvField[]).map((field) => (
+                <label
+                  key={field}
+                  className="grid gap-2 sm:grid-cols-3 sm:items-center"
+                >
+                  <span className="text-sm font-medium text-gray-700">
+                    {csvFieldLabels[field]}
+                  </span>
+                  <select
+                    value={fieldMapping[field]}
+                    onChange={(e) =>
+                      setFieldMapping((current) => ({
+                        ...current,
+                        [field]: e.target.value,
+                      }))
+                    }
+                    className="sm:col-span-2 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  >
+                    <option value="">Select CSV column</option>
+                    {csvHeaders.map((header) => (
+                      <option key={header} value={header}>
+                        {header}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+
+              <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-medium text-slate-900">Preview</p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    {csvRows.length} CSV rows
+                  </p>
+                </div>
+                <p className="mt-1">
+                  Leads are created only after the fields are mapped. Rows
+                  missing student name, mobile, or course will be skipped.
+                </p>
+
+                <div className="mt-3 max-h-72 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2">
+                  {csvRows.length === 0 ? (
+                    <p className="text-sm text-gray-500">No data rows</p>
+                  ) : (
+                    csvRows.map((row, idx) => {
+                      const previewRow = {
+                        studentName: getCellValue(
+                          row,
+                          fieldMapping.studentName,
+                        ),
+                        mobile: getCellValue(row, fieldMapping.mobile),
+                        course: getCellValue(row, fieldMapping.course),
+                      };
+
+                      return (
+                        <div
+                          key={idx}
+                          className="mt-2 rounded-md border bg-white p-2 text-sm"
+                        >
+                          <div className="flex gap-4">
+                            <div className="min-w-[160px]">
+                              <div className="text-xs text-gray-500">
+                                Row {idx + 1} Name
+                              </div>
+                              <div className="font-medium">
+                                {previewRow.studentName || "—"}
+                              </div>
+                            </div>
+                            <div className="min-w-[120px]">
+                              <div className="text-xs text-gray-500">
+                                Mobile
+                              </div>
+                              <div className="font-medium">
+                                {previewRow.mobile || "—"}
+                              </div>
+                            </div>
+                            <div className="min-w-[120px]">
+                              <div className="text-xs text-gray-500">
+                                Course
+                              </div>
+                              <div className="font-medium">
+                                {previewRow.course || "—"}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-gray-200 p-6">
+              <button
+                type="button"
+                onClick={cancelMapping}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={applyMapping}
+                disabled={
+                  csvRows.length === 0 ||
+                  csvRows.every((row) => {
+                    // determine if mapping would produce no required fields
+                    const v = (field: CsvField) =>
+                      getCellValue(row, fieldMapping[field]);
+
+                    return !(v("studentName") && v("mobile") && v("course"));
+                  })
+                }
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                Use mapping
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Assignment Settings */}
       {leads.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6">
@@ -139,31 +454,123 @@ export default function BulkUpload({
             <label className="flex items-center gap-3">
               <input
                 type="radio"
-                checked={assignmentMethod === "roundRobin"}
-                onChange={() => setAssignmentMethod("roundRobin")}
+                checked={assignmentMethod === "equalSplit"}
+                onChange={() => setAssignmentMethod("equalSplit")}
                 className="w-4 h-4"
               />
               <span className="text-gray-700">
-                Round Robin - Distribute evenly among counselors
+                Equal split - divide leads evenly among selected counselors
               </span>
             </label>
             <label className="flex items-center gap-3">
               <input
                 type="radio"
-                checked={assignmentMethod === "singleCounselor"}
-                onChange={() => setAssignmentMethod("singleCounselor")}
+                checked={assignmentMethod === "roundRobin"}
+                onChange={() => setAssignmentMethod("roundRobin")}
                 className="w-4 h-4"
               />
-              <span className="text-gray-700">Assign to single counselor:</span>
+              <span className="text-gray-700">
+                Round robin - assign leads one by one to active counselors
+              </span>
             </label>
-            {assignmentMethod === "singleCounselor" && (
-              <input
-                type="text"
-                placeholder="Counselor name"
-                value={singleCounselor}
-                onChange={(e) => setSingleCounselor(e.target.value)}
-                className="ml-6 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
+          </div>
+
+          {selectedCounselors.length > 0 && leads.length > 0 && (
+            <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="font-medium text-blue-900">
+                    Assignment breakdown
+                  </p>
+                  <p className="text-sm text-blue-800">
+                    {assignmentMethod === "roundRobin"
+                      ? "Round robin assignment based on the current lead count."
+                      : "Equal split across the selected counselors."}
+                  </p>
+                </div>
+                <p className="text-sm font-medium text-blue-900">
+                  {leads.length} total leads
+                </p>
+              </div>
+
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {getAssignmentBreakdown().map((item) => (
+                  <div
+                    key={item.id}
+                    className="rounded-lg border border-blue-100 bg-white px-3 py-2"
+                  >
+                    <p className="font-medium text-gray-900">{item.name}</p>
+                    <p className="text-sm text-gray-600">
+                      {item.count} lead{item.count === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-6 border-t border-gray-200 pt-4">
+            <div className="flex items-center justify-between gap-3">
+              <h4 className="font-medium text-gray-900">Active counselors</h4>
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedCounselorIds(
+                    counselors.map((counselor) => counselor.id),
+                  )
+                }
+                className="text-sm font-medium text-blue-600 hover:text-blue-700"
+              >
+                Select all
+              </button>
+            </div>
+
+            {counselors.length === 0 ? (
+              <p className="mt-3 text-sm text-gray-500">
+                No active counselors were found.
+              </p>
+            ) : (
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {counselors.map((counselor) => {
+                  const isSelected = selectedCounselorIds.includes(
+                    counselor.id,
+                  );
+
+                  return (
+                    <label
+                      key={counselor.id}
+                      className={`flex items-start gap-3 rounded-lg border p-3 transition ${
+                        isSelected
+                          ? "border-blue-500 bg-blue-50"
+                          : "border-gray-200 bg-white"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={(e) => {
+                          setSelectedCounselorIds((current) =>
+                            e.target.checked
+                              ? [...current, counselor.id]
+                              : current.filter((id) => id !== counselor.id),
+                          );
+                        }}
+                        className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600"
+                      />
+                      <span className="min-w-0">
+                        <span className="block font-medium text-gray-900">
+                          {counselor.name}
+                        </span>
+                        {counselor.email && (
+                          <span className="block truncate text-sm text-gray-500">
+                            {counselor.email}
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
             )}
           </div>
         </div>
@@ -218,6 +625,15 @@ export default function BulkUpload({
           <p className="text-sm mt-1">
             Uploaded: {uploadResult.uploaded} | Failed: {uploadResult.failed}
           </p>
+          {uploadResult.errors && uploadResult.errors.length > 0 && (
+            <ul className="mt-3 space-y-1 text-sm">
+              {uploadResult.errors.map((error, index) => (
+                <li key={`${error.row}-${index}`}>
+                  Row {error.row}: {error.message}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </div>

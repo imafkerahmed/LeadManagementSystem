@@ -40,7 +40,16 @@ async function setupCollections() {
           type: "select",
           required: true,
           options: {
-            values: ["admin", "counselor"],
+            values: ["admin", "student-counsellor"],
+            maxSelect: 1,
+          },
+        },
+        {
+          name: "accountStatus",
+          type: "select",
+          required: true,
+          options: {
+            values: ["active", "disabled"],
             maxSelect: 1,
           },
         },

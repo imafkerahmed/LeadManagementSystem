@@ -5,12 +5,51 @@ function generateLeadId(lastNum: number): string {
   return `AMZ/LEAD/${String(lastNum + 1).padStart(4, "0")}`;
 }
 
+type CounselorRecord = {
+  id: string;
+  name?: string;
+  email?: string;
+};
+
+async function getAssignableCounselors(
+  pb: Awaited<ReturnType<typeof getPocketBaseAdminClient>>,
+  selectedCounselorIds?: string[],
+) {
+  const activeFilter =
+    'role = "student-counsellor" && accountStatus = "active"';
+  const fallbackFilter = 'role = "student-counsellor"';
+
+  let counselors = [] as CounselorRecord[];
+
+  try {
+    counselors = (await pb.collection("users").getFullList({
+      filter: activeFilter,
+      fields: "id,name,email",
+    })) as CounselorRecord[];
+  } catch {
+    counselors = (await pb.collection("users").getFullList({
+      filter: fallbackFilter,
+      fields: "id,name,email",
+    })) as CounselorRecord[];
+  }
+
+  const selectedIds = selectedCounselorIds?.filter(Boolean) ?? [];
+  if (selectedIds.length > 0) {
+    counselors = counselors.filter((counselor) =>
+      selectedIds.includes(counselor.id),
+    );
+  }
+
+  return counselors.filter((counselor) => counselor.id && counselor.name);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
       leads,
       assignmentMethod,
+      selectedCounselorIds,
       singleCounselor,
       performedBy,
       performedByLabel,
@@ -42,12 +81,47 @@ export async function POST(request: NextRequest) {
     let failedCount = 0;
     const errors: Array<{ row: number; message: string }> = [];
 
-    // Get list of counselors for round-robin
-    const counselors = await pb.collection("users").getFullList({
-      filter: 'role = "counselor"',
-    });
+    const counselors = await getAssignableCounselors(pb, selectedCounselorIds);
 
+    if (counselors.length === 0 && !singleCounselor) {
+      return NextResponse.json(
+        {
+          success: false,
+          uploaded: 0,
+          failed: leads.length,
+          message: "No active counselors available for assignment",
+        },
+        { status: 400 },
+      );
+    }
+
+    const counselorIds = counselors.map((counselor) => counselor.id || "");
+    const counselorNamesById = Object.fromEntries(
+      counselors.map((c) => [c.id || "", c.name || ""]),
+    );
     let currentCounselorIndex = 0;
+
+    const getBalancedCounselorId = (leadIndex: number) => {
+      if (counselorIds.length === 0) return "";
+
+      const baseCount = Math.floor(leads.length / counselorIds.length);
+      const remainder = leads.length % counselorIds.length;
+
+      let cursor = 0;
+      for (
+        let counselorIndex = 0;
+        counselorIndex < counselorIds.length;
+        counselorIndex++
+      ) {
+        const takeCount = baseCount + (counselorIndex < remainder ? 1 : 0);
+        if (leadIndex < cursor + takeCount) {
+          return counselorIds[counselorIndex];
+        }
+        cursor += takeCount;
+      }
+
+      return counselorIds[counselorIds.length - 1] || "";
+    };
 
     // Upload each lead
     for (let i = 0; i < leads.length; i++) {
@@ -61,16 +135,20 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Determine assigned counselor
-        let assignedCounselor = singleCounselor;
+        // Determine assigned counselor id (PocketBase relation expects IDs)
+        let assignedCounselorId = singleCounselor;
 
-        if (assignmentMethod === "roundRobin" && counselors.length > 0) {
-          assignedCounselor = counselors[currentCounselorIndex].name;
+        if (assignmentMethod === "roundRobin" && counselorIds.length > 0) {
+          assignedCounselorId = counselorIds[currentCounselorIndex];
           currentCounselorIndex =
-            (currentCounselorIndex + 1) % counselors.length;
+            (currentCounselorIndex + 1) % counselorIds.length;
         }
 
-        if (!assignedCounselor) {
+        if (assignmentMethod === "equalSplit" && counselorIds.length > 0) {
+          assignedCounselorId = getBalancedCounselorId(i);
+        }
+
+        if (!assignedCounselorId) {
           errors.push({ row: i + 2, message: "No counselor assigned" });
           failedCount++;
           continue;
@@ -94,40 +172,66 @@ export async function POST(request: NextRequest) {
             text: "Lead imported",
           },
         ]);
-
-        const createdLead = await pb.collection("leads").create({
-          leadId,
-          studentName: lead.studentName,
-          mobile: lead.mobile,
-          email: lead.email || "",
-          course: lead.course,
-          leadSource: lead.leadSource || "Bulk Upload",
-          status: "New",
-          assignedTo: assignedCounselor,
-          comments: "",
-          commentLog: initLog,
-          lastModified: now,
-        });
-
+        // Attempt to create lead and capture richer errors when they occur
         try {
-          await pb.collection("leadHistory").create({
-            timeStamp: now,
-            leadId: createdLead.id,
-            studentName: createdLead.id,
-            eventType: "Lead Created",
-            changedBy: performedBy,
-            newValue: "New",
-            comment: `${performedByLabel || "Bulk Upload"} · ${
-              assignmentMethod === "roundRobin"
-                ? `Round Robin → ${assignedCounselor}`
-                : `Single Counselor → ${assignedCounselor}`
-            }`,
+          const leadNow = now.toISOString();
+          const createdLead = await pb.collection("leads").create({
+            leadId,
+            studentName: lead.studentName,
+            mobileNo: lead.mobile,
+            email: lead.email || "",
+            courseName: lead.course,
+            leadSource: lead.leadSource || "Bulk Upload",
+            leadStatus: "New",
+            assignedTo: assignedCounselorId,
+            latestComment: "Lead imported",
+            addedDate: leadNow,
+            lastModified: leadNow,
+            commentLog: initLog,
           });
-        } catch (historyError) {
-          console.warn("Lead history log skipped:", historyError);
-        }
 
-        uploadedCount++;
+          try {
+            await pb.collection("leadHistory").create({
+              timeStamp: now,
+              leadId: createdLead.id,
+              studentName: createdLead.id,
+              eventType: "Lead Created",
+              changedBy: performedBy,
+              newValue: "New",
+              comment: `${performedByLabel || "Bulk Upload"} · ${
+                assignmentMethod === "roundRobin"
+                  ? `Round Robin → ${counselorNamesById[assignedCounselorId] || assignedCounselorId}`
+                  : assignmentMethod === "equalSplit"
+                    ? `Equal Split → ${counselorNamesById[assignedCounselorId] || assignedCounselorId}`
+                    : `Single Counselor → ${counselorNamesById[assignedCounselorId] || assignedCounselorId}`
+              }`,
+            });
+          } catch (historyError) {
+            console.warn("Lead history log skipped:", historyError);
+          }
+
+          uploadedCount++;
+        } catch (createError: any) {
+          failedCount++;
+
+          // Try to extract pocketbase validation details when available
+          let detail =
+            createError instanceof Error
+              ? createError.message
+              : String(createError);
+          try {
+            if (createError?.data)
+              detail += ` | ${JSON.stringify(createError.data)}`;
+            else if (createError?.response?.data)
+              detail += ` | ${JSON.stringify(createError.response.data)}`;
+          } catch (e) {
+            // ignore JSON errors
+          }
+
+          errors.push({ row: i + 2, message: detail });
+          // continue to next row
+          continue;
+        }
       } catch (error) {
         failedCount++;
         errors.push({
