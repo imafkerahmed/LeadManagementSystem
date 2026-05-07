@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, LogOut, X } from "lucide-react";
 import { createPocketBaseClient } from "@/lib/pocketbase";
@@ -77,16 +77,30 @@ const PAGE_SIZE = 8;
 
 export default function CounselorPage() {
   const router = useRouter();
-  const pb = createPocketBaseClient();
-  const authUser = pb.authStore.model as {
-    id?: string;
-    name?: string;
-    role?: string;
-  } | null;
-  const counselorId = authUser?.id || "";
-  const counselorName = authUser?.name || "Student Counsellor";
-  const isCounselorValid =
-    pb.authStore.isValid && authUser?.role === "student-counsellor";
+  const counselorAuthSnapshot = useSyncExternalStore(
+    () => () => {},
+    () => {
+      const pb = createPocketBaseClient();
+      const authUser = pb.authStore.model as {
+        id?: string;
+        name?: string;
+        role?: string;
+      } | null;
+
+      const isValid =
+        pb.authStore.isValid && authUser?.role === "student-counsellor";
+      const counselorId = isValid ? authUser?.id || "" : "";
+      const counselorName = isValid
+        ? authUser?.name || "Student Counsellor"
+        : "Student Counsellor";
+
+      return `${isValid ? "1" : "0"}|${counselorId}|${counselorName}`;
+    },
+    () => "0||Student Counsellor",
+  );
+
+  const [authFlag, counselorId, counselorName] =
+    counselorAuthSnapshot.split("|");
 
   const [tab, setTab] = useState<"followup" | "addlead">("followup");
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -111,10 +125,10 @@ export default function CounselorPage() {
   const [toastType, setToastType] = useState<"success" | "error">("success");
 
   useEffect(() => {
-    if (!isCounselorValid) {
+    if (authFlag !== "1") {
       router.replace("/");
     }
-  }, [isCounselorValid, router]);
+  }, [authFlag, router]);
 
   useEffect(() => {
     const loadUserLookup = async () => {
@@ -378,6 +392,10 @@ export default function CounselorPage() {
     currentPage * PAGE_SIZE,
   );
 
+  if (authFlag !== "1") {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
@@ -386,7 +404,9 @@ export default function CounselorPage() {
             <h1 className="text-lg font-semibold tracking-tight sm:text-xl">
               Amazon College
             </h1>
-            <p className="text-sm text-slate-500">{counselorName}</p>
+            <p className="text-sm text-slate-500" suppressHydrationWarning>
+              {counselorName}
+            </p>
           </div>
           <button
             onClick={() => {
