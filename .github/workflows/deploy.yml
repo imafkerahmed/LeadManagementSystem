@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build:
@@ -52,3 +53,35 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/lead-management-app:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Pull latest image
+        run: docker pull ${{ secrets.DOCKER_USERNAME }}/lead-management-app:latest
+
+      - name: Restart application container
+        run: |
+          docker stop lead-management-app || true
+          docker rm lead-management-app || true
+
+          docker run -d \
+            --name lead-management-app \
+            --restart unless-stopped \
+            -p ${{ secrets.APP_PORT || 8082 }}:3000 \
+            -e NEXT_PUBLIC_POCKETBASE_URL=${{ secrets.NEXT_PUBLIC_POCKETBASE_URL }} \
+            -e POCKETBASE_ADMIN_EMAIL=${{ secrets.POCKETBASE_ADMIN_EMAIL }} \
+            -e POCKETBASE_ADMIN_PASSWORD=${{ secrets.POCKETBASE_ADMIN_PASSWORD }} \
+            ${{ secrets.DOCKER_USERNAME }}/lead-management-app:latest
+
+      - name: Cleanup old images
+        run: docker image prune -f
