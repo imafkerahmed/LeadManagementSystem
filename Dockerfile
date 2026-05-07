@@ -12,6 +12,10 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Ensure optional static asset directory exists even when the repo's public/
+# folder is empty, so the final stage copy does not fail.
+RUN mkdir -p public
+
 # Build the application
 RUN npm run build
 
