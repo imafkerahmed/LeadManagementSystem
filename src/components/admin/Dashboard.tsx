@@ -380,10 +380,12 @@ export default function AdminDashboard() {
       Math.ceil((stats?.recentActivity.length || 0) / ACTIVITY_PAGE_SIZE),
     );
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActivityPage((currentPage) => Math.min(currentPage, totalPages));
   }, [stats?.recentActivity.length]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActivityPage(1);
   }, [selectedCounselor]);
 

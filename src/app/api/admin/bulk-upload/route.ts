@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
           }
 
           uploadedCount++;
-        } catch (createError: any) {
+        } catch (createError: unknown) {
           failedCount++;
 
           // Try to extract pocketbase validation details when available
@@ -220,11 +220,18 @@ export async function POST(request: NextRequest) {
               ? createError.message
               : String(createError);
           try {
-            if (createError?.data)
-              detail += ` | ${JSON.stringify(createError.data)}`;
-            else if (createError?.response?.data)
-              detail += ` | ${JSON.stringify(createError.response.data)}`;
-          } catch (e) {
+            if (createError instanceof Object && "data" in createError)
+              detail += ` | ${JSON.stringify((createError as Record<string, unknown>).data)}`;
+            else if (
+              createError instanceof Object &&
+              "response" in createError
+            ) {
+              const response = (createError as Record<string, unknown>)
+                .response;
+              if (response instanceof Object && "data" in response)
+                detail += ` | ${JSON.stringify((response as Record<string, unknown>).data)}`;
+            }
+          } catch {
             // ignore JSON errors
           }
 
