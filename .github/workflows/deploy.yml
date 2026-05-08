@@ -51,9 +51,9 @@ jobs:
       - name: Sync Configuration and Restart
         run: |
           # Copy the latest docker-compose.yml to your data folder
-          install -D -m 0644 docker-compose.yml '/DATA/Web Projects/LeadManagementSystem/deployment/docker-compose.yml'
+          install -D -m 0644 docker-compose.yml '/home/codix/LeadManagementSystem/deployment/docker-compose.yml'
 
-          cd '/DATA/Web Projects/LeadManagementSystem/deployment'
+          cd '/home/codix/LeadManagementSystem/deployment'
 
           # Guardrail: deployment expects an env file on the server.
           if [ ! -f .env ]; then
