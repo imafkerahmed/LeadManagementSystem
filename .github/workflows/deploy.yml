@@ -19,12 +19,6 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Login to Docker Hub (deploy)
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -54,6 +48,12 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
       - name: Sync Configuration and Restart
         run: |
           # Copy the latest docker-compose.yml to your data folder
@@ -63,7 +63,7 @@ jobs:
 
           # Guardrail: deployment expects an env file on the server.
           if [ ! -f .env ]; then
-            echo "Missing '/DATA/Web Projects/LeadManagementSystem/deployment/.env' on server"
+            echo "Missing '/home/codix/LeadManagementSystem/deployment/.env' on server"
             exit 1
           fi
 
