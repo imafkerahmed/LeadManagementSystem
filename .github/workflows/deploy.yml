@@ -42,7 +42,7 @@ jobs:
 
   deploy:
     name: Deploy to Server
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: [self-hosted, Linux, X64, lead-management]
     needs: build
     steps:
       - name: Checkout Code
