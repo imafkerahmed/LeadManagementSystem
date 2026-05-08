@@ -1,5 +1,6 @@
 services:
   app:
+    image: ${DOCKER_IMAGE:-afkerahmed/lead-management-app:latest}
     build:
       context: ../
       args:

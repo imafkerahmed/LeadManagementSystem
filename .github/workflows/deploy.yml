@@ -8,6 +8,9 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build and Push Docker Images
@@ -51,6 +54,13 @@ jobs:
           cp docker-compose.yml '/DATA/Web Projects/LeadManagementSystem/deployment/docker-compose.yml'
 
           cd '/DATA/Web Projects/LeadManagementSystem/deployment'
+
+          # Guardrail: deployment expects an env file on the server.
+          if [ ! -f .env ]; then
+            echo "Missing '/DATA/Web Projects/LeadManagementSystem/deployment/.env' on server"
+            exit 1
+          fi
+
           docker compose pull
           docker compose down --remove-orphans
           docker compose up -d --no-build
