@@ -1,6 +1,9 @@
 services:
   app:
-    image: afkerahmed/lead-management-app:latest
+    build:
+      context: ../
+      args:
+        NEXT_PUBLIC_POCKETBASE_URL: ${NEXT_PUBLIC_POCKETBASE_URL}
     container_name: lead-management-app
     ports:
       - "${APP_PORT:-8082}:3000"
