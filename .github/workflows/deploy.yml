@@ -51,7 +51,7 @@ jobs:
       - name: Sync Configuration and Restart
         run: |
           # Copy the latest docker-compose.yml to your data folder
-          cp docker-compose.yml '/DATA/Web Projects/LeadManagementSystem/deployment/docker-compose.yml'
+          install -D -m 0644 docker-compose.yml '/DATA/Web Projects/LeadManagementSystem/deployment/docker-compose.yml'
 
           cd '/DATA/Web Projects/LeadManagementSystem/deployment'
 
