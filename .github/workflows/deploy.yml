@@ -67,7 +67,27 @@ jobs:
             exit 1
           fi
 
+          echo "📋 Checking for existing container..."
+          CONTAINER_NAME="lead-management-app"
+          
+          # Force stop and remove container if it exists
+          if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+            echo "🛑 Stopping and removing existing container..."
+            docker stop "$CONTAINER_NAME" 2>/dev/null || true
+            docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
+            echo "✅ Old container removed"
+          fi
+
+          echo "📦 Pulling latest image..."
           docker compose pull
-          docker compose down --remove-orphans
+          
+          echo "🚀 Starting new container..."
           docker compose up -d --no-build
+          
+          echo "🧹 Cleaning up unused images..."
           docker image prune -f
+          
+          echo "📋 Verifying deployment..."
+          sleep 3
+          docker compose ps
+          docker compose logs --tail=10
