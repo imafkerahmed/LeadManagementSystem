@@ -9,7 +9,14 @@ export async function GET() {
     let admins: Array<{ id: string; email?: string; name?: string }> = [];
     try {
       // pocketbase SDK exposes an admins service
-      const list = await (pb as any).admins?.getFullList?.();
+      const pbTyped = pb as unknown as Record<string, unknown>;
+      const adminService = pbTyped.admins as {
+        getFullList?: () => Promise<unknown>;
+      };
+      const list = (await adminService?.getFullList?.()) as
+        | Array<{ id?: string; email?: string; name?: string }>
+        | null
+        | undefined;
       admins = (list || []).map(
         (a: { id?: string; email?: string; name?: string }) => ({
           id: a.id || "",

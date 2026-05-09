@@ -61,17 +61,14 @@ export async function getPocketBaseAdminClient() {
 
       // Manually set the token in the PocketBase client
       if (data.token) {
-        // pb SDK expects a full RecordModel-like object; coerce admin payload safely
-        pbAdminInstance.authStore.save(
-          data.token,
-          (data.admin
-            ? ({
-                id: data.admin.id || "",
-                collectionId: "",
-                collectionName: "",
-              } as unknown)
-            : ({} as unknown)) as any,
-        );
+        // pb SDK expects an AuthRecord or undefined; set up minimal admin model
+        const adminModel: Record<string, unknown> = {
+          id: data.admin?.id || "",
+          collectionId: "",
+          collectionName: "",
+        };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        pbAdminInstance.authStore.save(data.token, adminModel as any);
       } else {
         throw new Error("No auth token received from PocketBase");
       }

@@ -309,7 +309,15 @@ export default function AdminLeads() {
         const rawItems = (list.items || []) as LeadRecord[];
         const items: Lead[] = rawItems.map((record) => mapLead(record));
 
-        let next = items;
+        // Deduplicate leads by ID to avoid React key warnings
+        const seen = new Set<string>();
+        const dedupItems = items.filter((lead) => {
+          if (seen.has(lead.id)) return false;
+          seen.add(lead.id);
+          return true;
+        });
+
+        let next = dedupItems;
         if (statusFilter) next = next.filter((l) => l.status === statusFilter);
         if (counselorFilter)
           next = next.filter((l) => l.assignedTo === counselorFilter);
@@ -323,7 +331,7 @@ export default function AdminLeads() {
           );
         }
 
-        setLeads(items);
+        setLeads(dedupItems);
         setFilteredLeads(next);
         setTotalPages(
           Math.max(1, Math.ceil((list.totalItems || 0) / PAGE_SIZE)),
@@ -384,8 +392,19 @@ export default function AdminLeads() {
           history = await histRes.json();
         }
 
+        // Deduplicate timeline entries by ID
+        const seenTimelineIds = new Set<string>();
+        const uniqueTimeline = (
+          history as Array<Record<string, unknown>>
+        ).filter((h) => {
+          const id = String(h["id"] ?? "");
+          if (seenTimelineIds.has(id)) return false;
+          seenTimelineIds.add(id);
+          return true;
+        });
+
         setTimeline(
-          (history as Array<Record<string, unknown>>).map((h) => {
+          uniqueTimeline.map((h) => {
             const hh = h as Record<string, unknown>;
             return {
               id: String(hh["id"] ?? ""),

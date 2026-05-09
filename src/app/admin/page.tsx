@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut, BarChart3, Users, Upload, Settings } from "lucide-react";
 import AdminDashboard from "@/components/admin/Dashboard";
@@ -35,6 +35,8 @@ export default function AdminPage() {
     try {
       const params = new URLSearchParams(window.location.search);
       const tab = params.get("tab");
+      // Setting state in effect is intentional for URL-driven initialization
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (isValidTab(tab)) setCurrentTab(tab);
     } catch {
       // ignore
