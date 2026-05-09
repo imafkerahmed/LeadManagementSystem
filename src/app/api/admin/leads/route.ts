@@ -6,6 +6,8 @@ type LeadRecord = {
   leadId?: string;
   studentName?: string;
   mobile?: string;
+  mobileWithCountry?: string;
+  countryCode?: string;
   email?: string;
   course?: string;
   leadSource?: string;
@@ -59,7 +61,9 @@ export async function GET(request: NextRequest) {
       id: lead.id,
       leadId: lead.leadId,
       studentName: lead.studentName,
-      mobile: lead.mobile,
+      mobile: lead.mobileWithCountry || lead.mobile || "",
+      mobileWithCountry: lead.mobileWithCountry || lead.mobile || "",
+      countryCode: lead.countryCode || "+94",
       email: lead.email,
       course: lead.course,
       leadSource: lead.leadSource,

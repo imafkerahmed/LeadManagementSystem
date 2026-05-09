@@ -5,30 +5,99 @@ function generateLeadId(lastNum: number): string {
   return `AMZ/LEAD/${String(lastNum + 1).padStart(4, "0")}`;
 }
 
+function normalizeCountryCode(value: string): string {
+  const trimmed = value.trim().replace(/\s+/g, "");
+  return trimmed.startsWith("+")
+    ? `+${trimmed.slice(1).replace(/[^\d]/g, "")}`
+    : `+${trimmed.replace(/[^\d]/g, "")}`;
+}
+
+function normalizeMobile(value: string): string {
+  return value.trim().replace(/\D/g, "").replace(/^0+/, "");
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { studentName, mobile, email, course, leadSource, counselorId } =
-      body;
+    const {
+      studentName,
+      countryCode,
+      mobile,
+      email,
+      course,
+      leadSource,
+      counselorId,
+    } = body;
 
-    if (!studentName || !mobile || !course || !counselorId) {
+    if (!studentName || !countryCode || !mobile || !course || !counselorId) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        {
+          error:
+            "Missing required fields (studentName, countryCode, mobile, course, counselorId)",
+        },
         { status: 400 },
       );
     }
 
     const pb = await getPocketBaseAdminClient();
 
-    // Get the last lead ID to generate new one
+    const normalizedCountryCode = normalizeCountryCode(countryCode);
+    const normalizedMobile = normalizeMobile(mobile);
+
+    // Create a canonical phone value for uniqueness checks and storage.
+    const mobileWithCountry = `${normalizedCountryCode}${normalizedMobile}`;
+    const legacyMobileWithCountry = `${normalizedCountryCode}-${normalizedMobile}`;
+
+    let duplicateDetected = false;
+    let duplicateLead: {
+      leadId?: string;
+      studentName?: string;
+      mobile?: string;
+      mobileWithCountry?: string;
+      status?: string;
+      assignedTo?: string;
+      assigneeName?: string;
+    } | null = null;
+
+    // Check for existing lead with same mobile+country
     const existingLeads = await pb.collection("leads").getFullList({
+      filter: `(mobileWithCountry = "${mobileWithCountry}" || mobileWithCountry = "${legacyMobileWithCountry}")`,
+    });
+
+    if (existingLeads.length > 0) {
+      duplicateDetected = true;
+      const existing = existingLeads[0];
+      // Fetch assignee info
+      let assigneeName = existing.assignedTo;
+      try {
+        const assignee = await pb
+          .collection("users")
+          .getOne(existing.assignedTo);
+        assigneeName = assignee.name || assignee.email || existing.assignedTo;
+      } catch {
+        // If user lookup fails, just use ID
+      }
+
+      duplicateLead = {
+        leadId: existing.leadId,
+        studentName: existing.studentName,
+        mobile: existing.mobile,
+        mobileWithCountry: existing.mobileWithCountry,
+        status: existing.status,
+        assignedTo: existing.assignedTo,
+        assigneeName,
+      };
+    }
+
+    // Get the last lead ID to generate new one
+    const allLeads = await pb.collection("leads").getFullList({
       sort: "-created",
       limit: 1,
     });
 
     let nextLeadId = "AMZ/LEAD/0001";
-    if (existingLeads.length > 0) {
-      const lastLead = existingLeads[0];
+    if (allLeads.length > 0) {
+      const lastLead = allLeads[0];
       const match = lastLead.leadId.match(/AMZ\/LEAD\/(\d+)/);
       if (match) {
         nextLeadId = generateLeadId(parseInt(match[1]));
@@ -39,7 +108,9 @@ export async function POST(request: NextRequest) {
     const leadPayload: Record<string, unknown> = {
       leadId: nextLeadId,
       studentName,
-      mobile,
+      countryCode: normalizedCountryCode,
+      mobile: normalizedMobile,
+      mobileWithCountry,
       email,
       courseName: course,
       leadSource,
@@ -81,6 +152,8 @@ export async function POST(request: NextRequest) {
       message: "Lead added successfully!",
       leadId: nextLeadId,
       recordId: newLead.id,
+      duplicateDetected,
+      existingLead: duplicateLead,
     });
   } catch (error) {
     console.error("Error adding lead:", error);

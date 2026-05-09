@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (trimmedComment) {
-      updates.comments = trimmedComment;
+      updates.latestComment = trimmedComment;
     }
 
     // Update the lead

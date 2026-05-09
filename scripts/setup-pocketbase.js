@@ -62,7 +62,9 @@ async function setupCollections() {
       fields: [
         { name: "leadId", type: "text", required: true },
         { name: "studentName", type: "text", required: true },
+        { name: "countryCode", type: "text", required: true },
         { name: "mobile", type: "text", required: true },
+        { name: "mobileWithCountry", type: "text", required: true },
         { name: "email", type: "email" },
         { name: "course", type: "text", required: true },
         { name: "leadSource", type: "text", required: true },

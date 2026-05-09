@@ -2,7 +2,13 @@
 
 import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, LogOut, X } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
+  X,
+  MessageSquare,
+} from "lucide-react";
 import { createPocketBaseClient } from "@/lib/pocketbase";
 import { toast } from "sonner";
 
@@ -10,7 +16,9 @@ interface Lead {
   id: string;
   leadId: string;
   name: string;
+  countryCode?: string;
   mobile: string;
+  mobileWithCountry?: string;
   email: string;
   course: string;
   status: string;
@@ -35,7 +43,9 @@ type LeadRecord = {
   id: string;
   leadId?: string;
   studentName?: string;
+  countryCode?: string;
   mobile?: string;
+  mobileWithCountry?: string;
   email?: string;
   courseName?: string;
   status?: string;
@@ -119,11 +129,23 @@ export default function CounselorPage() {
   const [statusSelect, setStatusSelect] = useState("");
   const [commentBox, setCommentBox] = useState("");
   const [newName, setNewName] = useState("");
+  const [newCountryCode, setNewCountryCode] = useState("+94");
   const [newMobile, setNewMobile] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newCourse, setNewCourse] = useState("");
   const [newLeadSource, setNewLeadSource] = useState("Direct");
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+
+  // Duplicate detection state
+  const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
+  const [duplicateWarningVisible, setDuplicateWarningVisible] = useState(false);
+  const [duplicateInfo, setDuplicateInfo] = useState<{
+    leadId: string;
+    studentName: string;
+    mobile: string;
+    status: string;
+    assigneeName: string;
+  } | null>(null);
 
   // Status flow: New -> Contacted -> Follow-Up -> Registered
   const statusFlow = ["New", "Contacted", "Follow-up", "Registered", "Lost"];
@@ -145,6 +167,9 @@ export default function CounselorPage() {
         return "bg-slate-100 text-slate-700";
     }
   };
+
+  const formatPhoneNumber = (value: string) => value.replace(/-/g, "");
+
   const getValidNextStatuses = (
     currentStatus: string | undefined,
   ): string[] => {
@@ -185,6 +210,22 @@ export default function CounselorPage() {
     const timer = window.setTimeout(() => setAddLeadModalVisible(false), 180);
     return () => window.clearTimeout(timer);
   }, [addLeadModalOpen]);
+
+  useEffect(() => {
+    if (duplicateWarningOpen) {
+      const timer = window.setTimeout(
+        () => setDuplicateWarningVisible(true),
+        0,
+      );
+      return () => window.clearTimeout(timer);
+    }
+
+    const timer = window.setTimeout(
+      () => setDuplicateWarningVisible(false),
+      180,
+    );
+    return () => window.clearTimeout(timer);
+  }, [duplicateWarningOpen]);
 
   const groupHistoryEntries = (entries: HistoryEntry[]) => {
     const grouped: Array<{
@@ -313,7 +354,9 @@ export default function CounselorPage() {
           id: lead.id,
           leadId: lead.leadId || "",
           name: lead.studentName || "",
+          countryCode: lead.countryCode || "+92",
           mobile: lead.mobile || "",
+          mobileWithCountry: lead.mobileWithCountry || "",
           email: lead.email || "",
           course: lead.courseName || "",
           status: lead.status || "",
@@ -385,7 +428,9 @@ export default function CounselorPage() {
         id: latestLead.id,
         leadId: latestLead.leadId || "",
         name: latestLead.studentName || "",
+        countryCode: latestLead.countryCode || "+94",
         mobile: latestLead.mobile || "",
+        mobileWithCountry: latestLead.mobileWithCountry || "",
         email: latestLead.email || "",
         course: latestLead.courseName || "",
         status: latestLead.status || "",
@@ -511,7 +556,7 @@ export default function CounselorPage() {
 
   const handleAddLead = async () => {
     const trimmedName = newName.trim();
-    const trimmedMobile = newMobile.trim();
+    const trimmedMobile = newMobile.trim().replace(/^0+/, "");
     const trimmedCourse = newCourse.trim();
     const trimmedEmail = newEmail.trim();
 
@@ -520,8 +565,8 @@ export default function CounselorPage() {
       return;
     }
 
-    if (!trimmedName || !trimmedMobile || !trimmedCourse) {
-      showToast("Name, mobile, and course are required", "error");
+    if (!trimmedName || !trimmedMobile || !trimmedCourse || !newCountryCode) {
+      showToast("Name, country code, mobile, and course are required", "error");
       return;
     }
 
@@ -532,6 +577,7 @@ export default function CounselorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           studentName: trimmedName,
+          countryCode: newCountryCode,
           mobile: trimmedMobile,
           email: trimmedEmail || undefined,
           course: trimmedCourse,
@@ -542,9 +588,18 @@ export default function CounselorPage() {
       });
 
       const result = await response.json();
+
       if (response.ok && result.success) {
-        showToast("Lead created", "success");
+        if (result.duplicateDetected && result.existingLead?.assigneeName) {
+          showToast(
+            `Lead created successfully. Similar lead already exists and is assigned to ${result.existingLead.assigneeName}.`,
+            "success",
+          );
+        } else {
+          showToast("Lead created successfully!", "success");
+        }
         setNewName("");
+        setNewCountryCode("+94");
         setNewMobile("");
         setNewEmail("");
         setNewCourse("");
@@ -736,7 +791,10 @@ export default function CounselorPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-slate-700">
-                          {lead.mobile}
+                          {formatPhoneNumber(
+                            lead.mobileWithCountry ||
+                              `${lead.countryCode}-${lead.mobile}`,
+                          )}
                         </td>
                         <td className="px-4 py-3 text-slate-700">
                           {lead.course}
@@ -852,13 +910,237 @@ export default function CounselorPage() {
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-700">
+                    Country Code*
+                  </label>
+                  <select
+                    value={newCountryCode}
+                    onChange={(e) => setNewCountryCode(e.target.value)}
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  >
+                    <option value="+94">+94 (Sri Lanka)</option>
+                    <option value="+1">+1 (US/Canada)</option>
+                    <option value="+7">+7 (Russia)</option>
+                    <option value="+20">+20 (Egypt)</option>
+                    <option value="+27">+27 (South Africa)</option>
+                    <option value="+30">+30 (Greece)</option>
+                    <option value="+31">+31 (Netherlands)</option>
+                    <option value="+32">+32 (Belgium)</option>
+                    <option value="+33">+33 (France)</option>
+                    <option value="+34">+34 (Spain)</option>
+                    <option value="+36">+36 (Hungary)</option>
+                    <option value="+39">+39 (Italy)</option>
+                    <option value="+40">+40 (Romania)</option>
+                    <option value="+41">+41 (Switzerland)</option>
+                    <option value="+43">+43 (Austria)</option>
+                    <option value="+44">+44 (UK/Ireland)</option>
+                    <option value="+45">+45 (Denmark)</option>
+                    <option value="+46">+46 (Sweden)</option>
+                    <option value="+47">+47 (Norway)</option>
+                    <option value="+48">+48 (Poland)</option>
+                    <option value="+49">+49 (Germany)</option>
+                    <option value="+51">+51 (Peru)</option>
+                    <option value="+52">+52 (Mexico)</option>
+                    <option value="+53">+53 (Cuba)</option>
+                    <option value="+54">+54 (Argentina)</option>
+                    <option value="+55">+55 (Brazil)</option>
+                    <option value="+56">+56 (Chile)</option>
+                    <option value="+57">+57 (Colombia)</option>
+                    <option value="+58">+58 (Venezuela)</option>
+                    <option value="+60">+60 (Malaysia)</option>
+                    <option value="+61">+61 (Australia)</option>
+                    <option value="+62">+62 (Indonesia)</option>
+                    <option value="+63">+63 (Philippines)</option>
+                    <option value="+64">+64 (New Zealand)</option>
+                    <option value="+65">+65 (Singapore)</option>
+                    <option value="+66">+66 (Thailand)</option>
+                    <option value="+81">+81 (Japan)</option>
+                    <option value="+82">+82 (South Korea)</option>
+                    <option value="+84">+84 (Vietnam)</option>
+                    <option value="+86">+86 (China)</option>
+                    <option value="+90">+90 (Turkey)</option>
+                    <option value="+91">+91 (India)</option>
+                    <option value="+92">+92 (Pakistan)</option>
+                    <option value="+93">+93 (Afghanistan)</option>
+                    <option value="+95">+95 (Myanmar)</option>
+                    <option value="+98">+98 (Iran)</option>
+                    <option value="+212">+212 (Morocco)</option>
+                    <option value="+213">+213 (Algeria)</option>
+                    <option value="+216">+216 (Tunisia)</option>
+                    <option value="+218">+218 (Libya)</option>
+                    <option value="+220">+220 (Gambia)</option>
+                    <option value="+221">+221 (Senegal)</option>
+                    <option value="+222">+222 (Mauritania)</option>
+                    <option value="+223">+223 (Mali)</option>
+                    <option value="+224">+224 (Guinea)</option>
+                    <option value="+225">+225 (Ivory Coast)</option>
+                    <option value="+226">+226 (Burkina Faso)</option>
+                    <option value="+227">+227 (Niger)</option>
+                    <option value="+228">+228 (Togo)</option>
+                    <option value="+229">+229 (Benin)</option>
+                    <option value="+230">+230 (Mauritius)</option>
+                    <option value="+231">+231 (Liberia)</option>
+                    <option value="+232">+232 (Sierra Leone)</option>
+                    <option value="+233">+233 (Ghana)</option>
+                    <option value="+234">+234 (Nigeria)</option>
+                    <option value="+235">+235 (Chad)</option>
+                    <option value="+236">
+                      +236 (Central African Republic)
+                    </option>
+                    <option value="+237">+237 (Cameroon)</option>
+                    <option value="+238">+238 (Cape Verde)</option>
+                    <option value="+239">+239 (Sao Tome)</option>
+                    <option value="+240">+240 (Equatorial Guinea)</option>
+                    <option value="+241">+241 (Gabon)</option>
+                    <option value="+242">+242 (Republic of Congo)</option>
+                    <option value="+243">
+                      +243 (Democratic Republic of Congo)
+                    </option>
+                    <option value="+244">+244 (Angola)</option>
+                    <option value="+245">+245 (Guinea-Bissau)</option>
+                    <option value="+246">+246 (Diego Garcia)</option>
+                    <option value="+248">+248 (Seychelles)</option>
+                    <option value="+249">+249 (Sudan)</option>
+                    <option value="+250">+250 (Rwanda)</option>
+                    <option value="+251">+251 (Ethiopia)</option>
+                    <option value="+252">+252 (Somalia)</option>
+                    <option value="+253">+253 (Djibouti)</option>
+                    <option value="+254">+254 (Kenya)</option>
+                    <option value="+255">+255 (Tanzania)</option>
+                    <option value="+256">+256 (Uganda)</option>
+                    <option value="+257">+257 (Burundi)</option>
+                    <option value="+258">+258 (Mozambique)</option>
+                    <option value="+260">+260 (Zambia)</option>
+                    <option value="+261">+261 (Madagascar)</option>
+                    <option value="+262">+262 (Reunion)</option>
+                    <option value="+263">+263 (Zimbabwe)</option>
+                    <option value="+264">+264 (Namibia)</option>
+                    <option value="+265">+265 (Malawi)</option>
+                    <option value="+266">+266 (Lesotho)</option>
+                    <option value="+267">+267 (Botswana)</option>
+                    <option value="+268">+268 (Eswatini)</option>
+                    <option value="+269">+269 (Comoros)</option>
+                    <option value="+290">+290 (Saint Helena)</option>
+                    <option value="+291">+291 (Eritrea)</option>
+                    <option value="+297">+297 (Aruba)</option>
+                    <option value="+298">+298 (Faroe Islands)</option>
+                    <option value="+299">+299 (Greenland)</option>
+                    <option value="+350">+350 (Gibraltar)</option>
+                    <option value="+351">+351 (Portugal)</option>
+                    <option value="+352">+352 (Luxembourg)</option>
+                    <option value="+353">+353 (Ireland)</option>
+                    <option value="+354">+354 (Iceland)</option>
+                    <option value="+355">+355 (Albania)</option>
+                    <option value="+356">+356 (Malta)</option>
+                    <option value="+357">+357 (Cyprus)</option>
+                    <option value="+358">+358 (Finland)</option>
+                    <option value="+359">+359 (Bulgaria)</option>
+                    <option value="+370">+370 (Lithuania)</option>
+                    <option value="+371">+371 (Latvia)</option>
+                    <option value="+372">+372 (Estonia)</option>
+                    <option value="+373">+373 (Moldova)</option>
+                    <option value="+374">+374 (Armenia)</option>
+                    <option value="+375">+375 (Belarus)</option>
+                    <option value="+376">+376 (Andorra)</option>
+                    <option value="+377">+377 (Monaco)</option>
+                    <option value="+378">+378 (San Marino)</option>
+                    <option value="+380">+380 (Ukraine)</option>
+                    <option value="+381">+381 (Serbia)</option>
+                    <option value="+382">+382 (Montenegro)</option>
+                    <option value="+383">+383 (Kosovo)</option>
+                    <option value="+385">+385 (Croatia)</option>
+                    <option value="+386">+386 (Slovenia)</option>
+                    <option value="+387">+387 (Bosnia)</option>
+                    <option value="+389">+389 (North Macedonia)</option>
+                    <option value="+420">+420 (Czech Republic)</option>
+                    <option value="+421">+421 (Slovakia)</option>
+                    <option value="+423">+423 (Liechtenstein)</option>
+                    <option value="+500">+500 (Falkland Islands)</option>
+                    <option value="+501">+501 (Belize)</option>
+                    <option value="+502">+502 (Guatemala)</option>
+                    <option value="+503">+503 (El Salvador)</option>
+                    <option value="+504">+504 (Honduras)</option>
+                    <option value="+505">+505 (Nicaragua)</option>
+                    <option value="+506">+506 (Costa Rica)</option>
+                    <option value="+507">+507 (Panama)</option>
+                    <option value="+508">+508 (Saint Pierre)</option>
+                    <option value="+509">+509 (Haiti)</option>
+                    <option value="+590">+590 (Guadeloupe)</option>
+                    <option value="+591">+591 (Bolivia)</option>
+                    <option value="+592">+592 (Guyana)</option>
+                    <option value="+593">+593 (Ecuador)</option>
+                    <option value="+594">+594 (French Guiana)</option>
+                    <option value="+595">+595 (Paraguay)</option>
+                    <option value="+596">+596 (Martinique)</option>
+                    <option value="+597">+597 (Suriname)</option>
+                    <option value="+598">+598 (Uruguay)</option>
+                    <option value="+599">+599 (Netherlands Antilles)</option>
+                    <option value="+670">+670 (East Timor)</option>
+                    <option value="+672">+672 (Norfolk Island)</option>
+                    <option value="+673">+673 (Brunei)</option>
+                    <option value="+674">+674 (Nauru)</option>
+                    <option value="+675">+675 (Papua New Guinea)</option>
+                    <option value="+676">+676 (Tonga)</option>
+                    <option value="+677">+677 (Solomon Islands)</option>
+                    <option value="+678">+678 (Vanuatu)</option>
+                    <option value="+679">+679 (Fiji)</option>
+                    <option value="+680">+680 (Palau)</option>
+                    <option value="+681">+681 (Wallis Futuna)</option>
+                    <option value="+682">+682 (Cook Islands)</option>
+                    <option value="+683">+683 (Niue)</option>
+                    <option value="+684">+684 (American Samoa)</option>
+                    <option value="+685">+685 (Samoa)</option>
+                    <option value="+686">+686 (Kiribati)</option>
+                    <option value="+687">+687 (New Caledonia)</option>
+                    <option value="+688">+688 (Tuvalu)</option>
+                    <option value="+689">+689 (French Polynesia)</option>
+                    <option value="+690">+690 (Tokelau)</option>
+                    <option value="+691">+691 (Micronesia)</option>
+                    <option value="+692">+692 (Marshall Islands)</option>
+                    <option value="+850">+850 (North Korea)</option>
+                    <option value="+852">+852 (Hong Kong)</option>
+                    <option value="+853">+853 (Macau)</option>
+                    <option value="+855">+855 (Cambodia)</option>
+                    <option value="+856">+856 (Laos)</option>
+                    <option value="+880">+880 (Bangladesh)</option>
+                    <option value="+886">+886 (Taiwan)</option>
+                    <option value="+960">+960 (Maldives)</option>
+                    <option value="+961">+961 (Lebanon)</option>
+                    <option value="+962">+962 (Jordan)</option>
+                    <option value="+963">+963 (Syria)</option>
+                    <option value="+964">+964 (Iraq)</option>
+                    <option value="+965">+965 (Kuwait)</option>
+                    <option value="+966">+966 (Saudi Arabia)</option>
+                    <option value="+967">+967 (Yemen)</option>
+                    <option value="+968">+968 (Oman)</option>
+                    <option value="+970">+970 (Palestine)</option>
+                    <option value="+971">+971 (UAE)</option>
+                    <option value="+972">+972 (Israel)</option>
+                    <option value="+973">+973 (Bahrain)</option>
+                    <option value="+974">+974 (Qatar)</option>
+                    <option value="+975">+975 (Bhutan)</option>
+                    <option value="+976">+976 (Mongolia)</option>
+                    <option value="+977">+977 (Nepal)</option>
+                    <option value="+992">+992 (Tajikistan)</option>
+                    <option value="+993">+993 (Turkmenistan)</option>
+                    <option value="+994">+994 (Azerbaijan)</option>
+                    <option value="+995">+995 (Georgia)</option>
+                    <option value="+996">+996 (Kyrgyzstan)</option>
+                    <option value="+998">+998 (Uzbekistan)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">
                     Mobile No*
                   </label>
                   <input
                     type="tel"
-                    placeholder="07XXXXXXXX"
+                    placeholder="3001234567"
                     value={newMobile}
-                    onChange={(e) => setNewMobile(e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/^0+/, "") || "";
+                      setNewMobile(value);
+                    }}
                     className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
                   />
                 </div>
@@ -957,12 +1239,31 @@ export default function CounselorPage() {
 
             <div className="grid flex-1 gap-4 overflow-y-auto px-4 py-4 sm:px-6 lg:grid-cols-[280px_1fr] lg:gap-6">
               <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                {selectedLead.mobile && (
+                  <div>
+                    <button
+                      onClick={() =>
+                        window.open(
+                          `https://wa.me/${(selectedLead.mobile || "").replace(/\D/g, "")}?text=${encodeURIComponent(`Hello, I'm ${counselorName} from Amazon College. I'm reaching out regarding your inquiry about ${selectedLead.course}. How may I assist you today?`)}`,
+                          "_blank",
+                        )
+                      }
+                      className="w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      Send WhatsApp
+                    </button>
+                  </div>
+                )}
                 <div>
                   <div className="text-xs uppercase tracking-wide text-slate-500">
                     Mobile
                   </div>
                   <div className="mt-1 font-medium text-slate-900">
-                    {selectedLead.mobile}
+                    {formatPhoneNumber(
+                      selectedLead.mobileWithCountry ||
+                        `${selectedLead.countryCode}-${selectedLead.mobile}`,
+                    )}
                   </div>
                 </div>
                 <div>
@@ -1001,15 +1302,26 @@ export default function CounselorPage() {
                       "-"}
                   </div>
                 </div>
-                {selectedLead.mobile && (
-                  <a
-                    href={`https://wa.me/${selectedLead.mobile.replace(/\D/g, "")}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex w-full items-center justify-center rounded-md bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700"
+                {(selectedLead.mobileWithCountry ||
+                  selectedLead.countryCode ||
+                  selectedLead.mobile) && (
+                  <button
+                    onClick={() =>
+                      window.open(
+                        `https://wa.me/${formatPhoneNumber(
+                          selectedLead.mobileWithCountry ||
+                            `${selectedLead.countryCode}-${selectedLead.mobile}`,
+                        ).replace(/\D/g, "")}?text=${encodeURIComponent(
+                          "Hi " + selectedLead.name,
+                        )}`,
+                        "_blank",
+                      )
+                    }
+                    className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
                   >
-                    Send WhatsApp Message
-                  </a>
+                    <MessageSquare className="w-4 h-4" />
+                    WhatsApp
+                  </button>
                 )}
               </section>
 
@@ -1170,6 +1482,116 @@ export default function CounselorPage() {
                   )}
                 </div>
               </section>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {duplicateWarningVisible && duplicateInfo && (
+        <div
+          className={`fixed inset-0 z-40 flex items-end justify-center bg-black/50 px-0 transition-opacity duration-200 ease-out sm:items-center sm:px-4 ${
+            duplicateWarningOpen
+              ? "opacity-100"
+              : "pointer-events-none opacity-0"
+          }`}
+          onClick={() => setDuplicateWarningOpen(false)}
+        >
+          <div
+            className={`w-full max-w-md rounded-t-2xl bg-white shadow-2xl transition-all duration-200 ease-out sm:rounded-2xl ${
+              duplicateWarningOpen
+                ? "translate-y-0 scale-100 opacity-100"
+                : "translate-y-3 scale-95 opacity-0"
+            }`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-4 py-4 sm:px-6">
+              <div>
+                <p className="text-sm font-medium text-slate-500">
+                  Lead already exists
+                </p>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  Duplicate Lead Found
+                </h2>
+              </div>
+              <button
+                onClick={() => setDuplicateWarningOpen(false)}
+                className="rounded-md border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"
+                aria-label="Close duplicate warning"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="px-4 py-6 sm:px-6">
+              <div className="space-y-4">
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                  <p className="text-sm text-amber-900">
+                    ⚠️ A lead with this mobile number ({newCountryCode}-
+                    {newMobile}) already exists.
+                  </p>
+                </div>
+
+                <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div>
+                    <div className="text-xs uppercase tracking-wide text-slate-500">
+                      Lead ID
+                    </div>
+                    <div className="mt-1 font-mono font-medium text-slate-900">
+                      {duplicateInfo.leadId}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase tracking-wide text-slate-500">
+                      Student Name
+                    </div>
+                    <div className="mt-1 font-medium text-slate-900">
+                      {duplicateInfo.studentName}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase tracking-wide text-slate-500">
+                      Current Status
+                    </div>
+                    <div
+                      className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusColor(duplicateInfo.status)}`}
+                    >
+                      {duplicateInfo.status}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase tracking-wide text-slate-500">
+                      Assigned To
+                    </div>
+                    <div className="mt-1 font-medium text-slate-900">
+                      {duplicateInfo.assigneeName}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm text-slate-600">
+                    Would you like to continue anyway?
+                  </p>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <button
+                      onClick={() => setDuplicateWarningOpen(false)}
+                      className="flex-1 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={async () => {
+                        // Clear duplicate info and allow user to edit form
+                        setDuplicateWarningOpen(false);
+                        setDuplicateInfo(null);
+                      }}
+                      className="flex-1 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      Back to Form
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

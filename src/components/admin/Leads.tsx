@@ -28,6 +28,8 @@ interface Lead {
   leadId: string;
   studentName: string;
   mobile: string;
+  mobileWithCountry: string;
+  countryCode: string;
   email: string;
   course: string;
   leadSource: string;
@@ -53,6 +55,8 @@ type LeadRecord = {
   studentName?: string;
   mobile?: string;
   mobileNo?: string;
+  mobileWithCountry?: string;
+  countryCode?: string;
   email?: string;
   course?: string;
   courseName?: string;
@@ -80,6 +84,8 @@ type CreateLeadPayload = {
   course: string;
   leadSource?: string;
   assignee?: string;
+  countryCode?: string;
+  mobileWithCountry?: string;
 };
 
 type UserLookupRecord = {
@@ -92,6 +98,60 @@ type UserLookupRecord = {
 };
 
 const PAGE_SIZE = 10;
+
+function uniqueUsersById(
+  users: Array<{ id: string; name: string; role?: string }>,
+) {
+  const unique = new Map<string, { id: string; name: string; role?: string }>();
+
+  for (const user of users) {
+    if (!user.id || unique.has(user.id)) {
+      continue;
+    }
+    unique.set(user.id, user);
+  }
+
+  return Array.from(unique.values());
+}
+
+function normalizePhone(value: string) {
+  return value.replace(/[\s()-]/g, "").replace(/^0+/, "");
+}
+
+function splitPhoneParts(
+  mobileWithCountry?: string,
+  fallbackCountryCode = "+94",
+) {
+  const cleaned = (mobileWithCountry || "").trim();
+
+  if (!cleaned) {
+    return {
+      countryCode: fallbackCountryCode,
+      mobile: "",
+      mobileWithCountry: "",
+    };
+  }
+
+  const compact = cleaned.replace(/\s+/g, "");
+  const match = compact.match(/^(\+\d{1,4})[- ]?(.*)$/);
+
+  if (match) {
+    const countryCode = match[1];
+    const mobile = normalizePhone(match[2] || "");
+    return {
+      countryCode,
+      mobile,
+      mobileWithCountry: `${countryCode}-${mobile}`,
+    };
+  }
+
+  const mobile = normalizePhone(compact);
+  return {
+    countryCode: fallbackCountryCode,
+    mobile,
+    mobileWithCountry: `${fallbackCountryCode}-${mobile}`,
+  };
+}
 
 function parseLeadSequence(leadId?: string): number {
   if (!leadId) return 0;
@@ -163,7 +223,22 @@ export default function AdminLeads() {
         id: record.id,
         leadId: record.leadId || "",
         studentName: record.studentName || "",
-        mobile: record.mobileNo || record.mobile || "",
+        mobile: splitPhoneParts(
+          record.mobileWithCountry || record.mobile || record.mobileNo,
+          record.countryCode || "+94",
+        ).mobile,
+        mobileWithCountry:
+          record.mobileWithCountry ||
+          splitPhoneParts(
+            record.mobileWithCountry || record.mobile || record.mobileNo,
+            record.countryCode || "+94",
+          ).mobileWithCountry,
+        countryCode:
+          record.countryCode ||
+          splitPhoneParts(
+            record.mobileWithCountry || record.mobile || record.mobileNo,
+            "+94",
+          ).countryCode,
         email: record.email || "",
         course: record.courseName || record.course || "",
         leadSource: record.leadSource || "",
@@ -198,7 +273,7 @@ export default function AdminLeads() {
     setDraftAssignedToId(lead.assignedToId);
     setDraftComment(lead.comments);
     setDraftName(lead.studentName);
-    setDraftMobile(lead.mobile);
+    setDraftMobile(lead.mobile || "");
     setDraftEmail(lead.email);
     setDraftCourse(lead.course);
     setDraftLeadSource(lead.leadSource);
@@ -247,11 +322,13 @@ export default function AdminLeads() {
 
         if (combined.length > 0) {
           setUsersLookup(
-            combined.map((u) => ({
-              id: u.id,
-              name: u.name || u.email || u.id || "",
-              role: u.role,
-            })),
+            uniqueUsersById(
+              combined.map((u) => ({
+                id: u.id,
+                name: u.name || u.email || u.id || "",
+                role: u.role,
+              })),
+            ),
           );
           return;
         }
@@ -277,7 +354,7 @@ export default function AdminLeads() {
           role: user.role,
         }));
 
-        setUsersLookup(counselors);
+        setUsersLookup(uniqueUsersById(counselors));
       } catch (fallbackError) {
         if (
           !(
@@ -310,7 +387,7 @@ export default function AdminLeads() {
         if (searchTerm) {
           const q = searchTerm.replace(/"/g, '\\"');
           filterParts.push(
-            `(studentName ~ "${q}" || mobile ~ "${q}" || email ~ "${q}")`,
+            `(studentName ~ "${q}" || mobile ~ "${q}" || mobileWithCountry ~ "${q}" || email ~ "${q}")`,
           );
         }
 
@@ -483,7 +560,9 @@ export default function AdminLeads() {
     const nextAssignedToId = draftAssignedToId;
     const nextComment = draftComment.trim();
     const nextName = draftName.trim();
-    const nextMobile = draftMobile.trim();
+    const nextMobile = normalizePhone(draftMobile.trim());
+    const nextCountryCode = selectedLead.countryCode || "+94";
+    const normalizedMobileWithCountry = `${nextCountryCode}-${nextMobile}`;
     const nextEmail = draftEmail.trim();
     const nextCourse = draftCourse.trim();
     const nextLeadSource = draftLeadSource.trim();
@@ -492,7 +571,9 @@ export default function AdminLeads() {
     const assigneeChanged = nextAssignedToId !== selectedLead.assignedToId;
     const commentChanged = nextComment !== selectedLead.comments.trim();
     const nameChanged = nextName !== selectedLead.studentName;
-    const mobileChanged = nextMobile !== selectedLead.mobile;
+    const mobileChanged =
+      nextMobile !== selectedLead.mobile ||
+      normalizedMobileWithCountry !== selectedLead.mobileWithCountry;
     const emailChanged = nextEmail !== selectedLead.email;
     const courseChanged = nextCourse !== selectedLead.course;
     const leadSourceChanged = nextLeadSource !== selectedLead.leadSource;
@@ -529,10 +610,11 @@ export default function AdminLeads() {
         payload.assignedTo = nextAssignedToId;
       }
       if (commentChanged) payload.latestComment = nextComment;
-      if (commentChanged) payload.comments = nextComment;
       if (nameChanged) payload.studentName = nextName;
-      if (mobileChanged) payload.mobileNo = nextMobile;
-      if (mobileChanged) payload.mobile = nextMobile;
+      if (mobileChanged) {
+        payload.mobileWithCountry = normalizedMobileWithCountry;
+        payload.countryCode = nextCountryCode;
+      }
       if (emailChanged) payload.email = nextEmail;
       if (courseChanged) payload.courseName = nextCourse;
       if (courseChanged) payload.course = nextCourse;
@@ -639,15 +721,16 @@ export default function AdminLeads() {
       const createPayload: Record<string, unknown> = {
         leadId: nextLeadId,
         studentName: payload.studentName,
-        mobile: payload.mobile,
-        mobileNo: payload.mobile,
+        countryCode: payload.countryCode || "+94",
+        mobileWithCountry:
+          payload.mobileWithCountry ||
+          `${payload.countryCode || "+94"}-${normalizePhone(payload.mobile)}`,
         course: payload.course,
         courseName: payload.course,
         leadSource: payload.leadSource || "Manual",
         status: "New",
         leadStatus: "New",
         assignedTo: assigneeValue,
-        comments: "Created manually",
         latestComment: "Created manually",
         addedDate: now,
         lastModified: now,
@@ -782,7 +865,8 @@ export default function AdminLeads() {
                     {lead.studentName}
                   </td>
                   <td className="px-6 py-3 text-sm text-gray-600">
-                    {lead.mobile}
+                    {lead.mobileWithCountry ||
+                      `${lead.countryCode || "+94"}-${lead.mobile}`}
                   </td>
                   <td className="px-6 py-3 text-sm text-gray-600">
                     {lead.course}
@@ -939,7 +1023,10 @@ export default function AdminLeads() {
                           className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
                         />
                       ) : (
-                        <p className="text-sm">{selectedLead.mobile}</p>
+                        <p className="text-sm">
+                          {selectedLead.mobileWithCountry ||
+                            `${selectedLead.countryCode}-${selectedLead.mobile}`}
+                        </p>
                       )}
                     </div>
                     <div>
@@ -1089,7 +1176,13 @@ export default function AdminLeads() {
                       <button
                         onClick={() =>
                           window.open(
-                            `https://wa.me/${(selectedLead.mobile || "").replace(/\D/g, "")}?text=${encodeURIComponent("Hi " + selectedLead.studentName)}`,
+                            `https://wa.me/${(
+                              selectedLead.mobileWithCountry ||
+                              `${selectedLead.countryCode}-${selectedLead.mobile}`
+                            ).replace(
+                              /\D/g,
+                              "",
+                            )}?text=${encodeURIComponent(`Hello, I'm ${selectedLead.studentName} from Amazon College. I'm reaching out regarding your inquiry about ${selectedLead.course}. How may I assist you today?`)}`,
                             "_blank",
                           )
                         }
@@ -1198,6 +1291,7 @@ function NewLeadForm({
   onCancel: () => void;
 }) {
   const [name, setName] = useState("");
+  const [countryCode, setCountryCode] = useState("+94");
   const [mobile, setMobile] = useState("");
   const [email, setEmail] = useState("");
   const [course, setCourse] = useState("");
@@ -1216,7 +1310,16 @@ function NewLeadForm({
       toast.error("Please fill required fields: Name, Mobile, Course");
       return;
     }
-    onCreate({ studentName: name, mobile, email, course, assignee });
+    const cleanedMobile = normalizePhone(mobile);
+    onCreate({
+      studentName: name,
+      mobile: cleanedMobile,
+      email,
+      course,
+      assignee,
+      countryCode,
+      mobileWithCountry: `${countryCode}-${cleanedMobile}`,
+    });
   };
 
   return (
@@ -1231,6 +1334,23 @@ function NewLeadForm({
           placeholder="Student name"
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
         />
+      </div>
+      <div>
+        <label className="text-xs font-semibold text-gray-600 uppercase">
+          Country Code *
+        </label>
+        <select
+          value={countryCode}
+          onChange={(e) => setCountryCode(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+        >
+          <option value="+94">+94 (Sri Lanka)</option>
+          <option value="+1">+1 (US/Canada)</option>
+          <option value="+44">+44 (UK)</option>
+          <option value="+91">+91 (India)</option>
+          <option value="+92">+92 (Pakistan)</option>
+          <option value="+971">+971 (UAE)</option>
+        </select>
       </div>
       <div>
         <label className="text-xs font-semibold text-gray-600 uppercase">

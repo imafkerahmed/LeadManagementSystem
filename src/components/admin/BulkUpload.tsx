@@ -8,7 +8,7 @@ import { toast } from "sonner";
 
 interface Lead {
   studentName: string;
-  mobile: string;
+  mobileWithCountry: string;
   email: string;
   course: string;
   leadSource: string;
@@ -36,6 +36,12 @@ type UploadResult = {
   uploaded?: number;
   failed?: number;
   errors?: Array<{ row: number; message: string }>;
+  duplicates?: Array<{
+    row: number;
+    studentName: string;
+    mobileWithCountry: string;
+    assignedTo?: string;
+  }>;
 };
 
 export default function BulkUpload({
@@ -49,7 +55,7 @@ export default function BulkUpload({
   const [pendingFileName, setPendingFileName] = useState("");
   const [fieldMapping, setFieldMapping] = useState<MappingState>({
     studentName: "",
-    mobile: "",
+    mobileWithCountry: "",
     email: "",
     course: "",
     leadSource: "",
@@ -62,12 +68,13 @@ export default function BulkUpload({
     [],
   );
   const [isUploading, setIsUploading] = useState(false);
+  const [isBatchUploaded, setIsBatchUploaded] = useState(false);
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [lookupError, setLookupError] = useState<string | null>(null);
 
   const csvFieldLabels: Record<CsvField, string> = {
     studentName: "Student Name",
-    mobile: "Mobile",
+    mobileWithCountry: "Mobile With Country",
     email: "Email",
     course: "Course",
     leadSource: "Lead Source",
@@ -171,7 +178,13 @@ export default function BulkUpload({
 
     return {
       studentName: findHeader("studentname", "name", "student"),
-      mobile: findHeader("mobile", "mobilenumber", "phone", "phonenumber"),
+      mobileWithCountry: findHeader(
+        "mobilewithcountry",
+        "mobile",
+        "mobilenumber",
+        "phone",
+        "phonenumber",
+      ),
       email: findHeader("email", "mail"),
       course: findHeader("course", "coursename"),
       leadSource: findHeader("leadsource", "source", "leadsource"),
@@ -220,6 +233,7 @@ export default function BulkUpload({
 
   const handleFileUpload = (file: File) => {
     setUploadResult(null);
+    setIsBatchUploaded(false);
 
     Papa.parse<Record<string, string>>(file, {
       header: true,
@@ -263,23 +277,26 @@ export default function BulkUpload({
 
         return {
           studentName: resolveValue("studentName"),
-          mobile: resolveValue("mobile"),
+          mobileWithCountry: resolveValue("mobileWithCountry"),
           email: resolveValue("email"),
           course: resolveValue("course"),
           leadSource: resolveValue("leadSource") || "Bulk Upload",
         };
       })
-      .filter((lead) => lead.studentName && lead.mobile && lead.course);
+      .filter(
+        (lead) => lead.studentName && lead.mobileWithCountry && lead.course,
+      );
 
     if (mappedLeads.length === 0) {
       // Helpful feedback when mapping didn't produce any valid leads
       alert(
-        "No valid leads found with the current mapping. Ensure Student Name, Mobile and Course are mapped to the correct CSV columns.",
+        "No valid leads found with the current mapping. Ensure Student Name, Mobile With Country and Course are mapped to the correct CSV columns.",
       );
       return;
     }
 
     setLeads(mappedLeads);
+    setIsBatchUploaded(false);
     setMappingOpen(false);
   };
 
@@ -298,6 +315,13 @@ export default function BulkUpload({
 
     if (selectedCounselorIds.length === 0) {
       alert("Please select at least one counselor");
+      return;
+    }
+
+    if (isBatchUploaded) {
+      toast.info(
+        "This batch is already uploaded. Choose a new file to upload again.",
+      );
       return;
     }
 
@@ -322,6 +346,7 @@ export default function BulkUpload({
         toast.error(message);
       } else {
         setUploadResult(result);
+        setIsBatchUploaded(true);
         if (result?.success) {
           toast.success(result.message || "Leads uploaded");
         } else {
@@ -360,7 +385,8 @@ export default function BulkUpload({
               Click to upload CSV or Excel file
             </p>
             <p className="text-sm text-gray-500">
-              Columns: Student Name, Mobile, Email, Course, Lead Source
+              Columns: Student Name, Mobile With Country, Email, Course, Lead
+              Source
             </p>
           </label>
         </div>
@@ -427,7 +453,8 @@ export default function BulkUpload({
                 </div>
                 <p className="mt-1">
                   Leads are created only after the fields are mapped. Rows
-                  missing student name, mobile, or course will be skipped.
+                  missing student name, mobile with country, or course will be
+                  skipped.
                 </p>
 
                 <div className="mt-3 max-h-72 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2">
@@ -440,7 +467,10 @@ export default function BulkUpload({
                           row,
                           fieldMapping.studentName,
                         ),
-                        mobile: getCellValue(row, fieldMapping.mobile),
+                        mobileWithCountry: getCellValue(
+                          row,
+                          fieldMapping.mobileWithCountry,
+                        ),
                         course: getCellValue(row, fieldMapping.course),
                       };
 
@@ -463,7 +493,7 @@ export default function BulkUpload({
                                 Mobile
                               </div>
                               <div className="font-medium">
-                                {previewRow.mobile || "—"}
+                                {previewRow.mobileWithCountry || "—"}
                               </div>
                             </div>
                             <div className="min-w-[120px]">
@@ -501,7 +531,11 @@ export default function BulkUpload({
                     const v = (field: CsvField) =>
                       getCellValue(row, fieldMapping[field]);
 
-                    return !(v("studentName") && v("mobile") && v("course"));
+                    return !(
+                      v("studentName") &&
+                      v("mobileWithCountry") &&
+                      v("course")
+                    );
                   })
                 }
                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
@@ -670,7 +704,7 @@ export default function BulkUpload({
                 {leads.map((lead, idx) => (
                   <tr key={idx} className="border-b hover:bg-gray-50">
                     <td className="px-4 py-2">{lead.studentName}</td>
-                    <td className="px-4 py-2">{lead.mobile}</td>
+                    <td className="px-4 py-2">{lead.mobileWithCountry}</td>
                     <td className="px-4 py-2">{lead.course}</td>
                   </tr>
                 ))}
@@ -679,10 +713,14 @@ export default function BulkUpload({
           </div>
           <button
             onClick={handleUpload}
-            disabled={isUploading}
-            className="mt-4 w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition font-medium"
+            disabled={isUploading || isBatchUploaded}
+            className="mt-4 w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 transition font-medium"
           >
-            {isUploading ? "Uploading..." : "Upload Leads"}
+            {isUploading
+              ? "Uploading..."
+              : isBatchUploaded
+                ? "Bulk Upload Completed"
+                : "Upload Leads"}
           </button>
         </div>
       )}
@@ -708,6 +746,23 @@ export default function BulkUpload({
                 </li>
               ))}
             </ul>
+          )}
+          {uploadResult.duplicates && uploadResult.duplicates.length > 0 && (
+            <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900">
+              <p className="font-semibold">Already existing leads</p>
+              <ul className="mt-2 space-y-1 text-sm">
+                {uploadResult.duplicates.map((duplicate, index) => (
+                  <li
+                    key={`${duplicate.row}-${duplicate.mobileWithCountry}-${index}`}
+                  >
+                    Row {duplicate.row}: {duplicate.mobileWithCountry}
+                    {duplicate.assignedTo
+                      ? ` (Assigned to ${duplicate.assignedTo})`
+                      : ""}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
       )}

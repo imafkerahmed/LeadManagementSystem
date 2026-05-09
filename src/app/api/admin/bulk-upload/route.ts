@@ -5,10 +5,30 @@ function generateLeadId(lastNum: number): string {
   return `AMZ/LEAD/${String(lastNum + 1).padStart(4, "0")}`;
 }
 
+function normalizeMobileWithCountry(value: string): string {
+  const compact = value.trim().replace(/[^\d+]/g, "");
+  if (!compact) return "";
+
+  if (compact.startsWith("+")) {
+    return `+${compact.replace(/\D/g, "")}`;
+  }
+
+  // Accept digit-only values from CSV (e.g. 94718777704) as canonical intl format.
+  const digits = compact.replace(/\D/g, "");
+  return digits ? `+${digits}` : "";
+}
+
 type CounselorRecord = {
   id: string;
   name?: string;
   email?: string;
+};
+
+type DuplicateLeadInfo = {
+  row: number;
+  studentName: string;
+  mobileWithCountry: string;
+  assignedTo?: string;
 };
 
 async function getAssignableCounselors(
@@ -78,6 +98,7 @@ export async function POST(request: NextRequest) {
     let uploadedCount = 0;
     let failedCount = 0;
     const errors: Array<{ row: number; message: string }> = [];
+    const duplicateLeads: DuplicateLeadInfo[] = [];
 
     const counselors = await getAssignableCounselors(pb, selectedCounselorIds);
 
@@ -127,10 +148,51 @@ export async function POST(request: NextRequest) {
         const lead = leads[i];
 
         // Validate required fields
-        if (!lead.studentName || !lead.mobile || !lead.course) {
+        if (!lead.studentName || !lead.course) {
           errors.push({ row: i + 2, message: "Missing required fields" });
           failedCount++;
           continue;
+        }
+
+        const mobileWithCountry = normalizeMobileWithCountry(
+          lead.mobileWithCountry || lead.mobile || "",
+        );
+        if (!mobileWithCountry) {
+          errors.push({ row: i + 2, message: "Missing mobile number" });
+          failedCount++;
+          continue;
+        }
+
+        // Skip insert when this mobile already exists and collect duplicates for user review.
+        try {
+          const existingLead = await pb
+            .collection("leads")
+            .getFirstListItem(`mobileWithCountry = \"${mobileWithCountry}\"`, {
+              expand: "assignedTo",
+              fields:
+                "id,mobileWithCountry,studentName,assignedTo,expand.assignedTo.name,expand.assignedTo.email",
+            });
+
+          duplicateLeads.push({
+            row: i + 2,
+            studentName: existingLead.studentName || lead.studentName || "",
+            mobileWithCountry,
+            assignedTo:
+              existingLead.expand?.assignedTo?.name ||
+              existingLead.expand?.assignedTo?.email ||
+              existingLead.assignedTo ||
+              "",
+          });
+          failedCount++;
+          continue;
+        } catch (lookupError: unknown) {
+          const status =
+            lookupError instanceof Object && "status" in lookupError
+              ? (lookupError as { status?: number }).status
+              : undefined;
+          if (status !== 404) {
+            throw lookupError;
+          }
         }
 
         // Determine assigned counselor id (PocketBase relation expects IDs)
@@ -176,9 +238,7 @@ export async function POST(request: NextRequest) {
           const createdLead = await pb.collection("leads").create({
             leadId,
             studentName: lead.studentName,
-            // write both fields to cover schemas using either name
-            mobileNo: lead.mobile,
-            mobile: lead.mobile,
+            mobileWithCountry,
             email: lead.email || "",
             // write both course variants
             courseName: lead.course,
@@ -258,6 +318,7 @@ export async function POST(request: NextRequest) {
       failed: failedCount,
       message: `${uploadedCount} leads uploaded successfully`,
       errors: errors.length > 0 ? errors : undefined,
+      duplicates: duplicateLeads.length > 0 ? duplicateLeads : undefined,
     });
   } catch (error) {
     const errorMsg =
