@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, LogOut, X } from "lucide-react";
 import { createPocketBaseClient } from "@/lib/pocketbase";
@@ -78,30 +78,35 @@ const PAGE_SIZE = 8;
 
 export default function CounselorPage() {
   const router = useRouter();
-  const counselorAuthSnapshot = useSyncExternalStore(
-    () => () => {},
-    () => {
-      const pb = createPocketBaseClient();
-      const authUser = pb.authStore.model as {
-        id?: string;
-        name?: string;
-        role?: string;
-      } | null;
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isCounselor, setIsCounselor] = useState(false);
+  const [counselorId, setCounselorId] = useState("");
+  const [counselorName, setCounselorName] = useState("Student Counsellor");
 
-      const isValid =
-        pb.authStore.isValid && authUser?.role === "student-counsellor";
-      const counselorId = isValid ? authUser?.id || "" : "";
-      const counselorName = isValid
-        ? authUser?.name || "Student Counsellor"
-        : "Student Counsellor";
+  useEffect(() => {
+    const pb = createPocketBaseClient();
+    const authUser = pb.authStore.model as {
+      id?: string;
+      name?: string;
+      role?: string;
+    } | null;
 
-      return `${isValid ? "1" : "0"}|${counselorId}|${counselorName}`;
-    },
-    () => "0||Student Counsellor",
-  );
+    const isValid =
+      pb.authStore.isValid && authUser?.role === "student-counsellor";
 
-  const [authFlag, counselorId, counselorName] =
-    counselorAuthSnapshot.split("|");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAuthChecked(true);
+
+    if (!isValid) {
+      setIsCounselor(false);
+      router.replace("/");
+      return;
+    }
+
+    setIsCounselor(true);
+    setCounselorId(authUser?.id || "");
+    setCounselorName(authUser?.name || "Student Counsellor");
+  }, [router]);
 
   const [tab, setTab] = useState<"followup" | "addlead">("followup");
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -124,12 +129,6 @@ export default function CounselorPage() {
   const [newLeadSource, setNewLeadSource] = useState("Direct");
   const [toastMsg, setToastMsg] = useState("");
   const [toastType, setToastType] = useState<"success" | "error">("success");
-
-  useEffect(() => {
-    if (authFlag !== "1") {
-      router.replace("/");
-    }
-  }, [authFlag, router]);
 
   useEffect(() => {
     const loadUserLookup = async () => {
@@ -168,6 +167,14 @@ export default function CounselorPage() {
 
   const fetchLeads = useCallback(
     async (userId: string, selectedLeadId?: string) => {
+      // Guard: don't fetch if user ID is empty
+      if (!userId || userId.trim() === "") {
+        console.debug("Skipping fetch leads: empty userId");
+        setLeads([]);
+        setSelectedLead(null);
+        return;
+      }
+
       try {
         const pb = createPocketBaseClient();
         const safeUserId = userId.replaceAll('"', '\\"');
@@ -395,7 +402,25 @@ export default function CounselorPage() {
     currentPage * PAGE_SIZE,
   );
 
-  if (authFlag !== "1") {
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-white px-4 py-8 sm:px-6 sm:py-10">
+        <div className="mx-auto w-full max-w-5xl space-y-6">
+          <div className="h-14 rounded-lg bg-slate-100 animate-pulse" />
+          <div className="grid grid-cols-1 gap-6">
+            {[...Array(3)].map((_, i) => (
+              <div
+                key={i}
+                className="h-32 rounded-lg bg-slate-100 animate-pulse"
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isCounselor) {
     return null;
   }
 

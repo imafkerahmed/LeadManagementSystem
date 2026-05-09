@@ -69,7 +69,7 @@ jobs:
 
           echo "📋 Checking for existing container..."
           CONTAINER_NAME="lead-management-app"
-          
+
           # Force stop and remove container if it exists
           if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
             echo "🛑 Stopping and removing existing container..."
@@ -80,13 +80,13 @@ jobs:
 
           echo "📦 Pulling latest image..."
           docker compose pull
-          
+
           echo "🚀 Starting new container..."
           docker compose up -d --no-build
-          
+
           echo "🧹 Cleaning up unused images..."
           docker image prune -f
-          
+
           echo "📋 Verifying deployment..."
           sleep 3
           docker compose ps
