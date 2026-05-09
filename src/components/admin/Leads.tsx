@@ -164,6 +164,13 @@ function formatLeadId(sequence: number): string {
 }
 
 export default function AdminLeads() {
+  const authModel = createPocketBaseClient().authStore.model as {
+    name?: string;
+    email?: string;
+  } | null;
+  const currentUserName =
+    authModel?.name || authModel?.email || "Amazon College Team";
+
   const [leads, setLeads] = useState<Lead[]>([]);
   const [filteredLeads, setFilteredLeads] = useState<Lead[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -1182,7 +1189,7 @@ export default function AdminLeads() {
                             ).replace(
                               /\D/g,
                               "",
-                            )}?text=${encodeURIComponent(`Hello, I'm ${selectedLead.studentName} from Amazon College. I'm reaching out regarding your inquiry about ${selectedLead.course}. How may I assist you today?`)}`,
+                            )}?text=${encodeURIComponent(`Hello, I'm ${currentUserName} from Amazon College. I'm reaching out regarding your inquiry about ${selectedLead.course}. How may I assist you today?`)}`,
                             "_blank",
                           )
                         }

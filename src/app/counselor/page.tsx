@@ -1312,7 +1312,7 @@ export default function CounselorPage() {
                           selectedLead.mobileWithCountry ||
                             `${selectedLead.countryCode}-${selectedLead.mobile}`,
                         ).replace(/\D/g, "")}?text=${encodeURIComponent(
-                          "Hi " + selectedLead.name,
+                          `Hello, I'm ${counselorName} from Amazon College. I'm reaching out regarding your inquiry about ${selectedLead.course}. How may I assist you today?`,
                         )}`,
                         "_blank",
                       )
