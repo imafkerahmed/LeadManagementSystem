@@ -8,9 +8,15 @@ export async function GET() {
     // _pb_users_auth_ stores auth user records (counsellors/students)
     const list = await pb.collection("_pb_users_auth_").getFullList();
 
-    const users = (list || []).map((u: any) => ({
-      id: u.id,
-      name: u.name || u.username || u.email || u.id,
+    type AuthUser = {
+      id?: string;
+      name?: string;
+      username?: string;
+      email?: string;
+    };
+    const users = (list || []).map((u: AuthUser) => ({
+      id: u.id || "",
+      name: u.name || u.username || u.email || u.id || "",
       email: u.email,
     }));
 

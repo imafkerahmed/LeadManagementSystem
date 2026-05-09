@@ -90,21 +90,28 @@ export default function BulkUpload({
         try {
           const err = await response.json();
           setLookupError(err?.error || JSON.stringify(err));
-        } catch (e) {
+        } catch {
           setLookupError(`Lookup failed: ${response.status}`);
         }
-      } catch (e) {
-        console.error("users lookup fetch failed", e);
-        setLookupError(e instanceof Error ? e.message : String(e));
+      } catch {
+        console.error("users lookup fetch failed");
+        setLookupError("Lookup failed");
       }
 
       // Fallback: query PocketBase directly using client
       try {
         const pb = createPocketBaseClient();
+        type PBUser = {
+          id?: string;
+          name?: string;
+          email?: string;
+          role?: string;
+          accountStatus?: string;
+        };
         const users = (await pb.collection("users").getFullList({
           sort: "name",
           requestKey: null,
-        })) as any[];
+        })) as PBUser[];
 
         const filtered = users
           .filter((u) => {
@@ -112,8 +119,8 @@ export default function BulkUpload({
             return accountStatus === "enabled" || accountStatus === "active";
           })
           .map((user) => ({
-            id: user.id,
-            name: user.name || user.email || user.id,
+            id: user.id || "",
+            name: user.name || user.email || user.id || "",
             email: user.email,
             role: user.role,
           }));

@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { getPocketBaseAdminClient } from "@/lib/pocketbase";
 
+type PBUser = { id?: string; name?: string; email?: string };
+type PBEntry = {
+  id?: string;
+  expand?: { changedBy?: PBUser };
+  changedBy?: string;
+};
+
 export async function GET() {
   try {
     const pb = await getPocketBaseAdminClient();
@@ -18,7 +25,7 @@ export async function GET() {
         sort: "-created",
         expand: "changedBy,studentName,leadId",
       });
-    } catch (e) {
+    } catch {
       // If expand fails, fetch without it
       history = await pb.collection("leadHistory").getFullList({
         sort: "-created",
@@ -30,17 +37,17 @@ export async function GET() {
 
     // Get users from the users collection
     try {
-      const users = await pb.collection("users").getFullList();
-      (users || []).forEach((u: any) => {
-        userIdToName.set(u.id, u.name || u.email || u.id);
+      const users = (await pb.collection("users").getFullList()) as PBUser[];
+      (users || []).forEach((u) => {
+        userIdToName.set(u.id || "", u.name || u.email || u.id || "");
       });
-    } catch (e) {
-      console.debug("Failed to fetch users for resolution:", e);
+    } catch (err) {
+      console.debug("Failed to fetch users for resolution:", err);
     }
 
     // Manually resolve changedBy by querying for the user details
     // This is a workaround for when changedBy points to auth users
-    const historyWithResolvedNames = history.map((entry: any) => ({
+    const historyWithResolvedNames = (history as PBEntry[]).map((entry) => ({
       ...entry,
       changedByResolved: resolveChangedBy(entry, userIdToName),
     }));
@@ -58,10 +65,7 @@ export async function GET() {
   }
 }
 
-function resolveChangedBy(
-  entry: any,
-  userIdToName: Map<string, string>,
-): string {
+function resolveChangedBy(entry: PBEntry, userIdToName: Map<string, string>) {
   // First try expand
   if (entry.expand?.changedBy?.name) return entry.expand.changedBy.name;
   if (entry.expand?.changedBy?.email) return entry.expand.changedBy.email;

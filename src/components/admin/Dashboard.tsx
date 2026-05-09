@@ -43,6 +43,7 @@ type HistoryRecord = {
       email?: string;
     };
   };
+  changedByResolved?: string;
 };
 
 type RecentActivityItem = {
@@ -244,7 +245,7 @@ export default function AdminDashboard() {
           admins.forEach((a) => {
             userLookup.set(a.id, a.name || a.email || a.id);
           });
-        } catch (e) {
+        } catch {
           // ignore parse errors
         }
       }
@@ -256,7 +257,7 @@ export default function AdminDashboard() {
           authUsers.forEach((u) => {
             userLookup.set(u.id, u.name || u.email || u.id);
           });
-        } catch (e) {
+        } catch {
           // ignore
         }
       }
@@ -378,7 +379,7 @@ export default function AdminDashboard() {
 
       const recentActivity = (history as HistoryRecord[])
         .slice(0, 20)
-        .map((entry: any) => ({
+        .map((entry: HistoryRecord) => ({
           studentName:
             entry.expand?.leadId?.studentName ||
             leadIdToName.get(entry.expand?.leadId?.id || entry.leadId || "") ||

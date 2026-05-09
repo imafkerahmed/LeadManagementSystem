@@ -66,25 +66,12 @@ type LeadRecord = {
       id?: string;
       name?: string;
       email?: string;
+      role?: string;
     };
   };
 };
 
-type HistoryRecord = {
-  id: string;
-  eventType?: string;
-  changedBy?: string;
-  comment?: string;
-  oldValue?: string;
-  newValue?: string;
-  created?: string;
-  expand?: {
-    changedBy?: {
-      name?: string;
-      email?: string;
-    };
-  };
-};
+// HistoryRecord type removed — use TimelineEntry for timeline items
 
 type CreateLeadPayload = {
   studentName: string;
@@ -150,45 +137,49 @@ export default function AdminLeads() {
     null,
   );
 
-  const mapLead = (record: LeadRecord): Lead => {
-    const rawAssignedTo = (record.assignedTo || "").trim();
-    const lookupById = usersLookup.find((user) => user.id === rawAssignedTo);
-    const lookupByName = usersLookup.find(
-      (user) => (user.name || "").toLowerCase() === rawAssignedTo.toLowerCase(),
-    );
-    const assignedName =
-      record.expand?.assignedTo?.name ||
-      record.expand?.assignedTo?.email ||
-      lookupById?.name ||
-      lookupByName?.name ||
-      rawAssignedTo ||
-      "Unassigned";
-
-    const assignedRole =
-      (record.expand?.assignedTo as any)?.role ||
-      lookupById?.role ||
-      lookupByName?.role ||
-      "";
-
-    return {
-      id: record.id,
-      leadId: record.leadId || "",
-      studentName: record.studentName || "",
-      mobile: record.mobileNo || record.mobile || "",
-      email: record.email || "",
-      course: record.courseName || record.course || "",
-      leadSource: record.leadSource || "",
-      status: record.leadStatus || record.status || "",
-      assignedTo: assignedName + (assignedRole ? ` — ${assignedRole}` : ""),
-      assignedToId:
-        record.expand?.assignedTo?.id ||
-        lookupById?.id ||
-        lookupByName?.id ||
+  const mapLead = useCallback(
+    (record: LeadRecord): Lead => {
+      const rawAssignedTo = (record.assignedTo || "").trim();
+      const lookupById = usersLookup.find((user) => user.id === rawAssignedTo);
+      const lookupByName = usersLookup.find(
+        (user) =>
+          (user.name || "").toLowerCase() === rawAssignedTo.toLowerCase(),
+      );
+      const assignedName =
+        record.expand?.assignedTo?.name ||
+        record.expand?.assignedTo?.email ||
+        lookupById?.name ||
+        lookupByName?.name ||
         rawAssignedTo ||
-        "",
-      comments: record.latestComment || "",
-    };
-  };
+        "Unassigned";
+
+      const assignedRole =
+        record.expand?.assignedTo?.role ||
+        lookupById?.role ||
+        lookupByName?.role ||
+        "";
+
+      return {
+        id: record.id,
+        leadId: record.leadId || "",
+        studentName: record.studentName || "",
+        mobile: record.mobileNo || record.mobile || "",
+        email: record.email || "",
+        course: record.courseName || record.course || "",
+        leadSource: record.leadSource || "",
+        status: record.leadStatus || record.status || "",
+        assignedTo: assignedName + (assignedRole ? ` — ${assignedRole}` : ""),
+        assignedToId:
+          record.expand?.assignedTo?.id ||
+          lookupById?.id ||
+          lookupByName?.id ||
+          rawAssignedTo ||
+          "",
+        comments: record.latestComment || "",
+      };
+    },
+    [usersLookup],
+  );
 
   const syncDraftFromLead = (lead: Lead | null) => {
     if (!lead) {
@@ -215,12 +206,6 @@ export default function AdminLeads() {
 
   useEffect(() => {
     const loadUsers = async () => {
-      const normalizeRole = (role?: string) =>
-        (role || "")
-          .toLowerCase()
-          .replace(/[_\s]+/g, "-")
-          .trim();
-
       const isAssignableCounselor = (user: UserLookupRecord) => {
         const accountStatus = (user.accountStatus || "").toLowerCase();
         return accountStatus === "enabled" || accountStatus === "active";
@@ -233,31 +218,41 @@ export default function AdminLeads() {
           fetch("/api/auth-users/lookup"),
         ]);
 
-        let combined: any[] = [];
+        let combined: UserLookupRecord[] = [];
         if (resUsers.ok) {
           const u = await resUsers.json();
-          if (Array.isArray(u)) combined = combined.concat(u);
+          if (Array.isArray(u))
+            combined = combined.concat(u as UserLookupRecord[]);
         }
         if (resAdmins && resAdmins.ok) {
           const a = await resAdmins.json();
           if (Array.isArray(a))
             combined = combined.concat(
-              a.map((ad: any) => ({
-                id: ad.id,
-                name: ad.name,
-                email: ad.email,
-                role: "admin",
-              })),
+              (a as Array<{ id?: string; name?: string; email?: string }>).map(
+                (ad) => ({
+                  id: ad.id || "",
+                  name: ad.name || ad.email || "",
+                  email: ad.email,
+                  role: "admin",
+                }),
+              ),
             );
         }
 
         if (resAuthUsers && resAuthUsers.ok) {
           const au = await resAuthUsers.json();
-          if (Array.isArray(au)) combined = combined.concat(au);
+          if (Array.isArray(au))
+            combined = combined.concat(au as UserLookupRecord[]);
         }
 
         if (combined.length > 0) {
-          setUsersLookup(combined);
+          setUsersLookup(
+            combined.map((u) => ({
+              id: u.id,
+              name: u.name || u.email || u.id || "",
+              role: u.role,
+            })),
+          );
           return;
         }
       } catch (e) {
@@ -353,7 +348,7 @@ export default function AdminLeads() {
         setIsLoading(false);
       }
     },
-    [statusFilter, counselorFilter, searchTerm],
+    [statusFilter, counselorFilter, searchTerm, mapLead],
   );
 
   useEffect(() => {
@@ -390,15 +385,18 @@ export default function AdminLeads() {
         }
 
         setTimeline(
-          (history as any[]).map((h) => ({
-            id: h.id,
-            eventType: h.eventType || "",
-            changedBy: h.changedBy || "Unknown",
-            comment: h.comment,
-            oldValue: h.oldValue,
-            newValue: h.newValue,
-            created: h.created || "",
-          })),
+          (history as Array<Record<string, unknown>>).map((h) => {
+            const hh = h as Record<string, unknown>;
+            return {
+              id: String(hh["id"] ?? ""),
+              eventType: String(hh["eventType"] ?? ""),
+              changedBy: String(hh["changedBy"] ?? "Unknown"),
+              comment: (hh["comment"] as string | undefined) ?? undefined,
+              oldValue: (hh["oldValue"] as string | undefined) ?? undefined,
+              newValue: (hh["newValue"] as string | undefined) ?? undefined,
+              created: String(hh["created"] ?? ""),
+            } as TimelineEntry;
+          }),
         );
       } catch (e) {
         console.error("Failed to load timeline", e);
@@ -1134,6 +1132,8 @@ function NewLeadForm({
 
   useEffect(() => {
     if (!assignee && users.length > 0) {
+      // setting state from effect to initialize default assignee is intended
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAssignee(users[0].id);
     }
   }, [users, assignee]);

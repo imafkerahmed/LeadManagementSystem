@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { LogOut, BarChart3, Users, Upload, Settings } from "lucide-react";
 import AdminDashboard from "@/components/admin/Dashboard";
 import AdminLeads from "@/components/admin/Leads";
@@ -23,17 +23,23 @@ const isValidTab = (value: string | null): value is AdminTab =>
 
 export default function AdminPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const [currentTab, setCurrentTab] = useState<AdminTab>("dashboard");
 
   const [authChecked, setAuthChecked] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminId, setAdminId] = useState("");
   const [adminLabel, setAdminLabel] = useState("Admin");
 
-  const currentTab = useMemo<AdminTab>(() => {
-    const tab = searchParams.get("tab");
-    return isValidTab(tab) ? tab : "dashboard";
-  }, [searchParams]);
+  useEffect(() => {
+    // read URL on mount to restore active tab
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab");
+      if (isValidTab(tab)) setCurrentTab(tab);
+    } catch {
+      // ignore
+    }
+  }, []);
 
   useEffect(() => {
     const pb = createPocketBaseClient();
@@ -45,6 +51,8 @@ export default function AdminPage() {
     } | null;
 
     const validAdmin = pb.authStore.isValid && authUser?.role === "admin";
+    // setting mount-time auth state is intentional to avoid hydration redirects
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAuthChecked(true);
 
     if (!validAdmin) {
@@ -81,6 +89,7 @@ export default function AdminPage() {
   }
 
   const setTab = (tab: AdminTab) => {
+    setCurrentTab(tab);
     if (tab === "dashboard") {
       router.replace("/admin", { scroll: false });
       return;

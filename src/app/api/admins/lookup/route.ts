@@ -9,22 +9,25 @@ export async function GET() {
     let admins: Array<{ id: string; email?: string; name?: string }> = [];
     try {
       // pocketbase SDK exposes an admins service
-      // @ts-ignore
-      const list = await pb.admins.getFullList();
-      admins = (list || []).map((a: any) => ({
-        id: a.id,
-        email: a.email,
-        name: a.name || a.email,
-      }));
-    } catch (e) {
+      const list = await (pb as any).admins?.getFullList?.();
+      admins = (list || []).map(
+        (a: { id?: string; email?: string; name?: string }) => ({
+          id: a.id || "",
+          email: a.email,
+          name: a.name || a.email,
+        }),
+      );
+    } catch {
       // Fall back to direct collection call if admins service isn't present
       try {
         const coll = await pb.collection("admins").getFullList();
-        admins = (coll || []).map((a: any) => ({
-          id: a.id,
-          email: a.email,
-          name: a.name || a.email,
-        }));
+        admins = (coll || []).map(
+          (a: { id?: string; email?: string; name?: string }) => ({
+            id: a.id || "",
+            email: a.email,
+            name: a.name || a.email,
+          }),
+        );
       } catch (err) {
         // ignore, return empty array
         console.debug("No admins found or unable to list admins", err);

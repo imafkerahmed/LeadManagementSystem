@@ -17,12 +17,6 @@ export async function GET() {
       sort: "name",
     })) as UserRecord[];
 
-    const normalizeRole = (role?: string) =>
-      (role || "")
-        .toLowerCase()
-        .replace(/[_\s]+/g, "-")
-        .trim();
-
     // Show all users with accountStatus = "enabled" or "active", regardless of role
     const assignableUsers = users.filter((user) => {
       const accountStatus = (user.accountStatus || "").toLowerCase();

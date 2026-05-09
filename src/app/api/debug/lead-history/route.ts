@@ -10,7 +10,7 @@ export async function GET() {
       expand: "changedBy,studentName,leadId",
     });
 
-    return NextResponse.json(history.items || []);
+    return NextResponse.json(history || []);
   } catch (error) {
     console.error("Debug lead-history error:", error);
     return NextResponse.json({ error: "failed" }, { status: 500 });

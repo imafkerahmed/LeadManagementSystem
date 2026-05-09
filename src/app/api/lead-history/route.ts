@@ -23,7 +23,7 @@ export async function GET(request: Request) {
         sort: "-created",
         expand: "changedBy,studentName,leadId",
       });
-    } catch (e) {
+    } catch {
       // Fall back to query without expand
       history = await pb.collection("leadHistory").getFullList({
         filter: `leadId = "${leadId}"`,
@@ -34,24 +34,40 @@ export async function GET(request: Request) {
     // Try to get user list for fallback resolution
     const userIdToName = new Map<string, string>();
     try {
-      const users = await pb.collection("users").getFullList();
-      (users || []).forEach((u: any) => {
-        userIdToName.set(u.id, u.name || u.email || u.id);
+      type PBUser = { id?: string; name?: string; email?: string };
+      const users = (await pb.collection("users").getFullList()) as PBUser[];
+      (users || []).forEach((u) => {
+        userIdToName.set(u.id || "", u.name || u.email || u.id || "");
       });
-    } catch (e) {
+    } catch {
       // ignore
     }
 
     // Get the lead to resolve student name
-    let lead: any = null;
+    let lead: { studentName?: string } | null = null;
     try {
       lead = await pb.collection("leads").getOne(leadId);
-    } catch (e) {
+    } catch {
       // ignore
     }
 
     // Resolve changedBy and studentName
-    const resolved = history.map((entry: any) => ({
+    type Entry = {
+      id?: string;
+      eventType?: string;
+      comment?: string;
+      oldValue?: string;
+      newValue?: string;
+      created?: string;
+      expand?: {
+        leadId?: { studentName?: string };
+        changedBy?: { name?: string; email?: string };
+      };
+      leadId?: string;
+      changedBy?: string;
+    };
+
+    const resolved = (history as Entry[]).map((entry) => ({
       id: entry.id,
       eventType: entry.eventType,
       comment: entry.comment,
@@ -66,7 +82,7 @@ export async function GET(request: Request) {
       changedBy:
         entry.expand?.changedBy?.name ||
         entry.expand?.changedBy?.email ||
-        userIdToName.get(entry.changedBy) ||
+        userIdToName.get(entry.changedBy || "") ||
         entry.changedBy ||
         "Unknown",
     }));
