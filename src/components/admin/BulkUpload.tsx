@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Papa from "papaparse";
 import { Upload, X } from "lucide-react";
+import { createPocketBaseClient } from "@/lib/pocketbase";
+import { toast } from "sonner";
 
 interface Lead {
   studentName: string;
@@ -20,6 +22,7 @@ interface CounselorOption {
   id: string;
   name: string;
   email?: string;
+  role?: string;
 }
 
 interface BulkUploadProps {
@@ -60,6 +63,7 @@ export default function BulkUpload({
   );
   const [isUploading, setIsUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
+  const [lookupError, setLookupError] = useState<string | null>(null);
 
   const csvFieldLabels: Record<CsvField, string> = {
     studentName: "Student Name",
@@ -71,19 +75,66 @@ export default function BulkUpload({
 
   useEffect(() => {
     const loadCounselors = async () => {
+      setLookupError(null);
       try {
         const response = await fetch("/api/users/lookup");
-        if (!response.ok) {
+        if (response.ok) {
+          const data = (await response.json()) as CounselorOption[];
+          const nextCounselors = Array.isArray(data) ? data : [];
+          setCounselors(nextCounselors);
+          setSelectedCounselorIds(nextCounselors.map((c) => c.id));
           return;
         }
 
-        const data = (await response.json()) as CounselorOption[];
-        const nextCounselors = Array.isArray(data) ? data : [];
-        setCounselors(nextCounselors);
-        setSelectedCounselorIds(
-          nextCounselors.map((counselor) => counselor.id),
+        // try to read error body for debugging
+        try {
+          const err = await response.json();
+          setLookupError(err?.error || JSON.stringify(err));
+        } catch (e) {
+          setLookupError(`Lookup failed: ${response.status}`);
+        }
+      } catch (e) {
+        console.error("users lookup fetch failed", e);
+        setLookupError(e instanceof Error ? e.message : String(e));
+      }
+
+      // Fallback: query PocketBase directly using client
+      try {
+        const pb = createPocketBaseClient();
+        const users = (await pb.collection("users").getFullList({
+          sort: "name",
+          requestKey: null,
+        })) as any[];
+
+        const filtered = users
+          .filter((u) => {
+            const accountStatus = (u.accountStatus || "").toLowerCase();
+            return accountStatus === "enabled" || accountStatus === "active";
+          })
+          .map((user) => ({
+            id: user.id,
+            name: user.name || user.email || user.id,
+            email: user.email,
+            role: user.role,
+          }));
+
+        if (filtered.length > 0) {
+          setCounselors(filtered);
+          setSelectedCounselorIds(filtered.map((c) => c.id));
+          setLookupError(null);
+          return;
+        }
+
+        // no counselors found
+        setCounselors([]);
+        setSelectedCounselorIds([]);
+      } catch (fallbackError) {
+        console.error("Fallback users lookup failed", fallbackError);
+        setLookupError(
+          fallbackError instanceof Error
+            ? fallbackError.message
+            : String(fallbackError),
         );
-      } catch {
         setCounselors([]);
         setSelectedCounselorIds([]);
       }
@@ -258,7 +309,18 @@ export default function BulkUpload({
       });
 
       const result = await response.json();
-      setUploadResult(result);
+      if (!response.ok) {
+        const message = result?.error || result?.message || "Upload failed";
+        setUploadResult({ success: false, message });
+        toast.error(message);
+      } else {
+        setUploadResult(result);
+        if (result?.success) {
+          toast.success(result.message || "Leads uploaded");
+        } else {
+          toast.error(result.message || "Upload completed with errors");
+        }
+      }
     } catch {
       setUploadResult({ success: false, message: "Upload failed" });
     } finally {
@@ -526,9 +588,15 @@ export default function BulkUpload({
             </div>
 
             {counselors.length === 0 ? (
-              <p className="mt-3 text-sm text-gray-500">
-                No active counselors were found.
-              </p>
+              <div className="mt-3 text-sm">
+                {lookupError ? (
+                  <p className="text-red-600">{lookupError}</p>
+                ) : (
+                  <p className="text-gray-500">
+                    No active counselors were found.
+                  </p>
+                )}
+              </div>
             ) : (
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 {counselors.map((counselor) => {
@@ -561,9 +629,9 @@ export default function BulkUpload({
                         <span className="block font-medium text-gray-900">
                           {counselor.name}
                         </span>
-                        {counselor.email && (
+                        {counselor.role && (
                           <span className="block truncate text-sm text-gray-500">
-                            {counselor.email}
+                            {counselor.role}
                           </span>
                         )}
                       </span>

@@ -15,22 +15,20 @@ async function getAssignableCounselors(
   pb: Awaited<ReturnType<typeof getPocketBaseAdminClient>>,
   selectedCounselorIds?: string[],
 ) {
-  const activeFilter =
-    'role = "student-counsellor" && accountStatus = "active"';
-  const fallbackFilter = 'role = "student-counsellor"';
+  // Get all users with accountStatus = "enabled" or "active", regardless of role
+  const enabledFilter =
+    '(accountStatus = "enabled" || accountStatus = "active")';
 
   let counselors = [] as CounselorRecord[];
 
   try {
     counselors = (await pb.collection("users").getFullList({
-      filter: activeFilter,
+      filter: enabledFilter,
       fields: "id,name,email",
     })) as CounselorRecord[];
-  } catch {
-    counselors = (await pb.collection("users").getFullList({
-      filter: fallbackFilter,
-      fields: "id,name,email",
-    })) as CounselorRecord[];
+  } catch (error) {
+    console.error("Error fetching enabled users:", error);
+    // Return empty array on error
   }
 
   const selectedIds = selectedCounselorIds?.filter(Boolean) ?? [];
@@ -178,11 +176,17 @@ export async function POST(request: NextRequest) {
           const createdLead = await pb.collection("leads").create({
             leadId,
             studentName: lead.studentName,
+            // write both fields to cover schemas using either name
             mobileNo: lead.mobile,
+            mobile: lead.mobile,
             email: lead.email || "",
+            // write both course variants
             courseName: lead.course,
+            course: lead.course,
             leadSource: lead.leadSource || "Bulk Upload",
+            // write both status variants used across codebase
             leadStatus: "New",
+            status: "New",
             assignedTo: assignedCounselorId,
             latestComment: "Lead imported",
             addedDate: leadNow,
@@ -256,9 +260,19 @@ export async function POST(request: NextRequest) {
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error) {
-    console.error("Error uploading leads:", error);
+    const errorMsg =
+      error instanceof Error ? error.message : "Failed to upload leads";
+    console.error("Error uploading leads:", errorMsg);
+    console.error("Full error details:", {
+      message: errorMsg,
+      error: error,
+      stack: error instanceof Error ? error.stack : "No stack",
+    });
     return NextResponse.json(
-      { error: "Failed to upload leads" },
+      {
+        error: errorMsg,
+        details: error instanceof Error ? error.stack : undefined,
+      },
       { status: 500 },
     );
   }

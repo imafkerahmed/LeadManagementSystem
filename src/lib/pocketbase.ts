@@ -25,11 +25,46 @@ export async function getPocketBaseAdminClient() {
   }
 
   if (!pbAdminInstance.authStore.isValid) {
+    if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+      const msg =
+        "POCKETBASE admin credentials are not configured (POCKETBASE_ADMIN_EMAIL / POCKETBASE_ADMIN_PASSWORD).";
+      console.error(msg);
+      throw new Error(msg);
+    }
+
     try {
-      await pbAdminInstance.admins.authWithPassword(
-        ADMIN_EMAIL,
-        ADMIN_PASSWORD,
-      );
+      // Use HTTP API directly instead of SDK method to support newer PocketBase versions
+      const authUrl = new URL(
+        "/api/admins/auth-with-password",
+        pocketBaseUrl,
+      ).toString();
+      const response = await fetch(authUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          identity: ADMIN_EMAIL,
+          password: ADMIN_PASSWORD,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          `Admin auth failed: ${response.status} ${errorData.message || response.statusText}`,
+        );
+      }
+
+      const data = (await response.json()) as {
+        token?: string;
+        admin?: { id?: string };
+      };
+
+      // Manually set the token in the PocketBase client
+      if (data.token) {
+        pbAdminInstance.authStore.save(data.token, data.admin || {});
+      } else {
+        throw new Error("No auth token received from PocketBase");
+      }
     } catch (error) {
       console.error("Failed to authenticate as admin:", error);
       throw error;

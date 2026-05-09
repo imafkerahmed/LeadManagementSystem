@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, LogOut, X } from "lucide-react";
 import { createPocketBaseClient } from "@/lib/pocketbase";
+import { toast } from "sonner";
 
 interface Lead {
   id: string;
@@ -161,6 +162,8 @@ export default function CounselorPage() {
     setToastMsg(msg);
     setToastType(type);
     setTimeout(() => setToastMsg(""), 3000);
+    if (type === "success") toast.success(msg);
+    else toast.error(msg);
   };
 
   const fetchLeads = useCallback(

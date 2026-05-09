@@ -48,7 +48,7 @@ node scripts/setup-pocketbase.js
 - `email` (Email, Required)
 - `name` (Text, Required)
 - `role` (Select: admin, student-counsellor | Required)
-- `accountStatus` (Select: active, disabled | Required)
+- `accountStatus` (Select: enabled, disabled | Required)
 
 ### Collection 2: `leads`
 

@@ -11,6 +11,17 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { createPocketBaseClient } from "@/lib/pocketbase";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Lead {
   id: string;
@@ -40,10 +51,13 @@ type LeadRecord = {
   id: string;
   leadId?: string;
   studentName?: string;
+  mobile?: string;
   mobileNo?: string;
   email?: string;
+  course?: string;
   courseName?: string;
   leadSource?: string;
+  status?: string;
   leadStatus?: string;
   assignedTo?: string;
   latestComment?: string;
@@ -81,7 +95,26 @@ type CreateLeadPayload = {
   assignee?: string;
 };
 
+type UserLookupRecord = {
+  id: string;
+  name?: string;
+  email?: string;
+  role?: string;
+  accountStatus?: string;
+  active?: boolean;
+};
+
 const PAGE_SIZE = 10;
+
+function parseLeadSequence(leadId?: string): number {
+  if (!leadId) return 0;
+  const match = leadId.match(/AMZ\/LEAD\/(\d+)/i);
+  return match ? Number.parseInt(match[1], 10) || 0 : 0;
+}
+
+function formatLeadId(sequence: number): string {
+  return `AMZ/LEAD/${String(sequence).padStart(4, "0")}`;
+}
 
 export default function AdminLeads() {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -107,29 +140,55 @@ export default function AdminLeads() {
   const [draftCourse, setDraftCourse] = useState("");
   const [draftLeadSource, setDraftLeadSource] = useState("");
   const [usersLookup, setUsersLookup] = useState<
-    Array<{ id: string; name: string }>
+    Array<{ id: string; name: string; role?: string }>
   >([]);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
+  const [deleteConfirmDialogOpen, setDeleteConfirmDialogOpen] = useState(false);
+  const [deleteConfirmLeadId, setDeleteConfirmLeadId] = useState<string | null>(
+    null,
+  );
 
-  const mapLead = (record: LeadRecord): Lead => ({
-    id: record.id,
-    leadId: record.leadId || "",
-    studentName: record.studentName || "",
-    mobile: record.mobileNo || "",
-    email: record.email || "",
-    course: record.courseName || "",
-    leadSource: record.leadSource || "",
-    status: record.leadStatus || "",
-    assignedTo:
+  const mapLead = (record: LeadRecord): Lead => {
+    const rawAssignedTo = (record.assignedTo || "").trim();
+    const lookupById = usersLookup.find((user) => user.id === rawAssignedTo);
+    const lookupByName = usersLookup.find(
+      (user) => (user.name || "").toLowerCase() === rawAssignedTo.toLowerCase(),
+    );
+    const assignedName =
       record.expand?.assignedTo?.name ||
       record.expand?.assignedTo?.email ||
-      record.assignedTo ||
-      "",
-    assignedToId: record.expand?.assignedTo?.id || record.assignedTo || "",
-    comments: record.latestComment || "",
-  });
+      lookupById?.name ||
+      lookupByName?.name ||
+      rawAssignedTo ||
+      "Unassigned";
+
+    const assignedRole =
+      (record.expand?.assignedTo as any)?.role ||
+      lookupById?.role ||
+      lookupByName?.role ||
+      "";
+
+    return {
+      id: record.id,
+      leadId: record.leadId || "",
+      studentName: record.studentName || "",
+      mobile: record.mobileNo || record.mobile || "",
+      email: record.email || "",
+      course: record.courseName || record.course || "",
+      leadSource: record.leadSource || "",
+      status: record.leadStatus || record.status || "",
+      assignedTo: assignedName + (assignedRole ? ` — ${assignedRole}` : ""),
+      assignedToId:
+        record.expand?.assignedTo?.id ||
+        lookupById?.id ||
+        lookupByName?.id ||
+        rawAssignedTo ||
+        "",
+      comments: record.latestComment || "",
+    };
+  };
 
   const syncDraftFromLead = (lead: Lead | null) => {
     if (!lead) {
@@ -156,13 +215,84 @@ export default function AdminLeads() {
 
   useEffect(() => {
     const loadUsers = async () => {
+      const normalizeRole = (role?: string) =>
+        (role || "")
+          .toLowerCase()
+          .replace(/[_\s]+/g, "-")
+          .trim();
+
+      const isAssignableCounselor = (user: UserLookupRecord) => {
+        const accountStatus = (user.accountStatus || "").toLowerCase();
+        return accountStatus === "enabled" || accountStatus === "active";
+      };
+
       try {
-        const res = await fetch("/api/users/lookup");
-        if (!res.ok) return;
-        const data = await res.json();
-        setUsersLookup(data || []);
+        const [resUsers, resAdmins, resAuthUsers] = await Promise.all([
+          fetch("/api/users/lookup"),
+          fetch("/api/admins/lookup"),
+          fetch("/api/auth-users/lookup"),
+        ]);
+
+        let combined: any[] = [];
+        if (resUsers.ok) {
+          const u = await resUsers.json();
+          if (Array.isArray(u)) combined = combined.concat(u);
+        }
+        if (resAdmins && resAdmins.ok) {
+          const a = await resAdmins.json();
+          if (Array.isArray(a))
+            combined = combined.concat(
+              a.map((ad: any) => ({
+                id: ad.id,
+                name: ad.name,
+                email: ad.email,
+                role: "admin",
+              })),
+            );
+        }
+
+        if (resAuthUsers && resAuthUsers.ok) {
+          const au = await resAuthUsers.json();
+          if (Array.isArray(au)) combined = combined.concat(au);
+        }
+
+        if (combined.length > 0) {
+          setUsersLookup(combined);
+          return;
+        }
       } catch (e) {
-        console.error("Failed to load users lookup", e);
+        if (
+          !(e instanceof Error && e.message.toLowerCase().includes("aborted"))
+        ) {
+          console.error("Failed to load users lookup", e);
+        }
+      }
+
+      // Fallback: query PocketBase directly using the current logged-in auth.
+      try {
+        const pb = createPocketBaseClient();
+        const users = (await pb.collection("users").getFullList({
+          sort: "name",
+          requestKey: null,
+        })) as UserLookupRecord[];
+
+        const counselors = users.filter(isAssignableCounselor).map((user) => ({
+          id: user.id,
+          name: user.name || user.email || user.id,
+          role: user.role,
+        }));
+
+        setUsersLookup(counselors);
+      } catch (fallbackError) {
+        if (
+          !(
+            fallbackError instanceof Error &&
+            fallbackError.message.toLowerCase().includes("aborted")
+          )
+        ) {
+          console.error("Fallback users lookup failed", fallbackError);
+        }
+        setUsersLookup([]);
       }
     };
 
@@ -252,20 +382,18 @@ export default function AdminLeads() {
         setSelectedLead(hydratedLead);
         syncDraftFromLead(hydratedLead);
 
-        const history = await pb.collection("leadHistory").getFullList({
-          filter: `leadId = "${lead.id}"`,
-          sort: "-created",
-          expand: "changedBy,studentName,leadId",
-        });
+        // Use server endpoint to get lead history with resolved names
+        const histRes = await fetch(`/api/lead-history?leadId=${lead.id}`);
+        let history = [];
+        if (histRes.ok) {
+          history = await histRes.json();
+        }
+
         setTimeline(
-          (history as HistoryRecord[]).map((h) => ({
+          (history as any[]).map((h) => ({
             id: h.id,
             eventType: h.eventType || "",
-            changedBy:
-              h.expand?.changedBy?.name ||
-              h.expand?.changedBy?.email ||
-              h.changedBy ||
-              "Unknown",
+            changedBy: h.changedBy || "Unknown",
             comment: h.comment,
             oldValue: h.oldValue,
             newValue: h.newValue,
@@ -287,16 +415,25 @@ export default function AdminLeads() {
     setTimeline([]);
   };
 
-  const handleDelete = async (leadId: string) => {
-    if (!confirm("Delete this lead? This cannot be undone.")) return;
+  const handleDelete = (leadId: string) => {
+    setDeleteConfirmLeadId(leadId);
+    setDeleteConfirmDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmLeadId) return;
     try {
       const pb = createPocketBaseClient();
-      await pb.collection("leads").delete(leadId);
+      await pb.collection("leads").delete(deleteConfirmLeadId);
       await fetchLeads(page);
       closeSidebar();
+      toast.success("Lead deleted");
     } catch (e) {
       console.error("Delete failed", e);
-      alert("Failed to delete lead");
+      toast.error("Failed to delete lead");
+    } finally {
+      setDeleteConfirmDialogOpen(false);
+      setDeleteConfirmLeadId(null);
     }
   };
 
@@ -333,7 +470,12 @@ export default function AdminLeads() {
       !courseChanged &&
       !leadSourceChanged
     ) {
-      alert("No changes to update");
+      toast.error("No changes to update");
+      return;
+    }
+
+    if (assigneeChanged && !nextAssignedToId) {
+      toast.error("Please assign the lead to a counselor");
       return;
     }
 
@@ -345,12 +487,18 @@ export default function AdminLeads() {
       };
 
       if (statusChanged) payload.leadStatus = nextStatus;
-      if (assigneeChanged) payload.assignedTo = nextAssignedToId;
+      if (statusChanged) payload.status = nextStatus;
+      if (assigneeChanged) {
+        payload.assignedTo = nextAssignedToId;
+      }
       if (commentChanged) payload.latestComment = nextComment;
+      if (commentChanged) payload.comments = nextComment;
       if (nameChanged) payload.studentName = nextName;
       if (mobileChanged) payload.mobileNo = nextMobile;
+      if (mobileChanged) payload.mobile = nextMobile;
       if (emailChanged) payload.email = nextEmail;
       if (courseChanged) payload.courseName = nextCourse;
+      if (courseChanged) payload.course = nextCourse;
       if (leadSourceChanged) payload.leadSource = nextLeadSource;
 
       await pb.collection("leads").update(selectedLead.id, payload);
@@ -424,7 +572,7 @@ export default function AdminLeads() {
       await openSidebarFor(updatedLead, "view");
     } catch (e) {
       console.error("Lead update failed", e);
-      alert("Failed to update lead");
+      toast.error("Failed to update lead");
     } finally {
       setIsSaving(false);
     }
@@ -435,13 +583,34 @@ export default function AdminLeads() {
     try {
       const pb = createPocketBaseClient();
       const now = new Date().toISOString();
+
+      const latestLead = await pb.collection("leads").getList(1, 1, {
+        sort: "-created",
+      });
+      const latestLeadId = (
+        latestLead.items?.[0] as { leadId?: string } | undefined
+      )?.leadId;
+      const nextLeadId = formatLeadId(parseLeadSequence(latestLeadId) + 1);
+      const currentAdminId = (pb.authStore.model as { id?: string } | null)?.id;
+      const assigneeValue =
+        payload.assignee?.trim() || usersLookup[0]?.id || currentAdminId;
+      if (!assigneeValue) {
+        toast.error("No assignable user found. Please add a counselor first.");
+        return;
+      }
+
       const createPayload: Record<string, unknown> = {
+        leadId: nextLeadId,
         studentName: payload.studentName,
+        mobile: payload.mobile,
         mobileNo: payload.mobile,
+        course: payload.course,
         courseName: payload.course,
         leadSource: payload.leadSource || "Manual",
+        status: "New",
         leadStatus: "New",
-        assignedTo: payload.assignee || "",
+        assignedTo: assigneeValue,
+        comments: "Created manually",
         latestComment: "Created manually",
         addedDate: now,
         lastModified: now,
@@ -459,9 +628,10 @@ export default function AdminLeads() {
       await fetchLeads(1);
       setPage(1);
       setSidebarOpen(false);
+      toast.success("Lead created");
     } catch (e) {
       console.error("Create failed", e);
-      alert("Failed to create lead");
+      toast.error("Failed to create lead");
     } finally {
       setIsSaving(false);
     }
@@ -810,10 +980,13 @@ export default function AdminLeads() {
                           disabled={!isEditing || isSaving}
                           className="w-full px-3 py-2 border border-gray-300 rounded text-sm disabled:bg-gray-50"
                         >
-                          <option value="">Unassigned</option>
+                          <option value="" disabled>
+                            Select counselor
+                          </option>
                           {usersLookup.map((u) => (
                             <option key={u.id} value={u.id}>
                               {u.name}
+                              {u.role ? ` — ${u.role}` : ""}
                             </option>
                           ))}
                         </select>
@@ -914,6 +1087,30 @@ export default function AdminLeads() {
           </div>
         </div>
       )}
+
+      <AlertDialog
+        open={deleteConfirmDialogOpen}
+        onOpenChange={setDeleteConfirmDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Lead</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this lead? This action cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -924,7 +1121,7 @@ function NewLeadForm({
   saving,
   onCancel,
 }: {
-  users: Array<{ id: string; name: string }>;
+  users: Array<{ id: string; name: string; role?: string }>;
   onCreate: (payload: CreateLeadPayload) => Promise<void>;
   saving: boolean;
   onCancel: () => void;
@@ -935,9 +1132,15 @@ function NewLeadForm({
   const [course, setCourse] = useState("");
   const [assignee, setAssignee] = useState("");
 
+  useEffect(() => {
+    if (!assignee && users.length > 0) {
+      setAssignee(users[0].id);
+    }
+  }, [users, assignee]);
+
   const submit = () => {
     if (!name || !mobile || !course) {
-      alert("Please fill required fields: Name, Mobile, Course");
+      toast.error("Please fill required fields: Name, Mobile, Course");
       return;
     }
     onCreate({ studentName: name, mobile, email, course, assignee });
@@ -999,10 +1202,11 @@ function NewLeadForm({
           onChange={(e) => setAssignee(e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
         >
-          <option value="">Unassigned</option>
+          <option value="">Select counselor</option>
           {users.map((u) => (
             <option key={u.id} value={u.id}>
               {u.name}
+              {u.role ? ` — ${u.role}` : ""}
             </option>
           ))}
         </select>

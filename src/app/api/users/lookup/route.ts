@@ -5,34 +5,49 @@ type UserRecord = {
   id: string;
   name?: string;
   email?: string;
+  role?: string;
+  accountStatus?: string;
+  active?: boolean;
 };
 
 export async function GET() {
   try {
     const pb = await getPocketBaseAdminClient();
-    let users = [] as UserRecord[];
+    const users = (await pb.collection("users").getFullList({
+      sort: "name",
+    })) as UserRecord[];
 
-    try {
-      users = (await pb.collection("users").getFullList({
-        filter: 'role = "student-counsellor" && accountStatus = "active"',
-        fields: "id,name,email",
-      })) as UserRecord[];
-    } catch {
-      users = (await pb.collection("users").getFullList({
-        filter: 'role = "student-counsellor"',
-        fields: "id,name,email",
-      })) as UserRecord[];
-    }
+    const normalizeRole = (role?: string) =>
+      (role || "")
+        .toLowerCase()
+        .replace(/[_\s]+/g, "-")
+        .trim();
+
+    // Show all users with accountStatus = "enabled" or "active", regardless of role
+    const assignableUsers = users.filter((user) => {
+      const accountStatus = (user.accountStatus || "").toLowerCase();
+      return accountStatus === "enabled" || accountStatus === "active";
+    });
 
     return NextResponse.json(
-      users.map((user: UserRecord) => ({
+      assignableUsers.map((user: UserRecord) => ({
         id: user.id,
         name: user.name,
         email: user.email,
+        role: user.role,
       })),
     );
   } catch (error) {
     console.error("Error fetching user lookup:", error);
-    return NextResponse.json([]);
+    const msg =
+      error instanceof Error
+        ? error.message
+        : "Failed to fetch users from PocketBase";
+    console.error("Full error details:", {
+      message: msg,
+      error: error,
+      stack: error instanceof Error ? error.stack : "No stack",
+    });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

@@ -4,8 +4,11 @@ import { useState, useEffect, useCallback } from "react";
 import { createPocketBaseClient } from "@/lib/pocketbase";
 
 type LeadRecord = {
+  id?: string;
+  studentName?: string;
   created?: string;
   leadStatus?: string;
+  status?: string;
   assignedTo?:
     | string
     | {
@@ -24,12 +27,15 @@ type UserLookupRecord = {
 type HistoryRecord = {
   eventType?: string;
   changedBy?: string;
+  leadId?: string;
+  studentName?: string;
   created?: string;
   expand?: {
     studentName?: {
       studentName?: string;
     };
     leadId?: {
+      id?: string;
       studentName?: string;
     };
     changedBy?: {
@@ -188,17 +194,41 @@ export default function AdminDashboard() {
     try {
       setIsLoading(true);
       const pb = createPocketBaseClient();
-      const [leads, history, userResponse] = await Promise.all([
-        pb.collection("leads").getFullList({
-          sort: "-created",
-          expand: "assignedTo",
-        }),
-        pb.collection("leadHistory").getFullList({
-          sort: "-created",
-          expand: "changedBy,studentName,leadId",
-        }),
-        fetch("/api/users/lookup"),
-      ]);
+
+      const getLeads = async () => {
+        try {
+          return await pb.collection("leads").getFullList({
+            sort: "-created",
+            expand: "assignedTo",
+          });
+        } catch {
+          return await pb.collection("leads").getFullList({
+            sort: "-created",
+          });
+        }
+      };
+
+      const getHistory = async () => {
+        try {
+          return await pb.collection("leadHistory").getFullList({
+            sort: "-created",
+            expand: "changedBy,studentName,leadId",
+          });
+        } catch {
+          return await pb.collection("leadHistory").getFullList({
+            sort: "-created",
+          });
+        }
+      };
+
+      const [leads, history, userResponse, adminResponse, authUsersResponse] =
+        await Promise.all([
+          getLeads(),
+          getHistory(),
+          fetch("/api/users/lookup"),
+          fetch("/api/admins/lookup"),
+          fetch("/api/auth-users/lookup"),
+        ]);
 
       const userLookup = new Map<string, string>();
       if (userResponse.ok) {
@@ -208,23 +238,54 @@ export default function AdminDashboard() {
         });
       }
 
+      if (adminResponse && adminResponse.ok) {
+        try {
+          const admins = (await adminResponse.json()) as UserLookupRecord[];
+          admins.forEach((a) => {
+            userLookup.set(a.id, a.name || a.email || a.id);
+          });
+        } catch (e) {
+          // ignore parse errors
+        }
+      }
+
+      if (authUsersResponse && authUsersResponse.ok) {
+        try {
+          const authUsers =
+            (await authUsersResponse.json()) as UserLookupRecord[];
+          authUsers.forEach((u) => {
+            userLookup.set(u.id, u.name || u.email || u.id);
+          });
+        } catch (e) {
+          // ignore
+        }
+      }
+
       const leadRecords = leads as LeadRecord[];
+
+      // Build a map of lead IDs to student names
+      const leadIdToName = new Map<string, string>();
+      leadRecords.forEach((lead) => {
+        if (lead.id && lead.studentName) {
+          leadIdToName.set(lead.id, lead.studentName);
+        }
+      });
 
       const totalLeads = leadRecords.length;
       const newLeads = leadRecords.filter((lead) =>
-        matchesStatus(lead.leadStatus, "New"),
+        matchesStatus(lead.leadStatus || lead.status, "New"),
       ).length;
       const contactedLeads = leadRecords.filter((lead) =>
-        matchesStatus(lead.leadStatus, "Contacted"),
+        matchesStatus(lead.leadStatus || lead.status, "Contacted"),
       ).length;
       const followUpLeads = leadRecords.filter((lead) =>
-        matchesStatus(lead.leadStatus, "Follow-Up"),
+        matchesStatus(lead.leadStatus || lead.status, "Follow-Up"),
       ).length;
       const registeredLeads = leadRecords.filter((lead) =>
-        matchesStatus(lead.leadStatus, "Registered"),
+        matchesStatus(lead.leadStatus || lead.status, "Registered"),
       ).length;
       const lostLeads = leadRecords.filter((lead) =>
-        matchesStatus(lead.leadStatus, "Lost"),
+        matchesStatus(lead.leadStatus || lead.status, "Lost"),
       ).length;
 
       const grouped: Record<string, CounselorStat> = {};
@@ -247,17 +308,18 @@ export default function AdminDashboard() {
 
         const monthlyStat = monthlyGrouped[monthKey];
         monthlyStat.total += 1;
-        if (matchesStatus(lead.leadStatus, "New")) monthlyStat.newCount += 1;
-        if (matchesStatus(lead.leadStatus, "Contacted")) {
+        if (matchesStatus(lead.leadStatus || lead.status, "New"))
+          monthlyStat.newCount += 1;
+        if (matchesStatus(lead.leadStatus || lead.status, "Contacted")) {
           monthlyStat.contactedCount += 1;
         }
-        if (matchesStatus(lead.leadStatus, "Follow-Up")) {
+        if (matchesStatus(lead.leadStatus || lead.status, "Follow-Up")) {
           monthlyStat.followUpCount += 1;
         }
-        if (matchesStatus(lead.leadStatus, "Registered")) {
+        if (matchesStatus(lead.leadStatus || lead.status, "Registered")) {
           monthlyStat.registeredCount += 1;
         }
-        if (matchesStatus(lead.leadStatus, "Lost")) {
+        if (matchesStatus(lead.leadStatus || lead.status, "Lost")) {
           monthlyStat.lostCount += 1;
         }
 
@@ -275,23 +337,23 @@ export default function AdminDashboard() {
 
         grouped[counselorKey].leadCount += 1;
         monthlyCounselorGrouped[monthKey][counselorKey].leadCount += 1;
-        if (matchesStatus(lead.leadStatus, "New"))
+        if (matchesStatus(lead.leadStatus || lead.status, "New"))
           monthlyCounselorGrouped[monthKey][counselorKey].newCount += 1;
-        if (matchesStatus(lead.leadStatus, "New"))
+        if (matchesStatus(lead.leadStatus || lead.status, "New"))
           grouped[counselorKey].newCount += 1;
-        if (matchesStatus(lead.leadStatus, "Contacted")) {
+        if (matchesStatus(lead.leadStatus || lead.status, "Contacted")) {
           monthlyCounselorGrouped[monthKey][counselorKey].contactedCount += 1;
           grouped[counselorKey].contactedCount += 1;
         }
-        if (matchesStatus(lead.leadStatus, "Follow-Up")) {
+        if (matchesStatus(lead.leadStatus || lead.status, "Follow-Up")) {
           monthlyCounselorGrouped[monthKey][counselorKey].followUpCount += 1;
           grouped[counselorKey].followUpCount += 1;
         }
-        if (matchesStatus(lead.leadStatus, "Registered")) {
+        if (matchesStatus(lead.leadStatus || lead.status, "Registered")) {
           monthlyCounselorGrouped[monthKey][counselorKey].registeredCount += 1;
           grouped[counselorKey].registeredCount += 1;
         }
-        if (matchesStatus(lead.leadStatus, "Lost")) {
+        if (matchesStatus(lead.leadStatus || lead.status, "Lost")) {
           monthlyCounselorGrouped[monthKey][counselorKey].lostCount += 1;
           grouped[counselorKey].lostCount += 1;
         }
@@ -316,15 +378,18 @@ export default function AdminDashboard() {
 
       const recentActivity = (history as HistoryRecord[])
         .slice(0, 20)
-        .map((entry) => ({
+        .map((entry: any) => ({
           studentName:
-            entry.expand?.studentName?.studentName ||
             entry.expand?.leadId?.studentName ||
+            leadIdToName.get(entry.expand?.leadId?.id || entry.leadId || "") ||
+            entry.studentName ||
             "Unknown",
           eventType: entry.eventType || "update",
           changedBy:
+            entry.changedByResolved ||
             entry.expand?.changedBy?.name ||
             entry.expand?.changedBy?.email ||
+            userLookup.get(entry.changedBy || "") ||
             entry.changedBy ||
             "Unknown",
           created: entry.created || "",
@@ -390,13 +455,93 @@ export default function AdminDashboard() {
   }, [selectedCounselor]);
 
   if (isLoading) {
-    return <div className="text-center py-12">Loading dashboard...</div>;
+    return (
+      <div className="space-y-8">
+        {/* Stats Grid Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(6)].map((_, i) => (
+            <div
+              key={i}
+              className="bg-gray-200 animate-pulse rounded-lg p-6 h-24"
+            />
+          ))}
+        </div>
+
+        {/* Chart Skeleton */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="h-64 bg-gray-100 animate-pulse rounded-lg mb-4" />
+          <div className="flex gap-3">
+            {[...Array(5)].map((_, i) => (
+              <div
+                key={i}
+                className="h-3 w-3 rounded-sm bg-gray-300 animate-pulse"
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Table Skeleton */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="bg-white rounded-lg shadow p-6">
+              <div className="h-8 bg-gray-200 animate-pulse rounded mb-4 w-1/3" />
+              <div className="space-y-3">
+                {[...Array(4)].map((_, j) => (
+                  <div
+                    key={j}
+                    className="h-12 bg-gray-100 animate-pulse rounded"
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   if (!stats) {
     return (
-      <div className="text-center py-12 text-red-600">
-        Failed to load dashboard
+      <div className="space-y-8">
+        {/* Stats Grid Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(6)].map((_, i) => (
+            <div
+              key={i}
+              className="bg-gray-200 animate-pulse rounded-lg p-6 h-24"
+            />
+          ))}
+        </div>
+
+        {/* Chart Skeleton */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="h-64 bg-gray-100 animate-pulse rounded-lg mb-4" />
+          <div className="flex gap-3">
+            {[...Array(5)].map((_, i) => (
+              <div
+                key={i}
+                className="h-3 w-3 rounded-sm bg-gray-300 animate-pulse"
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Table Skeleton */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="bg-white rounded-lg shadow p-6">
+              <div className="h-8 bg-gray-200 animate-pulse rounded mb-4 w-1/3" />
+              <div className="space-y-3">
+                {[...Array(4)].map((_, j) => (
+                  <div
+                    key={j}
+                    className="h-12 bg-gray-100 animate-pulse rounded"
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

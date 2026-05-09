@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createPocketBaseClient } from "@/lib/pocketbase";
+import { getPocketBaseAdminClient } from "@/lib/pocketbase";
 
 type LeadRecord = {
   id: string;
@@ -18,7 +18,7 @@ type LeadRecord = {
 
 export async function GET(request: NextRequest) {
   try {
-    const pb = createPocketBaseClient();
+    const pb = await getPocketBaseAdminClient();
 
     // Get all leads with optional filtering
     const statusFilter = request.nextUrl.searchParams.get("status");

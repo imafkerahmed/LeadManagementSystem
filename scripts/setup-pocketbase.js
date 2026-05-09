@@ -49,7 +49,7 @@ async function setupCollections() {
           type: "select",
           required: true,
           options: {
-            values: ["active", "disabled"],
+            values: ["enabled", "disabled"],
             maxSelect: 1,
           },
         },

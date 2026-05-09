@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { LogOut, BarChart3, Users, Upload, Settings } from "lucide-react";
 import AdminDashboard from "@/components/admin/Dashboard";
 import AdminLeads from "@/components/admin/Leads";
@@ -9,52 +9,85 @@ import BulkUpload from "@/components/admin/BulkUpload";
 import AdminSettings from "@/components/admin/Settings";
 import { createPocketBaseClient } from "@/lib/pocketbase";
 
+type AdminTab = "dashboard" | "leads" | "bulk" | "settings";
+
+const tabs: Array<{ id: AdminTab; label: string; icon: typeof BarChart3 }> = [
+  { id: "dashboard", label: "📊 Dashboard", icon: BarChart3 },
+  { id: "leads", label: "👥 All Leads", icon: Users },
+  { id: "bulk", label: "📤 Bulk Upload", icon: Upload },
+  { id: "settings", label: "⚙️ Settings", icon: Settings },
+];
+
+const isValidTab = (value: string | null): value is AdminTab =>
+  tabs.some((tab) => tab.id === value);
+
 export default function AdminPage() {
   const router = useRouter();
-  const [currentTab, setCurrentTab] = useState<
-    "dashboard" | "leads" | "bulk" | "settings"
-  >("dashboard");
+  const searchParams = useSearchParams();
 
-  const adminAuthSnapshot = useSyncExternalStore(
-    () => () => {},
-    () => {
-      const pb = createPocketBaseClient();
-      const authUser = pb.authStore.model as {
-        id?: string;
-        name?: string;
-        email?: string;
-        role?: string;
-      } | null;
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminId, setAdminId] = useState("");
+  const [adminLabel, setAdminLabel] = useState("Admin");
 
-      const isValid = pb.authStore.isValid && authUser?.role === "admin";
-      const adminId = isValid ? authUser?.id || "" : "";
-      const adminLabel = isValid
-        ? authUser?.email || authUser?.name || "Admin"
-        : "Admin";
-
-      return `${isValid ? "1" : "0"}|${adminId}|${adminLabel}`;
-    },
-    () => "0||Admin",
-  );
-
-  const [authFlag, adminId, adminLabel] = adminAuthSnapshot.split("|");
+  const currentTab = useMemo<AdminTab>(() => {
+    const tab = searchParams.get("tab");
+    return isValidTab(tab) ? tab : "dashboard";
+  }, [searchParams]);
 
   useEffect(() => {
-    if (authFlag !== "1") {
-      router.replace("/");
-    }
-  }, [authFlag, router]);
+    const pb = createPocketBaseClient();
+    const authUser = pb.authStore.model as {
+      id?: string;
+      name?: string;
+      email?: string;
+      role?: string;
+    } | null;
 
-  if (authFlag !== "1") {
+    const validAdmin = pb.authStore.isValid && authUser?.role === "admin";
+    setAuthChecked(true);
+
+    if (!validAdmin) {
+      setIsAdmin(false);
+      router.replace("/");
+      return;
+    }
+
+    setIsAdmin(true);
+    setAdminId(authUser?.id || "");
+    setAdminLabel(authUser?.email || authUser?.name || "Admin");
+  }, [router]);
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-white px-4 py-8 sm:px-6 sm:py-10">
+        <div className="mx-auto w-full max-w-5xl space-y-6">
+          <div className="h-14 rounded-lg bg-slate-100 animate-pulse" />
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {[...Array(6)].map((_, i) => (
+              <div
+                key={i}
+                className="h-24 rounded-lg bg-slate-100 animate-pulse"
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
     return null;
   }
 
-  const tabs = [
-    { id: "dashboard", label: "📊 Dashboard", icon: BarChart3 },
-    { id: "leads", label: "👥 All Leads", icon: Users },
-    { id: "bulk", label: "📤 Bulk Upload", icon: Upload },
-    { id: "settings", label: "⚙️ Settings", icon: Settings },
-  ] as const;
+  const setTab = (tab: AdminTab) => {
+    if (tab === "dashboard") {
+      router.replace("/admin", { scroll: false });
+      return;
+    }
+
+    router.replace(`/admin?tab=${tab}`, { scroll: false });
+  };
 
   return (
     <div className="min-h-screen bg-white text-slate-900">
@@ -85,7 +118,7 @@ export default function AdminPage() {
           {tabs.map((t) => (
             <button
               key={t.id}
-              onClick={() => setCurrentTab(t.id)}
+              onClick={() => setTab(t.id)}
               className={`rounded-md px-3 py-2 text-sm font-medium transition ${
                 currentTab === t.id
                   ? "bg-slate-900 text-white"
