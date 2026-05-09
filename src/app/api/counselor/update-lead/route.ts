@@ -35,15 +35,80 @@ export async function POST(request: NextRequest) {
     }
 
     const lead = leads[0];
-    const oldStatus = lead.leadStatus;
+    const oldStatus = lead.status;
     const now = new Date().toISOString();
 
-    // Update the lead
-    await pb.collection("leads").update(lead.id, {
-      leadStatus: newStatus,
+    const statusFlow = ["New", "Contacted", "Follow-up", "Registered", "Lost"];
+    const oldIndex = statusFlow.indexOf(oldStatus);
+    const newIndex = statusFlow.indexOf(newStatus);
+
+    // Prevent updating terminal statuses (even comments should be disallowed)
+    if (oldStatus === "Registered" || oldStatus === "Lost") {
+      return NextResponse.json(
+        { error: "Cannot update a lead that is Registered or Lost" },
+        { status: 403 },
+      );
+    }
+
+    type UserRoleRecord = {
+      role?: string;
+    };
+
+    // Determine the requester's role from the app's users collection.
+    // This matches the role source used by the login flow.
+    let isAdmin = false;
+    try {
+      const userRecord = (await pb
+        .collection("users")
+        .getOne(counselorId)) as UserRoleRecord;
+      isAdmin = userRecord.role === "admin";
+    } catch {
+      return NextResponse.json(
+        { error: "Unable to verify user role" },
+        { status: 403 },
+      );
+    }
+
+    // Validate status indices
+    if (oldIndex === -1 || newIndex === -1) {
+      return NextResponse.json(
+        { error: "Invalid status value provided" },
+        { status: 400 },
+      );
+    }
+
+    // Require that the first status change from "New" must be to "Contacted"
+    if (
+      oldStatus === "New" &&
+      newStatus !== "New" &&
+      newStatus !== "Contacted" &&
+      !isAdmin
+    ) {
+      return NextResponse.json(
+        { error: "First status change from New must be to Contacted" },
+        { status: 403 },
+      );
+    }
+
+    // Prevent moving backward in the status flow for non-admins
+    if (!isAdmin && newIndex < oldIndex) {
+      return NextResponse.json(
+        { error: "Cannot change to a previous status" },
+        { status: 403 },
+      );
+    }
+
+    // Update the lead: allow same-status updates (for comments) or forward moves
+    const updatePayload: Record<string, unknown> = {
       latestComment: trimmedComment || "",
-      lastModified: now,
-    });
+      updated: now,
+    };
+
+    if (oldStatus !== newStatus) {
+      updatePayload.status = newStatus;
+    }
+
+    await pb.collection("leads").update(lead.id, updatePayload);
 
     const historyEntries: Array<Record<string, unknown>> = [];
 
@@ -58,14 +123,17 @@ export async function POST(request: NextRequest) {
         newValue: newStatus,
         comment: trimmedComment || "",
       });
-    } else if (trimmedComment) {
+    }
+
+    if (trimmedComment) {
       historyEntries.push({
         timeStamp: now,
         leadId: lead.id,
         studentName: lead.id,
         eventType: "Comment",
         changedBy: counselorId,
-        comment: trimmedComment,
+        oldValue: trimmedComment,
+        newValue: trimmedComment,
       });
     }
 
@@ -83,6 +151,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: "Updated successfully!",
+      updatedStatus: oldStatus !== newStatus ? newStatus : oldStatus,
+      latestComment: trimmedComment || "",
     });
   } catch (error) {
     console.error("Error updating lead:", error);

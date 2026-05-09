@@ -39,14 +39,15 @@ export async function POST(request: NextRequest) {
     const leadPayload: Record<string, unknown> = {
       leadId: nextLeadId,
       studentName,
-      mobileNo: mobile,
+      mobile,
+      email,
       courseName: course,
       leadSource,
-      leadStatus: "New",
+      status: "New",
       assignedTo: counselorId,
       latestComment: "Lead created",
-      addedDate: now,
-      lastModified: now,
+      created: now,
+      updated: now,
     };
 
     const trimmedEmail = email?.trim();

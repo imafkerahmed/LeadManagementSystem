@@ -299,11 +299,30 @@ export default function AdminLeads() {
       setIsLoading(true);
       try {
         const pb = createPocketBaseClient();
+        // Build server-side filter for PocketBase. Use status and searchTerm when provided.
+        const filterParts: string[] = [];
+        if (statusFilter) {
+          // leadStatus/status may both exist; try matching either
+          filterParts.push(
+            `(leadStatus = "${statusFilter}" || status = "${statusFilter}")`,
+          );
+        }
+        if (searchTerm) {
+          const q = searchTerm.replace(/"/g, '\\"');
+          filterParts.push(
+            `(studentName ~ "${q}" || mobile ~ "${q}" || email ~ "${q}")`,
+          );
+        }
+
+        const filter =
+          filterParts.length > 0 ? filterParts.join(" && ") : undefined;
+
         const list = await pb
           .collection("leads")
           .getList(pageToLoad, PAGE_SIZE, {
             sort: "-created",
             expand: "assignedTo",
+            ...(filter ? { filter } : {}),
           });
 
         const rawItems = (list.items || []) as LeadRecord[];
@@ -317,19 +336,10 @@ export default function AdminLeads() {
           return true;
         });
 
+        // Client-side filters for counselor name only (we keep server filters for status/search)
         let next = dedupItems;
-        if (statusFilter) next = next.filter((l) => l.status === statusFilter);
         if (counselorFilter)
           next = next.filter((l) => l.assignedTo === counselorFilter);
-        if (searchTerm) {
-          const q = searchTerm.toLowerCase();
-          next = next.filter(
-            (l) =>
-              l.studentName.toLowerCase().includes(q) ||
-              (l.mobile || "").toLowerCase().includes(q) ||
-              (l.email || "").toLowerCase().includes(q),
-          );
-        }
 
         setLeads(dedupItems);
         setFilteredLeads(next);
@@ -359,9 +369,19 @@ export default function AdminLeads() {
     [statusFilter, counselorFilter, searchTerm, mapLead],
   );
 
+  // When any filter/search changes, reload the first page of results
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchLeads(page);
+    // call asynchronously to avoid synchronous setState inside effect
+    setTimeout(() => {
+      void fetchLeads(1);
+    }, 0);
+  }, [statusFilter, counselorFilter, searchTerm, fetchLeads]);
+
+  useEffect(() => {
+    // call asynchronously to avoid synchronous setState inside effect
+    setTimeout(() => {
+      void fetchLeads(page);
+    }, 0);
   }, [page, fetchLeads]);
 
   const openSidebarFor = async (
@@ -806,6 +826,40 @@ export default function AdminLeads() {
             <ChevronLeft className="w-4 h-4" />
             Prev
           </button>
+
+          {/* Page numbers - show window of pages when there are many */}
+          <div className="inline-flex items-center gap-1">
+            {Array.from({ length: totalPages }).map((_, idx) => {
+              const p = idx + 1;
+              // show first, last, current ±2
+              if (
+                p === 1 ||
+                p === totalPages ||
+                (p >= page - 2 && p <= page + 2)
+              ) {
+                return (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p)}
+                    className={`px-3 py-1 rounded-lg border ${
+                      p === page ? "bg-blue-600 text-white" : "bg-white"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                );
+              }
+
+              // render ellipsis once for omitted ranges
+              const isBefore = p < page - 2 && p > 1;
+              const isAfter = p > page + 2 && p < totalPages;
+              if (isBefore && idx === 1) return <span key={`e-${p}`}>...</span>;
+              if (isAfter && idx === totalPages - 2)
+                return <span key={`e2-${p}`}>...</span>;
+              return null;
+            })}
+          </div>
+
           <button
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}

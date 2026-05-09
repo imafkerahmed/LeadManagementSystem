@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, LogOut, X } from "lucide-react";
 import { createPocketBaseClient } from "@/lib/pocketbase";
@@ -28,17 +28,17 @@ interface HistoryEntry {
   oldValue?: string;
   newValue?: string;
   comment?: string;
+  commentText?: string;
   created: string;
 }
-
 type LeadRecord = {
   id: string;
   leadId?: string;
   studentName?: string;
-  mobileNo?: string;
+  mobile?: string;
   email?: string;
   courseName?: string;
-  leadStatus?: string;
+  status?: string;
   latestComment?: string;
   created?: string;
   updated?: string;
@@ -64,6 +64,7 @@ type HistoryRecord = {
     };
     leadId?: {
       studentName?: string;
+      latestComment?: string;
     };
   };
 };
@@ -74,39 +75,32 @@ interface UserLookupItem {
   email?: string;
 }
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 10;
 
 export default function CounselorPage() {
   const router = useRouter();
-  const [authChecked, setAuthChecked] = useState(false);
-  const [isCounselor, setIsCounselor] = useState(false);
-  const [counselorId, setCounselorId] = useState("");
-  const [counselorName, setCounselorName] = useState("Student Counsellor");
+  const isMounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const pb = createPocketBaseClient();
+  const authUser = pb.authStore.model as {
+    id?: string;
+    name?: string;
+    email?: string;
+    role?: string;
+  } | null;
+  const isCounselor =
+    pb.authStore.isValid && authUser?.role === "student-counsellor";
+  const counselorId = authUser?.id || "";
+  const counselorName = authUser?.name || "Student Counsellor";
 
   useEffect(() => {
-    const pb = createPocketBaseClient();
-    const authUser = pb.authStore.model as {
-      id?: string;
-      name?: string;
-      role?: string;
-    } | null;
-
-    const isValid =
-      pb.authStore.isValid && authUser?.role === "student-counsellor";
-
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setAuthChecked(true);
-
-    if (!isValid) {
-      setIsCounselor(false);
+    if (!isCounselor) {
       router.replace("/");
-      return;
     }
-
-    setIsCounselor(true);
-    setCounselorId(authUser?.id || "");
-    setCounselorName(authUser?.name || "Student Counsellor");
-  }, [router]);
+  }, [isCounselor, router]);
 
   const [tab, setTab] = useState<"followup" | "addlead">("followup");
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -127,8 +121,118 @@ export default function CounselorPage() {
   const [newEmail, setNewEmail] = useState("");
   const [newCourse, setNewCourse] = useState("");
   const [newLeadSource, setNewLeadSource] = useState("Direct");
-  const [toastMsg, setToastMsg] = useState("");
-  const [toastType, setToastType] = useState<"success" | "error">("success");
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+
+  // Status flow: New -> Contacted -> Follow-Up -> Registered
+  const statusFlow = ["New", "Contacted", "Follow-up", "Registered", "Lost"];
+
+  // Status badge color map
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "New":
+        return "bg-blue-100 text-blue-700";
+      case "Contacted":
+        return "bg-purple-100 text-purple-700";
+      case "Follow-up":
+        return "bg-amber-100 text-amber-700";
+      case "Registered":
+        return "bg-emerald-100 text-emerald-700";
+      case "Lost":
+        return "bg-rose-100 text-rose-700";
+      default:
+        return "bg-slate-100 text-slate-700";
+    }
+  };
+  const getValidNextStatuses = (
+    currentStatus: string | undefined,
+  ): string[] => {
+    if (!currentStatus || currentStatus.trim() === "") return statusFlow;
+    const currentIndex = statusFlow.indexOf(currentStatus);
+    if (currentIndex === -1) return statusFlow;
+    // If already in a terminal state, no updates allowed
+    if (currentStatus === "Registered" || currentStatus === "Lost") return [];
+    // Include the current status so comment-only submissions are allowed,
+    // then allow forward statuses (no going back).
+    return [currentStatus, ...statusFlow.slice(currentIndex + 1)];
+  };
+
+  const getDefaultModalStatus = (currentStatus: string) => {
+    if (currentStatus === "New") {
+      return "Contacted";
+    }
+
+    return currentStatus;
+  };
+
+  const groupHistoryEntries = (entries: HistoryEntry[]) => {
+    const grouped: Array<{
+      entries: HistoryEntry[];
+      timestamp: string;
+      changedBy: string;
+    }> = [];
+    const processed = new Set<string>();
+
+    for (let i = 0; i < entries.length; i++) {
+      if (processed.has(entries[i].id)) continue;
+
+      const current = entries[i];
+      const next = entries[i + 1];
+
+      // Helper to check if two timestamps are within 2 seconds of each other
+      const isWithinTimeWindow = (ts1: string, ts2: string) => {
+        try {
+          const date1 = new Date(ts1).getTime();
+          const date2 = new Date(ts2).getTime();
+          return Math.abs(date1 - date2) <= 2000; // 2 seconds
+        } catch {
+          return false;
+        }
+      };
+
+      // Check if current is Status Change and next is Comment (within time window, same user)
+      if (
+        current.eventType === "Status Change" &&
+        next &&
+        next.eventType === "Comment" &&
+        isWithinTimeWindow(current.created, next.created) &&
+        current.changedBy === next.changedBy
+      ) {
+        grouped.push({
+          entries: [current, next],
+          timestamp: current.created,
+          changedBy: current.changedBy,
+        });
+        processed.add(current.id);
+        processed.add(next.id);
+        i++; // Skip the comment entry as it's grouped
+      }
+      // Check if current is Comment and next is Status Change (within time window, same user)
+      else if (
+        current.eventType === "Comment" &&
+        next &&
+        next.eventType === "Status Change" &&
+        isWithinTimeWindow(current.created, next.created) &&
+        current.changedBy === next.changedBy
+      ) {
+        grouped.push({
+          entries: [next, current], // Put Status Change first
+          timestamp: current.created,
+          changedBy: current.changedBy,
+        });
+        processed.add(current.id);
+        processed.add(next.id);
+        i++; // Skip the status change entry as it's grouped
+      } else {
+        grouped.push({
+          entries: [current],
+          timestamp: current.created,
+          changedBy: current.changedBy,
+        });
+        processed.add(current.id);
+      }
+    }
+    return grouped;
+  };
 
   useEffect(() => {
     const loadUserLookup = async () => {
@@ -158,32 +262,28 @@ export default function CounselorPage() {
   }, []);
 
   const showToast = (msg: string, type: "success" | "error") => {
-    setToastMsg(msg);
-    setToastType(type);
-    setTimeout(() => setToastMsg(""), 3000);
     if (type === "success") toast.success(msg);
     else toast.error(msg);
   };
 
   const fetchLeads = useCallback(
     async (userId: string, selectedLeadId?: string) => {
-      // Guard: don't fetch if user ID is empty
-      if (!userId || userId.trim() === "") {
-        console.debug("Skipping fetch leads: empty userId");
-        setLeads([]);
-        setSelectedLead(null);
-        return;
-      }
+      // Note: PocketBase's listRule automatically handles authorization
+      // Counsellors see leads based on their assigned leads and role
+      console.debug("fetchLeads called with userId:", userId);
 
       try {
         const pb = createPocketBaseClient();
-        const safeUserId = userId.replaceAll('"', '\\"');
-        const safeCounselorName = counselorName.replaceAll('"', '\\"');
-        const assignedFilter = safeCounselorName
-          ? `(assignedTo = "${safeUserId}" || assignedTo = "${safeCounselorName}")`
-          : `assignedTo = "${safeUserId}"`;
+
+        console.debug("fetchLeads debug:", { userId, counselorName });
+
+        // Query all leads - PocketBase's listRule will automatically filter based on user role
+        // No need to manually filter since the rule already handles:
+        // - Admins see all
+        // - Counsellors with role="student-counsellor" see all
+        // - Counsellors see leads assigned to them
+
         const records = (await pb.collection("leads").getFullList({
-          filter: `${assignedFilter} && (leadStatus = "New" || leadStatus = "Contacted" || leadStatus = "Follow-Up")`,
           sort: "-created",
         })) as LeadRecord[];
 
@@ -191,10 +291,10 @@ export default function CounselorPage() {
           id: lead.id,
           leadId: lead.leadId || "",
           name: lead.studentName || "",
-          mobile: lead.mobileNo || "",
+          mobile: lead.mobile || "",
           email: lead.email || "",
           course: lead.courseName || "",
-          status: lead.leadStatus || "",
+          status: lead.status || "",
           comments: lead.latestComment || "",
           created: lead.created || "",
           updated: lead.lastModified || lead.updated || lead.created || "",
@@ -208,8 +308,9 @@ export default function CounselorPage() {
             ? nextLeads.findIndex((lead) => lead.id === selectedLeadId)
             : 0;
           const safeIndex = nextIndex >= 0 ? nextIndex : 0;
-          setSelectedLead(nextLeads[safeIndex]);
-          setStatusSelect(nextLeads[safeIndex].status);
+          const nextLead = nextLeads[safeIndex];
+          setSelectedLead(nextLead);
+          setStatusSelect(getDefaultModalStatus(nextLead.status));
         } else {
           setSelectedLead(null);
           setStatusSelect("");
@@ -233,13 +334,22 @@ export default function CounselorPage() {
   );
 
   useEffect(() => {
-    if (!counselorId) {
+    console.debug("fetchLeads effect triggered:", {
+      counselorId,
+      counselorName,
+      isCounselor,
+    });
+
+    if (!counselorId || counselorId.trim() === "" || !isCounselor) {
+      console.debug(
+        "Skipping fetchLeads: counselorId empty or not counselor role",
+      );
       return;
     }
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchLeads(counselorId);
-  }, [counselorId, fetchLeads]);
+  }, [counselorId, counselorName, fetchLeads, isCounselor]);
 
   const openLeadDetails = async (lead: Lead) => {
     setModalOpen(true);
@@ -251,46 +361,50 @@ export default function CounselorPage() {
       const latestLead = await pb.collection("leads").getOne(lead.id);
       const nextLead: Lead = {
         id: latestLead.id,
-        leadId: latestLead.leadId,
-        name: latestLead.studentName,
-        mobile: latestLead.mobileNo,
+        leadId: latestLead.leadId || "",
+        name: latestLead.studentName || "",
+        mobile: latestLead.mobile || "",
         email: latestLead.email || "",
-        course: latestLead.courseName,
-        status: latestLead.leadStatus,
+        course: latestLead.courseName || "",
+        status: latestLead.status || "",
         comments: latestLead.latestComment || "",
-        created: latestLead.created,
-        updated:
-          latestLead.lastModified || latestLead.updated || latestLead.created,
-        assignedTo: latestLead.assignedTo,
+        created: latestLead.created || "",
+        updated: latestLead.updated || latestLead.created || "",
+        assignedTo: latestLead.assignedTo || "",
       };
 
       setSelectedLead(nextLead);
-      setStatusSelect(nextLead.status);
+      setStatusSelect(getDefaultModalStatus(nextLead.status));
       const history = (await pb.collection("leadHistory").getFullList({
         filter: `leadId = "${lead.id}"`,
         sort: "-created",
         expand: "leadId,studentName,changedBy",
       })) as HistoryRecord[];
 
-      setLeadHistory(
-        history.map((entry) => ({
-          id: entry.id,
-          eventType: entry.eventType || "",
-          changedBy:
-            entry.expand?.changedBy?.name ||
-            entry.expand?.changedBy?.email ||
-            entry.changedBy ||
-            "Unknown",
-          studentName:
-            entry.expand?.studentName?.studentName ||
-            entry.expand?.leadId?.studentName ||
-            nextLead.name,
-          oldValue: entry.oldValue,
-          newValue: entry.newValue,
-          comment: entry.comment,
-          created: entry.created || "",
-        })),
-      );
+      const mappedHistory = history.map((entry) => ({
+        id: entry.id,
+        eventType: entry.eventType || "",
+        changedBy:
+          entry.expand?.changedBy?.name ||
+          entry.expand?.changedBy?.email ||
+          entry.changedBy ||
+          "Unknown",
+        studentName:
+          entry.expand?.studentName?.studentName ||
+          entry.expand?.leadId?.studentName ||
+          nextLead.name,
+        oldValue: entry.oldValue,
+        newValue: entry.newValue,
+        comment: entry.comment,
+        commentText:
+          entry.oldValue ||
+          entry.newValue ||
+          entry.expand?.leadId?.latestComment ||
+          "",
+        created: entry.created || "",
+      }));
+
+      setLeadHistory(mappedHistory);
     } catch (error) {
       console.error("Error loading history:", error);
       setLeadHistory([]);
@@ -308,8 +422,33 @@ export default function CounselorPage() {
       return;
     }
 
+    // If in a terminal state, disallow any updates (server also enforces)
+    if (
+      selectedLead.status === "Registered" ||
+      selectedLead.status === "Lost"
+    ) {
+      showToast("Cannot update a Registered or Lost lead", "error");
+      return;
+    }
+
     if (statusSelect === selectedLead.status && !trimmedComment) {
       showToast("Change the status or add a comment", "error");
+      return;
+    }
+
+    // Client-side enforcement: first change from New must be to Contacted
+    if (
+      selectedLead.status === "New" &&
+      statusSelect !== selectedLead.status &&
+      statusSelect !== "Contacted"
+    ) {
+      showToast("First status change from New must be to Contacted", "error");
+      return;
+    }
+
+    // Validate that the selected status is allowed (can't go backward)
+    if (!validNextStatuses.includes(statusSelect)) {
+      showToast("You cannot change to a previous status", "error");
       return;
     }
 
@@ -331,6 +470,11 @@ export default function CounselorPage() {
       if (result.success) {
         showToast("Updated successfully!", "success");
         setCommentBox("");
+        setTablePage(1);
+        setStatusFilter(null);
+        if (result.updatedStatus) {
+          setStatusSelect(result.updatedStatus);
+        }
         await fetchLeads(counselorId, selectedLead.id);
         await openLeadDetails(selectedLead);
       } else {
@@ -395,14 +539,54 @@ export default function CounselorPage() {
     }
   };
 
-  const totalPages = Math.max(1, Math.ceil(leads.length / PAGE_SIZE));
+  // Filter leads by status if a status filter is selected
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredLeads = (
+    statusFilter ? leads.filter((lead) => lead.status === statusFilter) : leads
+  ).filter((lead) => {
+    if (!searchTerm || searchTerm.trim() === "") return true;
+    const q = searchTerm.toLowerCase();
+    return (
+      (lead.name || "").toLowerCase().includes(q) ||
+      (lead.mobile || "").toLowerCase().includes(q) ||
+      (lead.email || "").toLowerCase().includes(q)
+    );
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredLeads.length / PAGE_SIZE));
   const currentPage = Math.min(tablePage, totalPages);
-  const paginatedLeads = leads.slice(
+  const paginatedLeads = filteredLeads.slice(
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE,
   );
 
-  if (!authChecked) {
+  const validNextStatuses = selectedLead
+    ? getValidNextStatuses(selectedLead.status)
+    : statusFlow;
+
+  // Deduplicate statuses to ensure unique keys when rendering options
+  const dedupedValidNextStatuses = Array.from(new Set(validNextStatuses));
+
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen bg-white px-4 py-8 sm:px-6 sm:py-10">
+        <div className="mx-auto w-full max-w-5xl space-y-6">
+          <div className="h-14 rounded-lg bg-slate-100 animate-pulse" />
+          <div className="grid grid-cols-1 gap-6">
+            {[...Array(3)].map((_, i) => (
+              <div
+                key={i}
+                className="h-32 rounded-lg bg-slate-100 animate-pulse"
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isCounselor) {
     return (
       <div className="min-h-screen bg-white px-4 py-8 sm:px-6 sm:py-10">
         <div className="mx-auto w-full max-w-5xl space-y-6">
@@ -474,23 +658,52 @@ export default function CounselorPage() {
       </header>
 
       <main className="mx-auto w-full max-w-5xl px-4 py-4 sm:px-6 sm:py-6">
-        {toastMsg && (
-          <div
-            className={`mb-4 rounded-md border px-3 py-2 text-sm ${
-              toastType === "success"
-                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                : "border-rose-200 bg-rose-50 text-rose-800"
-            }`}
-          >
-            {toastMsg}
-          </div>
-        )}
-
         {tab === "followup" ? (
           <div className="space-y-4">
-            {leads.length === 0 ? (
+            {/* Status Filter Tabs */}
+            <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+              <button
+                onClick={() => setStatusFilter(null)}
+                className={`rounded-md px-3 py-2 text-sm font-medium transition ${
+                  statusFilter === null
+                    ? "bg-slate-900 text-white"
+                    : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                All ({leads.length})
+              </button>
+              {statusFlow.map((status) => {
+                const count = leads.filter((l) => l.status === status).length;
+                return (
+                  <button
+                    key={status}
+                    onClick={() => setStatusFilter(status)}
+                    className={`rounded-md px-3 py-2 text-sm font-medium transition ${
+                      statusFilter === status
+                        ? "bg-slate-900 text-white"
+                        : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    {status} ({count})
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Search box */}
+            <div className="mt-3">
+              <input
+                type="text"
+                placeholder="Search name, mobile, email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full max-w-md rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              />
+            </div>
+
+            {filteredLeads.length === 0 ? (
               <div className="rounded-lg border border-slate-200 bg-white p-6 text-center text-sm text-slate-500 shadow-sm">
-                No active leads assigned
+                No leads found
               </div>
             ) : (
               <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -524,7 +737,9 @@ export default function CounselorPage() {
                             {lead.course}
                           </td>
                           <td className="px-4 py-3">
-                            <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusColor(lead.status)}`}
+                            >
                               {lead.status}
                             </span>
                           </td>
@@ -548,8 +763,8 @@ export default function CounselorPage() {
                 <div className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     Showing {(currentPage - 1) * PAGE_SIZE + 1} -{" "}
-                    {Math.min(currentPage * PAGE_SIZE, leads.length)} of{" "}
-                    {leads.length}
+                    {Math.min(currentPage * PAGE_SIZE, filteredLeads.length)} of{" "}
+                    {filteredLeads.length}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -724,7 +939,9 @@ export default function CounselorPage() {
                   <div className="text-xs uppercase tracking-wide text-slate-500">
                     Current status
                   </div>
-                  <div className="mt-1 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                  <div
+                    className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusColor(selectedLead.status)}`}
+                  >
                     {selectedLead.status}
                   </div>
                 </div>
@@ -738,14 +955,16 @@ export default function CounselorPage() {
                       "-"}
                   </div>
                 </div>
-                <a
-                  href={`https://wa.me/${selectedLead.mobile.replace(/\D/g, "")}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex w-full items-center justify-center rounded-md bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700"
-                >
-                  Send WhatsApp Message
-                </a>
+                {selectedLead.mobile && (
+                  <a
+                    href={`https://wa.me/${selectedLead.mobile.replace(/\D/g, "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex w-full items-center justify-center rounded-md bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700"
+                  >
+                    Send WhatsApp Message
+                  </a>
+                )}
               </section>
 
               <section className="space-y-4">
@@ -758,19 +977,22 @@ export default function CounselorPage() {
                       <select
                         value={statusSelect}
                         onChange={(e) => setStatusSelect(e.target.value)}
-                        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                        disabled={
+                          !validNextStatuses || validNextStatuses.length === 0
+                        }
+                        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200 disabled:opacity-50"
                       >
-                        {[
-                          "New",
-                          "Contacted",
-                          "Follow-Up",
-                          "Registered",
-                          "Lost",
-                        ].map((status) => (
-                          <option key={status} value={status}>
-                            {status}
+                        {dedupedValidNextStatuses.length > 0 ? (
+                          dedupedValidNextStatuses.map((status) => (
+                            <option key={status} value={status}>
+                              {status}
+                            </option>
+                          ))
+                        ) : (
+                          <option value="" disabled>
+                            No updates available
                           </option>
-                        ))}
+                        )}
                       </select>
                     </div>
 
@@ -789,7 +1011,12 @@ export default function CounselorPage() {
                     <div className="sm:col-span-2 flex flex-col gap-2 sm:flex-row">
                       <button
                         onClick={handleSubmitForm}
-                        disabled={isUpdating}
+                        disabled={
+                          isUpdating ||
+                          (selectedLead &&
+                            (selectedLead.status === "Registered" ||
+                              selectedLead.status === "Lost"))
+                        }
                         className="inline-flex flex-1 items-center justify-center rounded-md bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {isUpdating ? "Updating..." : "Update Lead"}
@@ -828,38 +1055,66 @@ export default function CounselorPage() {
                           No history found for this lead.
                         </p>
                       ) : (
-                        leadHistory.map((entry) => (
-                          <div key={entry.id} className="relative pl-5">
+                        groupHistoryEntries(leadHistory).map((group) => (
+                          <div
+                            key={group.entries[0].id}
+                            className="relative pl-5"
+                          >
                             <span className="absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full bg-slate-900" />
                             <div className="flex flex-col gap-1 rounded-lg border border-slate-200 bg-slate-50 p-3">
                               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                                 <span className="font-medium text-slate-700">
-                                  {entry.eventType}
+                                  {group.entries.length > 1
+                                    ? "Status Change + Comment"
+                                    : group.entries[0].eventType}
                                 </span>
                                 <span>
-                                  {new Date(entry.created).toLocaleString()}
+                                  {new Date(group.timestamp).toLocaleString()}
                                 </span>
                                 <span>
                                   By{" "}
-                                  {userLookup[entry.changedBy] ||
-                                    entry.changedBy}
+                                  {userLookup[group.changedBy] ||
+                                    group.changedBy}
                                 </span>
                               </div>
-                              <div className="text-sm text-slate-700">
-                                {entry.oldValue || entry.newValue ? (
-                                  <span>
-                                    {entry.oldValue ? `${entry.oldValue} ` : ""}
-                                    {entry.oldValue && entry.newValue
-                                      ? "→ "
-                                      : ""}
-                                    {entry.newValue || ""}
-                                  </span>
-                                ) : null}
-                              </div>
-                              {entry.comment ? (
-                                <p className="text-sm text-slate-600">
-                                  {entry.comment}
-                                </p>
+
+                              {/* Status Change part */}
+                              {group.entries[0].eventType ===
+                                "Status Change" && (
+                                <div className="text-sm font-medium text-slate-700">
+                                  {group.entries[0].oldValue
+                                    ? `${group.entries[0].oldValue} `
+                                    : ""}
+                                  {group.entries[0].oldValue &&
+                                  group.entries[0].newValue
+                                    ? "→ "
+                                    : ""}
+                                  {group.entries[0].newValue || ""}
+                                </div>
+                              )}
+
+                              {/* Comment part - from either Status Change or standalone Comment entry */}
+                              {group.entries.length > 1 &&
+                              group.entries[1].eventType === "Comment" &&
+                              group.entries[1].commentText ? (
+                                <div className="mt-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                                  <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                                    Comment entered
+                                  </div>
+                                  <p className="mt-1 whitespace-pre-wrap">
+                                    {group.entries[1].commentText}
+                                  </p>
+                                </div>
+                              ) : group.entries[0].eventType === "Comment" &&
+                                group.entries[0].commentText ? (
+                                <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                                  <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                                    Comment entered
+                                  </div>
+                                  <p className="mt-1 whitespace-pre-wrap">
+                                    {group.entries[0].commentText}
+                                  </p>
+                                </div>
                               ) : null}
                             </div>
                           </div>
