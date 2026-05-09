@@ -102,7 +102,6 @@ export default function CounselorPage() {
     }
   }, [isCounselor, router]);
 
-  const [tab, setTab] = useState<"followup" | "addlead">("followup");
   const [leads, setLeads] = useState<Lead[]>([]);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [leadHistory, setLeadHistory] = useState<HistoryEntry[]>([]);
@@ -111,6 +110,9 @@ export default function CounselorPage() {
   const [tablePage, setTablePage] = useState(1);
   const [isUpdating, setIsUpdating] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [addLeadModalOpen, setAddLeadModalOpen] = useState(false);
+  const [addLeadModalVisible, setAddLeadModalVisible] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
 
   // Form states
@@ -163,6 +165,26 @@ export default function CounselorPage() {
 
     return currentStatus;
   };
+
+  useEffect(() => {
+    if (modalOpen) {
+      const timer = window.setTimeout(() => setModalVisible(true), 0);
+      return () => window.clearTimeout(timer);
+    }
+
+    const timer = window.setTimeout(() => setModalVisible(false), 180);
+    return () => window.clearTimeout(timer);
+  }, [modalOpen]);
+
+  useEffect(() => {
+    if (addLeadModalOpen) {
+      const timer = window.setTimeout(() => setAddLeadModalVisible(true), 0);
+      return () => window.clearTimeout(timer);
+    }
+
+    const timer = window.setTimeout(() => setAddLeadModalVisible(false), 180);
+    return () => window.clearTimeout(timer);
+  }, [addLeadModalOpen]);
 
   const groupHistoryEntries = (entries: HistoryEntry[]) => {
     const grouped: Array<{
@@ -527,7 +549,7 @@ export default function CounselorPage() {
         setNewEmail("");
         setNewCourse("");
         setNewLeadSource("Direct");
-        setTab("followup");
+        setAddLeadModalOpen(false);
         await fetchLeads(counselorId);
       } else {
         showToast(result.error || "Failed to create lead", "error");
@@ -632,262 +654,286 @@ export default function CounselorPage() {
             Logout
           </button>
         </div>
-
-        <div className="mx-auto flex w-full max-w-5xl gap-2 px-4 pb-4 sm:px-6">
-          <button
-            onClick={() => setTab("followup")}
-            className={`rounded-md px-3 py-2 text-sm font-medium transition ${
-              tab === "followup"
-                ? "bg-slate-900 text-white"
-                : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-            }`}
-          >
-            Follow-up
-          </button>
-          <button
-            onClick={() => setTab("addlead")}
-            className={`rounded-md px-3 py-2 text-sm font-medium transition ${
-              tab === "addlead"
-                ? "bg-slate-900 text-white"
-                : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-            }`}
-          >
-            Add Lead
-          </button>
-        </div>
       </header>
 
+      <button
+        onClick={() => setAddLeadModalOpen(true)}
+        className="fixed bottom-5 right-5 z-20 inline-flex items-center gap-2 rounded-full bg-teal-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-teal-600/25 transition hover:bg-teal-700"
+      >
+        + Add Lead
+      </button>
+
       <main className="mx-auto w-full max-w-5xl px-4 py-4 sm:px-6 sm:py-6">
-        {tab === "followup" ? (
-          <div className="space-y-4">
-            {/* Status Filter Tabs */}
-            <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
-              <button
-                onClick={() => setStatusFilter(null)}
-                className={`rounded-md px-3 py-2 text-sm font-medium transition ${
-                  statusFilter === null
-                    ? "bg-slate-900 text-white"
-                    : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                All ({leads.length})
-              </button>
-              {statusFlow.map((status) => {
-                const count = leads.filter((l) => l.status === status).length;
-                return (
-                  <button
-                    key={status}
-                    onClick={() => setStatusFilter(status)}
-                    className={`rounded-md px-3 py-2 text-sm font-medium transition ${
-                      statusFilter === status
-                        ? "bg-slate-900 text-white"
-                        : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                    }`}
-                  >
-                    {status} ({count})
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Search box */}
-            <div className="mt-3">
-              <input
-                type="text"
-                placeholder="Search name, mobile, email..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full max-w-md rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-              />
-            </div>
-
-            {filteredLeads.length === 0 ? (
-              <div className="rounded-lg border border-slate-200 bg-white p-6 text-center text-sm text-slate-500 shadow-sm">
-                No leads found
-              </div>
-            ) : (
-              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead className="bg-slate-50 text-left text-slate-600">
-                      <tr>
-                        <th className="px-4 py-3 font-medium">Lead</th>
-                        <th className="px-4 py-3 font-medium">Mobile</th>
-                        <th className="px-4 py-3 font-medium">Course</th>
-                        <th className="px-4 py-3 font-medium">Status</th>
-                        <th className="px-4 py-3 font-medium">Updated</th>
-                        <th className="px-4 py-3 font-medium">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {paginatedLeads.map((lead) => (
-                        <tr key={lead.id} className="hover:bg-slate-50">
-                          <td className="px-4 py-3">
-                            <div className="font-medium text-slate-900">
-                              {lead.name}
-                            </div>
-                            <div className="text-xs text-slate-500">
-                              {lead.leadId}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-slate-700">
-                            {lead.mobile}
-                          </td>
-                          <td className="px-4 py-3 text-slate-700">
-                            {lead.course}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span
-                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusColor(lead.status)}`}
-                            >
-                              {lead.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-slate-600">
-                            {new Date(lead.updated).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3">
-                            <button
-                              onClick={() => openLeadDetails(lead)}
-                              className="rounded-md border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100"
-                            >
-                              View details
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    Showing {(currentPage - 1) * PAGE_SIZE + 1} -{" "}
-                    {Math.min(currentPage * PAGE_SIZE, filteredLeads.length)} of{" "}
-                    {filteredLeads.length}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() =>
-                        setTablePage((page) => Math.max(1, page - 1))
-                      }
-                      disabled={currentPage === 1}
-                      className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-3 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                      Prev
-                    </button>
-                    <span className="text-xs font-medium text-slate-500">
-                      Page {currentPage} of {totalPages}
-                    </span>
-                    <button
-                      onClick={() =>
-                        setTablePage((page) => Math.min(totalPages, page + 1))
-                      }
-                      disabled={currentPage === totalPages}
-                      className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-3 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Next
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2 sm:col-span-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Student Name*
-                </label>
-                <input
-                  type="text"
-                  placeholder="Student Name"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Mobile No*
-                </label>
-                <input
-                  type="tel"
-                  placeholder="07XXXXXXXX"
-                  value={newMobile}
-                  onChange={(e) => setNewMobile(e.target.value)}
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  placeholder="optional@email.com"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-                />
-              </div>
-
-              <div className="space-y-2 sm:col-span-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Course*
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g., HND in Business"
-                  value={newCourse}
-                  onChange={(e) => setNewCourse(e.target.value)}
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-                />
-              </div>
-
-              <div className="space-y-2 sm:col-span-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Lead Source
-                </label>
-                <select
-                  value={newLeadSource}
-                  onChange={(e) => setNewLeadSource(e.target.value)}
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-                >
-                  <option>Direct</option>
-                  <option>Referral</option>
-                  <option>Social Media</option>
-                  <option>Website</option>
-                  <option>Other</option>
-                </select>
-              </div>
-
-              <div className="sm:col-span-2">
+        <div className="space-y-4">
+          {/* Status Filter Tabs */}
+          <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+            <button
+              onClick={() => setStatusFilter(null)}
+              className={`rounded-md px-3 py-2 text-sm font-medium transition ${
+                statusFilter === null
+                  ? "bg-slate-900 text-white"
+                  : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              All ({leads.length})
+            </button>
+            {statusFlow.map((status) => {
+              const count = leads.filter((l) => l.status === status).length;
+              return (
                 <button
-                  onClick={handleAddLead}
-                  disabled={isUpdating}
-                  className="w-full rounded-md bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  key={status}
+                  onClick={() => setStatusFilter(status)}
+                  className={`rounded-md px-3 py-2 text-sm font-medium transition ${
+                    statusFilter === status
+                      ? "bg-slate-900 text-white"
+                      : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                  }`}
                 >
-                  {isUpdating ? "Creating..." : "Create New Lead"}
+                  {status} ({count})
                 </button>
+              );
+            })}
+          </div>
+
+          {/* Search box */}
+          <div className="mt-3">
+            <input
+              type="text"
+              placeholder="Search name, mobile, email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full max-w-md rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+            />
+          </div>
+
+          {filteredLeads.length === 0 ? (
+            <div className="rounded-lg border border-slate-200 bg-white p-6 text-center text-sm text-slate-500 shadow-sm">
+              No leads found
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                  <thead className="bg-slate-50 text-left text-slate-600">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Lead</th>
+                      <th className="px-4 py-3 font-medium">Mobile</th>
+                      <th className="px-4 py-3 font-medium">Course</th>
+                      <th className="px-4 py-3 font-medium">Status</th>
+                      <th className="px-4 py-3 font-medium">Updated</th>
+                      <th className="px-4 py-3 font-medium">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {paginatedLeads.map((lead) => (
+                      <tr key={lead.id} className="hover:bg-slate-50">
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-slate-900">
+                            {lead.name}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {lead.leadId}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {lead.mobile}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {lead.course}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusColor(lead.status)}`}
+                          >
+                            {lead.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {new Date(lead.updated).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => openLeadDetails(lead)}
+                            className="rounded-md border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                          >
+                            View details
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  Showing {(currentPage - 1) * PAGE_SIZE + 1} -{" "}
+                  {Math.min(currentPage * PAGE_SIZE, filteredLeads.length)} of{" "}
+                  {filteredLeads.length}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() =>
+                      setTablePage((page) => Math.max(1, page - 1))
+                    }
+                    disabled={currentPage === 1}
+                    className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-3 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Prev
+                  </button>
+                  <span className="text-xs font-medium text-slate-500">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    onClick={() =>
+                      setTablePage((page) => Math.min(totalPages, page + 1))
+                    }
+                    disabled={currentPage === totalPages}
+                    className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-3 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </main>
 
-      {modalOpen && selectedLead && (
+      {addLeadModalVisible && (
         <div
-          className="fixed inset-0 z-20 flex items-end justify-center bg-black/50 px-0 sm:items-center sm:px-4"
+          className={`fixed inset-0 z-30 flex items-end justify-center bg-black/50 px-0 transition-opacity duration-200 ease-out sm:items-center sm:px-4 ${
+            addLeadModalOpen ? "opacity-100" : "pointer-events-none opacity-0"
+          }`}
+          onClick={() => setAddLeadModalOpen(false)}
+        >
+          <div
+            className={`w-full max-w-2xl rounded-t-2xl bg-white shadow-2xl transition-all duration-200 ease-out sm:rounded-2xl ${
+              addLeadModalOpen
+                ? "translate-y-0 scale-100 opacity-100"
+                : "translate-y-3 scale-95 opacity-0"
+            }`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-4 py-4 sm:px-6">
+              <div>
+                <p className="text-sm font-medium text-slate-500">
+                  Create lead
+                </p>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  Add New Lead
+                </h2>
+              </div>
+              <button
+                onClick={() => setAddLeadModalOpen(false)}
+                className="rounded-md border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"
+                aria-label="Close add lead modal"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="max-h-[80vh] overflow-y-auto px-4 py-4 sm:px-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2 sm:col-span-2">
+                  <label className="text-sm font-medium text-slate-700">
+                    Student Name*
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Student Name"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">
+                    Mobile No*
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder="07XXXXXXXX"
+                    value={newMobile}
+                    onChange={(e) => setNewMobile(e.target.value)}
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="optional@email.com"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  />
+                </div>
+
+                <div className="space-y-2 sm:col-span-2">
+                  <label className="text-sm font-medium text-slate-700">
+                    Course*
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g., HND in Business"
+                    value={newCourse}
+                    onChange={(e) => setNewCourse(e.target.value)}
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  />
+                </div>
+
+                <div className="space-y-2 sm:col-span-2">
+                  <label className="text-sm font-medium text-slate-700">
+                    Lead Source
+                  </label>
+                  <select
+                    value={newLeadSource}
+                    onChange={(e) => setNewLeadSource(e.target.value)}
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                  >
+                    <option>Direct</option>
+                    <option>Referral</option>
+                    <option>Social Media</option>
+                    <option>Website</option>
+                    <option>Other</option>
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <button
+                    onClick={handleAddLead}
+                    disabled={isUpdating}
+                    className="w-full rounded-md bg-teal-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isUpdating ? "Creating..." : "Create New Lead"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalVisible && selectedLead && (
+        <div
+          className={`fixed inset-0 z-20 flex items-end justify-center bg-black/50 px-0 transition-opacity duration-200 ease-out sm:items-center sm:px-4 ${
+            modalOpen ? "opacity-100" : "pointer-events-none opacity-0"
+          }`}
           onClick={() => setModalOpen(false)}
         >
           <div
-            className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
+            className={`flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl transition-all duration-200 ease-out sm:rounded-2xl ${
+              modalOpen
+                ? "translate-y-0 scale-100 opacity-100"
+                : "translate-y-3 scale-95 opacity-0"
+            }`}
             onClick={(event) => event.stopPropagation()}
           >
             <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
