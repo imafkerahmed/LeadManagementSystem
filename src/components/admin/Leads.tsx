@@ -247,7 +247,7 @@ export default function AdminLeads() {
             "+94",
           ).countryCode,
         email: record.email || "",
-        course: record.course || "",
+        course: record.course || record.courseName || "",
         leadSource: record.leadSource || "",
         status: record.leadStatus || record.status || "",
         assignedTo: assignedName + (assignedRole ? ` — ${assignedRole}` : ""),
