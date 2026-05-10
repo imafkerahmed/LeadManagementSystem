@@ -2,20 +2,37 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, BarChart3, Users, Upload, Settings } from "lucide-react";
+import {
+  MdDashboard,
+  MdPeople,
+  MdCloudUpload,
+  MdSettings,
+  MdExitToApp,
+} from "react-icons/md";
 import AdminDashboard from "@/components/admin/Dashboard";
 import AdminLeads from "@/components/admin/Leads";
 import BulkUpload from "@/components/admin/BulkUpload";
 import AdminSettings from "@/components/admin/Settings";
 import { createPocketBaseClient } from "@/lib/pocketbase";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type AdminTab = "dashboard" | "leads" | "bulk" | "settings";
 
-const tabs: Array<{ id: AdminTab; label: string; icon: typeof BarChart3 }> = [
-  { id: "dashboard", label: "📊 Dashboard", icon: BarChart3 },
-  { id: "leads", label: "👥 All Leads", icon: Users },
-  { id: "bulk", label: "📤 Bulk Upload", icon: Upload },
-  { id: "settings", label: "⚙️ Settings", icon: Settings },
+const tabs: Array<{ id: AdminTab; label: string; icon: typeof MdDashboard }> = [
+  { id: "dashboard", label: "Dashboard", icon: MdDashboard },
+  { id: "leads", label: "All Leads", icon: MdPeople },
+  { id: "bulk", label: "Bulk Upload", icon: MdCloudUpload },
+  { id: "settings", label: "Settings", icon: MdSettings },
 ];
 
 const isValidTab = (value: string | null): value is AdminTab =>
@@ -29,6 +46,9 @@ export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminId, setAdminId] = useState("");
   const [adminLabel, setAdminLabel] = useState("Admin");
+  const [adminName, setAdminName] = useState("");
+  const [adminRole, setAdminRole] = useState("");
+  const [logoutOpen, setLogoutOpen] = useState(false);
 
   useEffect(() => {
     // read URL on mount to restore active tab
@@ -66,6 +86,8 @@ export default function AdminPage() {
     setIsAdmin(true);
     setAdminId(authUser?.id || "");
     setAdminLabel(authUser?.email || authUser?.name || "Admin");
+    setAdminName(authUser?.name || authUser?.email || "Admin");
+    setAdminRole(authUser?.role || "Admin");
   }, [router]);
 
   if (!authChecked) {
@@ -101,55 +123,102 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-slate-900">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight sm:text-xl">
-              Amazon College
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="flex h-screen">
+        {/* Sidebar */}
+        <aside className="w-64 border-r border-border bg-muted/30 flex flex-col">
+          <div className="px-6 py-8 border-b border-border">
+            <h1 className="text-xl font-bold tracking-tight">
+              Lead Management System
             </h1>
-            <p className="text-sm text-slate-500" suppressHydrationWarning>
-              {adminLabel}
-            </p>
+            <p className="text-sm text-muted-foreground mt-2">Amazon College</p>
           </div>
-          <button
-            onClick={() => {
-              const pb = createPocketBaseClient();
-              pb.authStore.clear();
-              router.replace("/");
-            }}
-            className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50"
-          >
-            <LogOut className="h-4 w-4" />
-            Logout
-          </button>
-        </div>
 
-        <div className="mx-auto flex w-full max-w-5xl gap-2 px-4 pb-4 sm:px-6">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`rounded-md px-3 py-2 text-sm font-medium transition ${
-                currentTab === t.id
-                  ? "bg-slate-900 text-white"
-                  : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-              }`}
+          <nav className="flex-1 px-3 py-6 space-y-2 overflow-y-auto">
+            {tabs.map((t) => {
+              const Icon = t.icon;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  className={`w-full flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all ${
+                    currentTab === t.id
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-foreground hover:bg-muted"
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span>{t.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+
+          <div className="border-t border-border p-4">
+            <Button
+              onClick={() => setLogoutOpen(true)}
+              variant="ghost"
+              className="w-full justify-start gap-3 h-auto py-3 px-4"
+              size="lg"
             >
-              {t.label.replace(/^[^\s]+\s?/, "")}
-            </button>
-          ))}
-        </div>
-      </header>
+              <MdExitToApp className="w-6 h-6 flex-shrink-0" />
+              <div className="text-left">
+                <div className="text-sm font-medium">{adminName}</div>
+                <div className="text-xs text-muted-foreground capitalize">
+                  {adminRole}
+                </div>
+              </div>
+            </Button>
+          </div>
+        </aside>
 
-      <main className="mx-auto w-full max-w-5xl px-4 py-4 sm:px-6 sm:py-6">
-        {currentTab === "dashboard" && <AdminDashboard />}
-        {currentTab === "leads" && <AdminLeads />}
-        {currentTab === "bulk" && (
-          <BulkUpload operatorId={adminId} operatorLabel={adminLabel} />
-        )}
-        {currentTab === "settings" && <AdminSettings />}
-      </main>
+        {/* Main content */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-4 shadow-sm">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight">
+                {tabs.find((t) => t.id === currentTab)?.label}
+              </h2>
+            </div>
+          </header>
+
+          <main className="flex-1 overflow-y-auto px-6 py-6">
+            <div className="mx-auto max-w-5xl">
+              {currentTab === "dashboard" && <AdminDashboard />}
+              {currentTab === "leads" && <AdminLeads />}
+              {currentTab === "bulk" && (
+                <BulkUpload operatorId={adminId} operatorLabel={adminLabel} />
+              )}
+              {currentTab === "settings" && <AdminSettings />}
+            </div>
+          </main>
+        </div>
+      </div>
+
+      <AlertDialog open={logoutOpen} onOpenChange={setLogoutOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Log Out</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to log out? You&apos;ll need to sign in
+              again to access the system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const pb = createPocketBaseClient();
+                pb.authStore.clear();
+                router.replace("/");
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Log Out
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
