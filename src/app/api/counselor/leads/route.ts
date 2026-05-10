@@ -6,6 +6,7 @@ type LeadRecord = {
   studentName?: string;
   mobileNo?: string;
   email?: string;
+  course?: string;
   courseName?: string;
   leadStatus?: string;
   latestComment?: string;
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
       name: lead.studentName,
       mobile: lead.mobileNo,
       email: lead.email,
-      course: lead.courseName,
+      course: lead.course || "",
       status: lead.leadStatus,
       comments: lead.latestComment || "",
       commentLog: [],

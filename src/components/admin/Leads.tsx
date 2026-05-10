@@ -141,7 +141,7 @@ function splitPhoneParts(
     return {
       countryCode,
       mobile,
-      mobileWithCountry: `${countryCode}-${mobile}`,
+      mobileWithCountry: `${countryCode}${mobile}`,
     };
   }
 
@@ -149,7 +149,7 @@ function splitPhoneParts(
   return {
     countryCode: fallbackCountryCode,
     mobile,
-    mobileWithCountry: `${fallbackCountryCode}-${mobile}`,
+    mobileWithCountry: `${fallbackCountryCode}${mobile}`,
   };
 }
 
@@ -247,7 +247,7 @@ export default function AdminLeads() {
             "+94",
           ).countryCode,
         email: record.email || "",
-        course: record.courseName || record.course || "",
+        course: record.course || "",
         leadSource: record.leadSource || "",
         status: record.leadStatus || record.status || "",
         assignedTo: assignedName + (assignedRole ? ` — ${assignedRole}` : ""),
@@ -569,7 +569,7 @@ export default function AdminLeads() {
     const nextName = draftName.trim();
     const nextMobile = normalizePhone(draftMobile.trim());
     const nextCountryCode = selectedLead.countryCode || "+94";
-    const normalizedMobileWithCountry = `${nextCountryCode}-${nextMobile}`;
+    const normalizedMobileWithCountry = `${nextCountryCode}${nextMobile}`;
     const nextEmail = draftEmail.trim();
     const nextCourse = draftCourse.trim();
     const nextLeadSource = draftLeadSource.trim();
@@ -623,7 +623,6 @@ export default function AdminLeads() {
         payload.countryCode = nextCountryCode;
       }
       if (emailChanged) payload.email = nextEmail;
-      if (courseChanged) payload.courseName = nextCourse;
       if (courseChanged) payload.course = nextCourse;
       if (leadSourceChanged) payload.leadSource = nextLeadSource;
 
@@ -731,9 +730,8 @@ export default function AdminLeads() {
         countryCode: payload.countryCode || "+94",
         mobileWithCountry:
           payload.mobileWithCountry ||
-          `${payload.countryCode || "+94"}-${normalizePhone(payload.mobile)}`,
+          `${payload.countryCode || "+94"}${normalizePhone(payload.mobile)}`,
         course: payload.course,
-        courseName: payload.course,
         leadSource: payload.leadSource || "Manual",
         status: "New",
         leadStatus: "New",
@@ -873,7 +871,7 @@ export default function AdminLeads() {
                   </td>
                   <td className="px-6 py-3 text-sm text-gray-600">
                     {lead.mobileWithCountry ||
-                      `${lead.countryCode || "+94"}-${lead.mobile}`}
+                      `${lead.countryCode || "+94"}${lead.mobile}`}
                   </td>
                   <td className="px-6 py-3 text-sm text-gray-600">
                     {lead.course}
@@ -1032,7 +1030,7 @@ export default function AdminLeads() {
                       ) : (
                         <p className="text-sm">
                           {selectedLead.mobileWithCountry ||
-                            `${selectedLead.countryCode}-${selectedLead.mobile}`}
+                            `${selectedLead.countryCode}${selectedLead.mobile}`}
                         </p>
                       )}
                     </div>
@@ -1325,7 +1323,7 @@ function NewLeadForm({
       course,
       assignee,
       countryCode,
-      mobileWithCountry: `${countryCode}-${cleanedMobile}`,
+      mobileWithCountry: `${countryCode}${cleanedMobile}`,
     });
   };
 

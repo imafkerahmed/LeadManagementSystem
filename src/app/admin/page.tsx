@@ -8,11 +8,13 @@ import {
   MdCloudUpload,
   MdSettings,
   MdExitToApp,
+  MdAssessment,
 } from "react-icons/md";
 import AdminDashboard from "@/components/admin/Dashboard";
 import AdminLeads from "@/components/admin/Leads";
 import BulkUpload from "@/components/admin/BulkUpload";
 import AdminSettings from "@/components/admin/Settings";
+import AdminReports from "@/components/admin/Reports";
 import { createPocketBaseClient } from "@/lib/pocketbase";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,12 +28,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-type AdminTab = "dashboard" | "leads" | "bulk" | "settings";
+type AdminTab = "dashboard" | "leads" | "bulk" | "reports" | "settings";
 
 const tabs: Array<{ id: AdminTab; label: string; icon: typeof MdDashboard }> = [
   { id: "dashboard", label: "Dashboard", icon: MdDashboard },
   { id: "leads", label: "All Leads", icon: MdPeople },
   { id: "bulk", label: "Bulk Upload", icon: MdCloudUpload },
+  { id: "reports", label: "Reports", icon: MdAssessment },
   { id: "settings", label: "Settings", icon: MdSettings },
 ];
 
@@ -189,6 +192,7 @@ export default function AdminPage() {
               {currentTab === "bulk" && (
                 <BulkUpload operatorId={adminId} operatorLabel={adminLabel} />
               )}
+              {currentTab === "reports" && <AdminReports />}
               {currentTab === "settings" && <AdminSettings />}
             </div>
           </main>

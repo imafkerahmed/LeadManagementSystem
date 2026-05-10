@@ -47,6 +47,7 @@ type LeadRecord = {
   mobile?: string;
   mobileWithCountry?: string;
   email?: string;
+  course?: string;
   courseName?: string;
   status?: string;
   latestComment?: string;
@@ -358,7 +359,7 @@ export default function CounselorPage() {
           mobile: lead.mobile || "",
           mobileWithCountry: lead.mobileWithCountry || "",
           email: lead.email || "",
-          course: lead.courseName || "",
+          course: lead.course || lead.courseName || "",
           status: lead.status || "",
           comments: lead.latestComment || "",
           created: lead.created || "",
@@ -432,7 +433,7 @@ export default function CounselorPage() {
         mobile: latestLead.mobile || "",
         mobileWithCountry: latestLead.mobileWithCountry || "",
         email: latestLead.email || "",
-        course: latestLead.courseName || "",
+        course: latestLead.course || latestLead.courseName || "",
         status: latestLead.status || "",
         comments: latestLead.latestComment || "",
         created: latestLead.created || "",

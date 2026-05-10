@@ -240,8 +240,6 @@ export async function POST(request: NextRequest) {
             studentName: lead.studentName,
             mobileWithCountry,
             email: lead.email || "",
-            // write both course variants
-            courseName: lead.course,
             course: lead.course,
             leadSource: lead.leadSource || "Bulk Upload",
             // write both status variants used across codebase

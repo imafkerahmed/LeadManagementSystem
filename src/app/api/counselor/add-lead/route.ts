@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
       mobile: normalizedMobile,
       mobileWithCountry,
       email,
-      courseName: course,
+      course: course,
       leadSource,
       status: "New",
       assignedTo: counselorId,
