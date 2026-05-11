@@ -140,8 +140,8 @@ export async function GET(request: NextRequest) {
         id: lead.id,
         studentName: lead.studentName || "",
         mobileWithCountry: lead.mobileWithCountry || "",
-        // Use canonical `course` field.
-        course: lead.course || "",
+        // Support both legacy and current schemas.
+        course: lead.course || lead.courseName || "",
         status: lead.status || "",
         assignedTo: lead.assignedTo || "",
         assignedToName:
