@@ -336,7 +336,9 @@ export default function AdminLeads() {
       if (newValue && !oldValue) return newValue;
     }
 
-    if (normalizeTimelineEventType(entry.eventType) === "lead details updated") {
+    if (
+      normalizeTimelineEventType(entry.eventType) === "lead details updated"
+    ) {
       return newValue || oldValue;
     }
 
@@ -1481,10 +1483,10 @@ export default function AdminLeads() {
                                     group.entries[0].eventType,
                                   ) !== "comment" &&
                                     getEntryTransition(group.entries[0]) && (
-                                    <p className="text-sm font-medium text-slate-700">
-                                      {getEntryTransition(group.entries[0])}
-                                    </p>
-                                  )}
+                                      <p className="text-sm font-medium text-slate-700">
+                                        {getEntryTransition(group.entries[0])}
+                                      </p>
+                                    )}
                                   {(() => {
                                     const commentSource =
                                       group.entries.find(
@@ -1513,16 +1515,16 @@ export default function AdminLeads() {
                                       ) === "lead details updated";
 
                                     return (
-                                    <div className="rounded-md bg-white px-3 py-2 text-sm text-slate-700">
-                                      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                                        {isDetailsChanged
-                                          ? "Details changed"
-                                          : "Comment entered"}
-                                      </p>
-                                      <p className="mt-1 whitespace-pre-wrap">
-                                        {note}
-                                      </p>
-                                    </div>
+                                      <div className="rounded-md bg-white px-3 py-2 text-sm text-slate-700">
+                                        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                                          {isDetailsChanged
+                                            ? "Details changed"
+                                            : "Comment entered"}
+                                        </p>
+                                        <p className="mt-1 whitespace-pre-wrap">
+                                          {note}
+                                        </p>
+                                      </div>
                                     );
                                   })()}
                                 </div>
