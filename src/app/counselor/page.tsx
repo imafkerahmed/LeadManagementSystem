@@ -758,7 +758,7 @@ export default function CounselorPage() {
 
       <button
         onClick={() => setAddLeadModalOpen(true)}
-        className="fixed bottom-5 right-5 z-20 inline-flex items-center gap-2 rounded-full bg-teal-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-teal-600/25 transition hover:bg-teal-700"
+        className="fixed bottom-5 right-5 z-20 inline-flex items-center gap-2 rounded-full bg-teal-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-teal-600/25 transition hover:bg-teal-700 md:hidden"
       >
         + Add Lead
       </button>
@@ -795,8 +795,8 @@ export default function CounselorPage() {
             })}
           </div>
 
-          {/* Search box */}
-          <div className="mt-3">
+          {/* Search box + desktop add button */}
+          <div className="mt-3 flex items-center gap-3">
             <input
               type="text"
               placeholder="Search name, mobile, email..."
@@ -804,6 +804,12 @@ export default function CounselorPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full max-w-md rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
             />
+            <button
+              onClick={() => setAddLeadModalOpen(true)}
+              className="hidden rounded-md bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-700 md:inline-flex"
+            >
+              + Add Lead
+            </button>
           </div>
 
           {filteredLeads.length === 0 ? (
