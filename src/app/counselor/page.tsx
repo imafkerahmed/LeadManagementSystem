@@ -1293,22 +1293,6 @@ export default function CounselorPage() {
 
             <div className="grid flex-1 gap-4 overflow-y-auto px-4 py-4 sm:px-6 lg:grid-cols-[280px_1fr] lg:gap-6">
               <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                {(selectedLead.mobile || selectedLead.mobileWithCountry) && (
-                  <div>
-                    <button
-                      onClick={() =>
-                        window.open(
-                          `https://wa.me/${(selectedLead.mobileWithCountry || selectedLead.mobile || "").replace(/\D/g, "")}?text=${encodeURIComponent(`Hello, I'm ${counselorName} from Amazon College. I'm reaching out regarding your inquiry about ${selectedLead.course}. How may I assist you today?`)}`,
-                          "_blank",
-                        )
-                      }
-                      className="w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium"
-                    >
-                      <MessageSquare className="w-4 h-4" />
-                      Send WhatsApp
-                    </button>
-                  </div>
-                )}
                 <div>
                   <div className="text-xs uppercase tracking-wide text-slate-500">
                     Mobile
@@ -1356,6 +1340,21 @@ export default function CounselorPage() {
                       "-"}
                   </div>
                 </div>
+                {selectedLead.leadSource && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wide text-slate-500">
+                      Lead Source
+                    </div>
+                    <div className="mt-1 font-medium text-slate-900">
+                      {selectedLead.leadSource}
+                    </div>
+                    {selectedLead.leadSourceDetail && (
+                      <p className="text-xs text-slate-500 mt-1">
+                        {selectedLead.leadSourceDetail}
+                      </p>
+                    )}
+                  </div>
+                )}
                 {(selectedLead.mobileWithCountry ||
                   selectedLead.countryCode ||
                   selectedLead.mobile) && (
