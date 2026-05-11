@@ -115,6 +115,7 @@ export default function CounselorPage() {
     pb.authStore.isValid && authUser?.role === "student-counsellor";
   const counselorId = authUser?.id || "";
   const counselorName = authUser?.name || "Student Counsellor";
+  const counselorEmail = authUser?.email || "";
 
   useEffect(() => {
     if (!isCounselor) {
@@ -345,25 +346,27 @@ export default function CounselorPage() {
 
   const fetchLeads = useCallback(
     async (userId: string, selectedLeadId?: string) => {
-      // Note: PocketBase's listRule automatically handles authorization
-      // Counsellors see leads based on their assigned leads and role
-      // Intentionally silent in production; avoid logging objects that may trigger
-      // cross-origin wrapper errors in browser extensions.
-
       try {
         const pb = createPocketBaseClient();
+        const token = pb.authStore.token;
+        const params = new URLSearchParams({
+          counselorId: userId,
+          counselor: counselorName,
+          counselorEmail,
+        });
 
-        // debug info omitted
+        const response = await fetch(`/api/counselor/leads?${params.toString()}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
 
-        // Query all leads - PocketBase's listRule will automatically filter based on user role
-        // No need to manually filter since the rule already handles:
-        // - Admins see all
-        // - Counsellors with role="student-counsellor" see all
-        // - Counsellors see leads assigned to them
+        if (!response.ok) {
+          const errorBody = await response.json().catch(() => ({}));
+          throw new Error(
+            errorBody?.error || `Failed to fetch leads: HTTP ${response.status}`,
+          );
+        }
 
-        const records = (await pb.collection("leads").getFullList({
-          sort: "-created",
-        })) as LeadRecord[];
+        const records = (await response.json()) as LeadRecord[];
 
         const nextLeads = records.map((lead) => ({
           id: lead.id,
@@ -414,7 +417,7 @@ export default function CounselorPage() {
         // No loading state needed here yet.
       }
     },
-    [],
+    [counselorName, counselorEmail],
   );
 
   useEffect(() => {
