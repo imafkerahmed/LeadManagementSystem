@@ -428,7 +428,8 @@ export default function AdminLeads() {
         if (!response.ok) {
           const errorBody = await response.json().catch(() => ({}));
           throw new Error(
-            errorBody?.error || `Failed to fetch leads: HTTP ${response.status}`,
+            errorBody?.error ||
+              `Failed to fetch leads: HTTP ${response.status}`,
           );
         }
 

@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
         userByName.get(lead.assignedTo || "")?.email ||
         lead.assignedTo ||
         "",
-      assignedTo: 
+      assignedTo:
         userById.get(lead.assignedTo || "")?.name ||
         userById.get(lead.assignedTo || "")?.email ||
         userByName.get(lead.assignedTo || "")?.name ||
