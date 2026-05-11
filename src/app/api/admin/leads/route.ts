@@ -146,7 +146,21 @@ export async function GET(request: NextRequest) {
       totalPages: leads.totalPages,
     });
   } catch (error) {
-    console.error("Error fetching leads:", error);
+    // Handle abort errors gracefully - these are expected when client cancels
+    if (
+      error instanceof Error &&
+      (error.message.includes("aborted") || error.message.includes("abort"))
+    ) {
+      return NextResponse.json(
+        { items: [], page: 1, perPage: 50, totalItems: 0, totalPages: 0 },
+        { status: 200 },
+      );
+    }
+
+    console.error(
+      "Error fetching leads:",
+      error instanceof Error ? error.message : String(error),
+    );
     return NextResponse.json(
       { error: "Failed to fetch leads" },
       { status: 500 },

@@ -103,13 +103,23 @@ export async function GET(request: NextRequest) {
       comments: lead.latestComment || "",
       created: lead.created || "",
       updated: lead.updated || lead.created || "",
-      assignedTo:
-        lead.assignedTo || counselorId || "",
+      assignedTo: lead.assignedTo || counselorId || "",
     }));
 
     return NextResponse.json(formattedLeads);
   } catch (error) {
-    console.error("Error fetching leads:", error);
+    // Handle abort errors gracefully - these are expected when client cancels
+    if (
+      error instanceof Error &&
+      (error.message.includes("aborted") || error.message.includes("abort"))
+    ) {
+      return NextResponse.json([], { status: 200 });
+    }
+
+    console.error(
+      "Error fetching leads:",
+      error instanceof Error ? error.message : String(error),
+    );
     return NextResponse.json(
       { error: "Failed to fetch leads" },
       { status: 500 },

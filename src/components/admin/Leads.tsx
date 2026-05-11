@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Search,
   Plus,
@@ -219,6 +219,9 @@ export default function AdminLeads() {
     null,
   );
 
+  // AbortController for managing concurrent fetch requests
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   const mapLead = useCallback(
     (record: LeadRecord): Lead => {
       const rawAssignedTo = (record.assignedTo || "").trim();
@@ -413,6 +416,13 @@ export default function AdminLeads() {
   const fetchLeads = useCallback(
     async (pageToLoad = 1) => {
       setIsLoading(true);
+      
+      // Cancel any pending requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+      
       try {
         const params = new URLSearchParams({
           page: String(pageToLoad),
@@ -423,7 +433,9 @@ export default function AdminLeads() {
         if (counselorFilter) params.set("counselor", counselorFilter);
         if (searchTerm) params.set("search", searchTerm);
 
-        const response = await fetch(`/api/admin/leads?${params.toString()}`);
+        const response = await fetch(`/api/admin/leads?${params.toString()}`, {
+          signal: abortControllerRef.current.signal,
+        });
 
         if (!response.ok) {
           const errorBody = await response.json().catch(() => ({}));
@@ -456,7 +468,9 @@ export default function AdminLeads() {
         setTotalPages(Math.max(1, list.totalPages || 1));
         setPage(list.page || pageToLoad);
       } catch (error) {
-        if (error instanceof Error && error.message.includes("aborted")) {
+        if (error instanceof Error && error.name === "AbortError") {
+          // Request was cancelled, don't show error
+        } else if (error instanceof Error && error.message.includes("aborted")) {
           // Request was cancelled, don't show error
         } else {
           console.error(
@@ -488,6 +502,15 @@ export default function AdminLeads() {
       void fetchLeads(page);
     }, 0);
   }, [page, fetchLeads]);
+
+  // Cleanup: cancel pending requests when component unmounts
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const openSidebarFor = async (
     lead: Lead | null,
