@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPocketBaseAdminClient } from "@/lib/pocketbase";
 
+type UserRecord = {
+  id: string;
+  name?: string;
+  email?: string;
+  role?: string;
+  accountStatus?: string;
+};
+
 type LeadRecord = {
   id: string;
   leadId?: string;
@@ -14,9 +22,16 @@ type LeadRecord = {
   status?: string;
   assignedTo?: string;
   comments?: string;
+  leadStatus?: string;
+  courseName?: string;
+  leadSourceDetail?: string;
   created?: string;
   updated?: string;
 };
+
+function escapeFilterValue(value: string) {
+  return value.replace(/"/g, '\\"');
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,20 +44,53 @@ export async function GET(request: NextRequest) {
     const page = request.nextUrl.searchParams.get("page") || "1";
     const limit = request.nextUrl.searchParams.get("limit") || "50";
 
+    const users = (await pb.collection("users").getFullList({
+      sort: "name",
+      fields: "id,name,email,role,accountStatus",
+    })) as UserRecord[];
+
+    const userById = new Map(users.map((user) => [user.id, user]));
+    const userByName = new Map(
+      users.map((user) => [user.name || user.email || user.id, user]),
+    );
+
     let filter = "";
     const filters: string[] = [];
 
     if (statusFilter) {
-      filters.push(`status = "${statusFilter}"`);
+      const escapedStatus = escapeFilterValue(statusFilter);
+      filters.push(`status = "${escapedStatus}"`);
     }
 
     if (counselorFilter) {
-      filters.push(`assignedTo = "${counselorFilter}"`);
+      const resolvedCounselor =
+        userById.get(counselorFilter) || userByName.get(counselorFilter);
+      const counselorValues = new Set<string>([
+        counselorFilter,
+        resolvedCounselor?.id || "",
+        resolvedCounselor?.name || "",
+        resolvedCounselor?.email || "",
+      ]);
+      const counselorFilterParts = Array.from(counselorValues)
+        .filter(Boolean)
+        .map((value) => `assignedTo = "${escapeFilterValue(value)}"`);
+
+      if (counselorFilterParts.length > 0) {
+        filters.push(`(${counselorFilterParts.join(" || ")})`);
+      }
     }
 
     if (searchTerm) {
+      const escapedSearch = escapeFilterValue(searchTerm);
       filters.push(
-        `(studentName ~ "${searchTerm}" || mobile ~ "${searchTerm}" || email ~ "${searchTerm}")`,
+        `(` +
+          `studentName ~ "${escapedSearch}" || ` +
+          `mobile ~ "${escapedSearch}" || ` +
+          `mobileWithCountry ~ "${escapedSearch}" || ` +
+          `email ~ "${escapedSearch}" || ` +
+          `course ~ "${escapedSearch}" || ` +
+          `courseName ~ "${escapedSearch}"` +
+          `)`,
       );
     }
 
@@ -65,10 +113,26 @@ export async function GET(request: NextRequest) {
       mobileWithCountry: lead.mobileWithCountry || lead.mobile || "",
       countryCode: lead.countryCode || "+94",
       email: lead.email,
-      course: lead.course,
+      course: lead.course || lead.courseName || "",
+      courseName: lead.courseName || lead.course || "",
       leadSource: lead.leadSource,
-      status: lead.status,
-      assignedTo: lead.assignedTo,
+      leadSourceDetail: lead.leadSourceDetail || "",
+      status: lead.leadStatus || lead.status,
+      assignedToId: lead.assignedTo || "",
+      assignedToName:
+        userById.get(lead.assignedTo || "")?.name ||
+        userById.get(lead.assignedTo || "")?.email ||
+        userByName.get(lead.assignedTo || "")?.name ||
+        userByName.get(lead.assignedTo || "")?.email ||
+        lead.assignedTo ||
+        "",
+      assignedTo: 
+        userById.get(lead.assignedTo || "")?.name ||
+        userById.get(lead.assignedTo || "")?.email ||
+        userByName.get(lead.assignedTo || "")?.name ||
+        userByName.get(lead.assignedTo || "")?.email ||
+        lead.assignedTo ||
+        "",
       comments: lead.comments,
       created: lead.created,
       updated: lead.updated,

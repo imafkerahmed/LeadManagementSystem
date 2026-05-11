@@ -37,11 +37,13 @@ interface Lead {
   countryCode: string;
   email: string;
   course: string;
+  courseName?: string;
   leadSource: string;
   leadSourceDetail?: string;
   status: string;
   assignedTo: string;
   assignedToId: string;
+  assignedToName?: string;
   comments: string;
 }
 
@@ -71,6 +73,8 @@ type LeadRecord = {
   status?: string;
   leadStatus?: string;
   assignedTo?: string;
+  assignedToName?: string;
+  assignedToId?: string;
   latestComment?: string;
   expand?: {
     assignedTo?: {
@@ -185,7 +189,9 @@ export default function AdminLeads() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [counselorFilter, setCounselorFilter] = useState("");
-  const [counselors, setCounselors] = useState<string[]>([]);
+  const [counselors, setCounselors] = useState<
+    Array<{ id: string; name: string; role?: string }>
+  >([]);
 
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -222,6 +228,7 @@ export default function AdminLeads() {
           (user.name || "").toLowerCase() === rawAssignedTo.toLowerCase(),
       );
       const assignedName =
+        record.assignedToName ||
         record.expand?.assignedTo?.name ||
         record.expand?.assignedTo?.email ||
         lookupById?.name ||
@@ -257,16 +264,19 @@ export default function AdminLeads() {
           ).countryCode,
         email: record.email || "",
         course: record.course || record.courseName || "",
+        courseName: record.courseName || record.course || "",
         leadSource: record.leadSource || "",
         leadSourceDetail: record.leadSourceDetail || "",
         status: record.leadStatus || record.status || "",
         assignedTo: assignedName + (assignedRole ? ` — ${assignedRole}` : ""),
         assignedToId:
+          record.assignedToId ||
           record.expand?.assignedTo?.id ||
           lookupById?.id ||
           lookupByName?.id ||
           rawAssignedTo ||
           "",
+        assignedToName: assignedName,
         comments: record.latestComment || "",
       };
     },
@@ -340,15 +350,15 @@ export default function AdminLeads() {
         }
 
         if (combined.length > 0) {
-          setUsersLookup(
-            uniqueUsersById(
-              combined.map((u) => ({
-                id: u.id,
-                name: u.name || u.email || u.id || "",
-                role: u.role,
-              })),
-            ),
+          const nextCounselors = uniqueUsersById(
+            combined.map((u) => ({
+              id: u.id,
+              name: u.name || u.email || u.id || "",
+              role: u.role,
+            })),
           );
+          setUsersLookup(nextCounselors);
+          setCounselors(nextCounselors);
           return;
         }
       } catch (e) {
@@ -376,7 +386,9 @@ export default function AdminLeads() {
           role: user.role,
         }));
 
-        setUsersLookup(uniqueUsersById(counselors));
+        const nextCounselors = uniqueUsersById(counselors);
+        setUsersLookup(nextCounselors);
+        setCounselors(nextCounselors);
       } catch (fallbackError) {
         if (
           !(
@@ -402,32 +414,30 @@ export default function AdminLeads() {
     async (pageToLoad = 1) => {
       setIsLoading(true);
       try {
-        const pb = createPocketBaseClient();
-        // Build server-side filter for PocketBase. Use status and searchTerm when provided.
-        const filterParts: string[] = [];
-        if (statusFilter) {
-          // leadStatus/status may both exist; try matching either
-          filterParts.push(
-            `(leadStatus = "${statusFilter}" || status = "${statusFilter}")`,
-          );
-        }
-        if (searchTerm) {
-          const q = searchTerm.replace(/"/g, '\\"');
-          filterParts.push(
-            `(studentName ~ "${q}" || mobile ~ "${q}" || mobileWithCountry ~ "${q}" || email ~ "${q}")`,
+        const params = new URLSearchParams({
+          page: String(pageToLoad),
+          limit: String(PAGE_SIZE),
+        });
+
+        if (statusFilter) params.set("status", statusFilter);
+        if (counselorFilter) params.set("counselor", counselorFilter);
+        if (searchTerm) params.set("search", searchTerm);
+
+        const response = await fetch(`/api/admin/leads?${params.toString()}`);
+
+        if (!response.ok) {
+          const errorBody = await response.json().catch(() => ({}));
+          throw new Error(
+            errorBody?.error || `Failed to fetch leads: HTTP ${response.status}`,
           );
         }
 
-        const filter =
-          filterParts.length > 0 ? filterParts.join(" && ") : undefined;
-
-        const list = await pb
-          .collection("leads")
-          .getList(pageToLoad, PAGE_SIZE, {
-            sort: "-created",
-            expand: "assignedTo",
-            ...(filter ? { filter } : {}),
-          });
+        const list = (await response.json()) as {
+          items?: LeadRecord[];
+          page?: number;
+          totalPages?: number;
+          totalItems?: number;
+        };
 
         const rawItems = (list.items || []) as LeadRecord[];
         const items: Lead[] = rawItems.map((record) => mapLead(record));
@@ -440,22 +450,10 @@ export default function AdminLeads() {
           return true;
         });
 
-        // Client-side filters for counselor name only (we keep server filters for status/search)
-        let next = dedupItems;
-        if (counselorFilter)
-          next = next.filter((l) => l.assignedTo === counselorFilter);
-
         setLeads(dedupItems);
-        setFilteredLeads(next);
-        setTotalPages(
-          Math.max(1, Math.ceil((list.totalItems || 0) / PAGE_SIZE)),
-        );
-        setPage(pageToLoad);
-
-        const uniqueCounselors = [
-          ...new Set(items.map((l) => l.assignedTo)),
-        ].filter(Boolean);
-        setCounselors(uniqueCounselors);
+        setFilteredLeads(dedupItems);
+        setTotalPages(Math.max(1, list.totalPages || 1));
+        setPage(list.page || pageToLoad);
       } catch (error) {
         if (error instanceof Error && error.message.includes("aborted")) {
           // Request was cancelled, don't show error
@@ -860,8 +858,8 @@ export default function AdminLeads() {
           >
             <option value="">All Counselors</option>
             {counselors.map((c) => (
-              <option key={c} value={c}>
-                {c}
+              <option key={c.id} value={c.id}>
+                {c.name}
               </option>
             ))}
           </select>
