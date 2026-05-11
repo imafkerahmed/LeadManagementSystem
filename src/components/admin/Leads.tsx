@@ -416,13 +416,13 @@ export default function AdminLeads() {
   const fetchLeads = useCallback(
     async (pageToLoad = 1) => {
       setIsLoading(true);
-      
+
       // Cancel any pending requests
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
       abortControllerRef.current = new AbortController();
-      
+
       try {
         const params = new URLSearchParams({
           page: String(pageToLoad),
@@ -470,7 +470,10 @@ export default function AdminLeads() {
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") {
           // Request was cancelled, don't show error
-        } else if (error instanceof Error && error.message.includes("aborted")) {
+        } else if (
+          error instanceof Error &&
+          error.message.includes("aborted")
+        ) {
           // Request was cancelled, don't show error
         } else {
           console.error(
