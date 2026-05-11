@@ -61,9 +61,9 @@ interface TimelineDisplayEntry {
   id: string;
   eventTypes: string[];
   changedBy: string;
-  comment?: string;
-  oldValue?: string;
-  newValue?: string;
+  commentText?: string;
+  statusOldValue?: string;
+  statusNewValue?: string;
   created: string;
 }
 
@@ -313,9 +313,9 @@ export default function AdminLeads() {
     }).format(date);
   };
 
-  const getTimelineNote = (entry: { comment?: string }) => {
-    if (entry.comment?.trim()) {
-      return entry.comment.trim();
+  const getTimelineNote = (entry: { commentText?: string }) => {
+    if (entry.commentText?.trim()) {
+      return entry.commentText.trim();
     }
 
     return "";
@@ -325,7 +325,7 @@ export default function AdminLeads() {
     const grouped = new Map<string, TimelineDisplayEntry>();
 
     for (const entry of timeline) {
-      const groupKey = `${entry.created}::${entry.changedBy}`;
+      const groupKey = `${Math.floor(new Date(entry.created).getTime() / 1000)}::${entry.changedBy}`;
       const existing = grouped.get(groupKey);
 
       if (!existing) {
@@ -333,9 +333,18 @@ export default function AdminLeads() {
           id: entry.id,
           eventTypes: [entry.eventType],
           changedBy: entry.changedBy,
-          comment: entry.comment,
-          oldValue: entry.oldValue,
-          newValue: entry.newValue,
+          commentText:
+            (entry.eventType || "").toLowerCase() === "comment updated"
+              ? entry.comment
+              : undefined,
+          statusOldValue:
+            (entry.eventType || "").toLowerCase() === "status updated"
+              ? entry.oldValue
+              : undefined,
+          statusNewValue:
+            (entry.eventType || "").toLowerCase() === "status updated"
+              ? entry.newValue
+              : undefined,
           created: entry.created,
         });
         continue;
@@ -343,16 +352,25 @@ export default function AdminLeads() {
 
       existing.eventTypes.push(entry.eventType);
 
-      if (!existing.comment && entry.comment) {
-        existing.comment = entry.comment;
+      if (
+        (entry.eventType || "").toLowerCase() === "comment updated" &&
+        entry.comment
+      ) {
+        existing.commentText = existing.commentText || entry.comment;
       }
 
-      if (!existing.oldValue && entry.oldValue) {
-        existing.oldValue = entry.oldValue;
+      if (
+        (entry.eventType || "").toLowerCase() === "status updated" &&
+        entry.oldValue
+      ) {
+        existing.statusOldValue = existing.statusOldValue || entry.oldValue;
       }
 
-      if (!existing.newValue && entry.newValue) {
-        existing.newValue = entry.newValue;
+      if (
+        (entry.eventType || "").toLowerCase() === "status updated" &&
+        entry.newValue
+      ) {
+        existing.statusNewValue = existing.statusNewValue || entry.newValue;
       }
     }
 
@@ -365,7 +383,7 @@ export default function AdminLeads() {
     );
     const hasStatusChange = eventTypes.includes("status updated");
     const hasComment =
-      eventTypes.includes("comment updated") || Boolean(entry.comment?.trim());
+      eventTypes.includes("comment updated") || Boolean(entry.commentText?.trim());
     const hasAssigneeChange = eventTypes.includes("assignee changed");
 
     if (hasStatusChange && hasComment) {
@@ -388,8 +406,8 @@ export default function AdminLeads() {
   };
 
   const getDisplayTimelineStatusChange = (entry: TimelineDisplayEntry) => {
-    const oldValue = entry.oldValue?.trim() || "";
-    const newValue = entry.newValue?.trim() || "";
+    const oldValue = entry.statusOldValue?.trim() || "";
+    const newValue = entry.statusNewValue?.trim() || "";
 
     if (!oldValue && !newValue) {
       return "";
