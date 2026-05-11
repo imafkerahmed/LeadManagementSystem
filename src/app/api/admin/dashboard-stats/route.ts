@@ -41,8 +41,8 @@ export async function GET() {
       (users || []).forEach((u) => {
         userIdToName.set(u.id || "", u.name || u.email || u.id || "");
       });
-    } catch (err) {
-      console.debug("Failed to fetch users for resolution:", err);
+    } catch {
+      // ignore user resolution failures
     }
 
     // Manually resolve changedBy by querying for the user details
@@ -57,7 +57,10 @@ export async function GET() {
       history: historyWithResolvedNames,
     });
   } catch (error) {
-    console.error("Error fetching dashboard stats:", error);
+    console.error(
+      "Error fetching dashboard stats:",
+      error instanceof Error ? error.message : String(error),
+    );
     return NextResponse.json(
       { error: "Failed to fetch dashboard stats" },
       { status: 500 },

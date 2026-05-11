@@ -328,7 +328,10 @@ export default function CounselorPage() {
           setUserLookup(nextLookup);
         }
       } catch (error) {
-        console.error("Error loading user lookup:", error);
+        console.error(
+          "Error loading user lookup:",
+          error instanceof Error ? error.message : String(error),
+        );
       }
     };
 
@@ -344,12 +347,13 @@ export default function CounselorPage() {
     async (userId: string, selectedLeadId?: string) => {
       // Note: PocketBase's listRule automatically handles authorization
       // Counsellors see leads based on their assigned leads and role
-      console.debug("fetchLeads called with userId:", userId);
+      // Intentionally silent in production; avoid logging objects that may trigger
+      // cross-origin wrapper errors in browser extensions.
 
       try {
         const pb = createPocketBaseClient();
 
-        console.debug("fetchLeads debug:", { userId, counselorName });
+        // debug info omitted
 
         // Query all leads - PocketBase's listRule will automatically filter based on user role
         // No need to manually filter since the rule already handles:
@@ -396,9 +400,11 @@ export default function CounselorPage() {
       } catch (error) {
         if (error instanceof Error && error.message.includes("aborted")) {
           // Request was cancelled, don't show error
-          console.debug("Leads request cancelled");
         } else {
-          console.error("Error fetching leads:", error);
+          console.error(
+            "Error fetching leads:",
+            error instanceof Error ? error.message : String(error),
+          );
           showToast(
             error instanceof Error ? error.message : "Failed to load leads",
             "error",
@@ -408,26 +414,17 @@ export default function CounselorPage() {
         // No loading state needed here yet.
       }
     },
-    [counselorName],
+    [],
   );
 
   useEffect(() => {
-    console.debug("fetchLeads effect triggered:", {
-      counselorId,
-      counselorName,
-      isCounselor,
-    });
-
     if (!counselorId || counselorId.trim() === "" || !isCounselor) {
-      console.debug(
-        "Skipping fetchLeads: counselorId empty or not counselor role",
-      );
       return;
     }
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchLeads(counselorId);
-  }, [counselorId, counselorName, fetchLeads, isCounselor]);
+  }, [counselorId, fetchLeads, isCounselor]);
 
   const openLeadDetails = async (lead: Lead) => {
     setModalOpen(true);
@@ -488,7 +485,10 @@ export default function CounselorPage() {
 
       setLeadHistory(mappedHistory);
     } catch (error) {
-      console.error("Error loading history:", error);
+      console.error(
+        "Error loading history:",
+        error instanceof Error ? error.message : String(error),
+      );
       setLeadHistory([]);
       showToast("Failed to load lead history", "error");
     } finally {

@@ -35,9 +35,8 @@ export async function GET() {
             name: a.name || a.email,
           }),
         );
-      } catch (err) {
+      } catch {
         // ignore, return empty array
-        console.debug("No admins found or unable to list admins", err);
       }
     }
 
@@ -49,7 +48,10 @@ export async function GET() {
       })),
     );
   } catch (error) {
-    console.error("Error fetching admins lookup:", error);
+    console.error(
+      "Error fetching admins lookup:",
+      error instanceof Error ? error.message : String(error),
+    );
     return NextResponse.json(
       { error: "Failed to fetch admins" },
       { status: 500 },
