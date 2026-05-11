@@ -141,7 +141,12 @@ export async function POST(request: NextRequest) {
       try {
         await pb.collection("leadHistory").create(entry);
       } catch (historyError) {
-        console.error("Lead history creation error:", historyError);
+        console.error(
+          "Lead history creation error:",
+          historyError instanceof Error
+            ? historyError.message
+            : String(historyError),
+        );
         throw new Error(
           `Failed to log history: ${historyError instanceof Error ? historyError.message : String(historyError)}`,
         );
@@ -155,7 +160,10 @@ export async function POST(request: NextRequest) {
       latestComment: trimmedComment || "",
     });
   } catch (error) {
-    console.error("Error updating lead:", error);
+    console.error(
+      "Error updating lead:",
+      error instanceof Error ? error.message : String(error),
+    );
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Failed to update lead",

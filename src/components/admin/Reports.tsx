@@ -165,15 +165,12 @@ export default function AdminReports() {
           throw new Error(`Failed to fetch counselors: HTTP ${res.status}`);
         }
         const counselorList = await res.json();
-        console.log("Counselors loaded:", counselorList);
-        console.log(
-          "Counselors count:",
-          Array.isArray(counselorList) ? counselorList.length : "Not an array",
-        );
         setCounselors(Array.isArray(counselorList) ? counselorList : []);
       } catch (error) {
-        console.error("Error fetching counselors:", error);
-        console.error("Full error details:", error);
+        console.error(
+          "Error fetching counselors:",
+          error instanceof Error ? error.message : String(error),
+        );
       }
     };
 
@@ -307,7 +304,10 @@ export default function AdminReports() {
       XLSX.writeFile(wb, filename);
       toast.success("Report exported successfully");
     } catch (error) {
-      console.error("Error exporting to XLSX:", error);
+      console.error(
+        "Error exporting to XLSX:",
+        error instanceof Error ? error.message : String(error),
+      );
       toast.error("Failed to export report");
     }
   };

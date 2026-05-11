@@ -68,15 +68,12 @@ export async function GET(request: NextRequest) {
     }
 
     const filter = filters.join(" && ");
-    console.log("Report filter:", filter);
 
     // Fetch leads using admin client
     const leads = (await pb.collection("leads").getFullList({
       filter,
       sort: "-created",
     })) as LeadRecord[];
-
-    console.log("Leads fetched:", leads.length);
 
     // Fetch all counselors for reference
     const counselors = (await pb
@@ -132,7 +129,7 @@ export async function GET(request: NextRequest) {
       stats.avgLeadsPerCounselor = Math.round(leads.length / counselorIds.size);
     }
 
-    console.log("Statistics calculated:", stats);
+    // stats calculated
 
     // Format leads for response
     const formattedLeads = leads.map((lead: LeadRecord) => {
@@ -155,14 +152,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Log first few leads to debug course field
-    if (formattedLeads.length > 0) {
-      console.log("Sample lead for debugging:", {
-        id: formattedLeads[0].id,
-        studentName: formattedLeads[0].studentName,
-        course: formattedLeads[0].course,
-        status: formattedLeads[0].status,
-      });
-    }
+    // sample lead omitted from logs in production
 
     // Fetch history for all leads in report
     const leadIds = leads.map((l) => l.id);
@@ -193,16 +183,14 @@ export async function GET(request: NextRequest) {
           };
         });
       } catch (err) {
-        console.error("Error fetching lead history:", err);
+        console.error(
+          "Error fetching lead history:",
+          err instanceof Error ? err.message : String(err),
+        );
         // Continue without history
       }
     }
-
-    console.log(
-      "Report generated successfully with",
-      allHistory.length,
-      "history records",
-    );
+    // report generated
 
     return NextResponse.json({
       leads: formattedLeads,
@@ -212,7 +200,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error("Error generating report:", errorMessage, error);
+    console.error("Error generating report:", errorMessage);
     return NextResponse.json(
       { error: "Failed to generate report", details: errorMessage },
       { status: 500 },

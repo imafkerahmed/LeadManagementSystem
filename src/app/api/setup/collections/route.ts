@@ -5,14 +5,13 @@ export async function POST() {
   try {
     const pb = await getPocketBaseAdminClient();
 
-    console.log("Setting up PocketBase collections...");
+    // Setting up PocketBase collections...
 
     // 1. Create Users collection
     try {
       await pb.collections.getOne("users");
-      console.log("Users collection already exists");
     } catch {
-      console.log("Creating users collection...");
+      // creating users collection
       await pb.collections.create({
         name: "users",
         type: "base",
@@ -30,15 +29,14 @@ export async function POST() {
           },
         ],
       });
-      console.log("✅ Users collection created");
+      // users collection created
     }
 
     // 2. Create Leads collection
     try {
       await pb.collections.getOne("leads");
-      console.log("Leads collection already exists");
     } catch {
-      console.log("Creating leads collection...");
+      // creating leads collection
       await pb.collections.create({
         name: "leads",
         type: "base",
@@ -65,15 +63,14 @@ export async function POST() {
           { name: "lastModified", type: "date" },
         ],
       });
-      console.log("✅ Leads collection created");
+      // leads collection created
     }
 
     // 3. Create LeadHistory collection
     try {
       await pb.collections.getOne("leadHistory");
-      console.log("LeadHistory collection already exists");
     } catch {
-      console.log("Creating leadHistory collection...");
+      // creating leadHistory collection
       await pb.collections.create({
         name: "leadHistory",
         type: "base",
@@ -118,7 +115,7 @@ export async function POST() {
           { name: "comment", type: "text" },
         ],
       });
-      console.log("✅ LeadHistory collection created");
+      // leadHistory collection created
     }
 
     return NextResponse.json({
@@ -126,7 +123,10 @@ export async function POST() {
       message: "PocketBase collections setup completed successfully!",
     });
   } catch (error) {
-    console.error("Error setting up collections:", error);
+    console.error(
+      "Error setting up collections:",
+      error instanceof Error ? error.message : String(error),
+    );
     return NextResponse.json(
       {
         success: false,

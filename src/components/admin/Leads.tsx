@@ -355,7 +355,10 @@ export default function AdminLeads() {
         if (
           !(e instanceof Error && e.message.toLowerCase().includes("aborted"))
         ) {
-          console.error("Failed to load users lookup", e);
+          console.error(
+            "Failed to load users lookup",
+            e instanceof Error ? e.message : String(e),
+          );
         }
       }
 
@@ -381,7 +384,12 @@ export default function AdminLeads() {
             fallbackError.message.toLowerCase().includes("aborted")
           )
         ) {
-          console.error("Fallback users lookup failed", fallbackError);
+          console.error(
+            "Fallback users lookup failed",
+            fallbackError instanceof Error
+              ? fallbackError.message
+              : String(fallbackError),
+          );
         }
         setUsersLookup([]);
       }
@@ -451,9 +459,11 @@ export default function AdminLeads() {
       } catch (error) {
         if (error instanceof Error && error.message.includes("aborted")) {
           // Request was cancelled, don't show error
-          console.debug("Request cancelled");
         } else {
-          console.error("Error fetching leads:", error);
+          console.error(
+            "Error fetching leads:",
+            error instanceof Error ? error.message : String(error),
+          );
           setLeads([]);
           setFilteredLeads([]);
           setTotalPages(1);
@@ -534,7 +544,10 @@ export default function AdminLeads() {
           }),
         );
       } catch (e) {
-        console.error("Failed to load timeline", e);
+        console.error(
+          "Failed to load timeline",
+          e instanceof Error ? e.message : String(e),
+        );
         setTimeline([]);
       }
     } else {
@@ -562,7 +575,10 @@ export default function AdminLeads() {
       closeSidebar();
       toast.success("Lead deleted");
     } catch (e) {
-      console.error("Delete failed", e);
+      console.error(
+        "Delete failed",
+        e instanceof Error ? e.message : String(e),
+      );
       toast.error("Failed to delete lead");
     } finally {
       setDeleteConfirmDialogOpen(false);
@@ -717,7 +733,10 @@ export default function AdminLeads() {
       setIsEditing(false);
       await openSidebarFor(updatedLead, "view");
     } catch (e) {
-      console.error("Lead update failed", e);
+      console.error(
+        "Lead update failed",
+        e instanceof Error ? e.message : String(e),
+      );
       toast.error("Failed to update lead");
     } finally {
       setIsSaving(false);
@@ -777,7 +796,10 @@ export default function AdminLeads() {
       setSidebarOpen(false);
       toast.success("Lead created");
     } catch (e) {
-      console.error("Create failed", e);
+      console.error(
+        "Create failed",
+        e instanceof Error ? e.message : String(e),
+      );
       toast.error("Failed to create lead");
     } finally {
       setIsSaving(false);

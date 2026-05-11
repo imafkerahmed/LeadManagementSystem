@@ -103,9 +103,9 @@ export default function BulkUpload({
         } catch {
           setLookupError(`Lookup failed: ${response.status}`);
         }
-      } catch {
-        console.error("users lookup fetch failed");
-        setLookupError("Lookup failed");
+      } catch (err) {
+        // avoid logging full error objects to console
+        setLookupError(err instanceof Error ? err.message : "Lookup failed");
       }
 
       // Fallback: query PocketBase directly using client
@@ -146,7 +146,6 @@ export default function BulkUpload({
         setCounselors([]);
         setSelectedCounselorIds([]);
       } catch (fallbackError) {
-        console.error("Fallback users lookup failed", fallbackError);
         setLookupError(
           fallbackError instanceof Error
             ? fallbackError.message

@@ -57,7 +57,10 @@ export async function GET() {
           }
         }
       } catch (fetchError) {
-        console.error("Error using direct HTTP fetch for users:", fetchError);
+        console.error(
+          "Error using direct HTTP fetch for users:",
+          fetchError instanceof Error ? fetchError.message : String(fetchError),
+        );
         // Fall back to SDK method
       }
     }
@@ -70,7 +73,10 @@ export async function GET() {
           sort: "name",
         })) as UserRecord[];
       } catch (sdkError) {
-        console.error("Error fetching users via SDK:", sdkError);
+        console.error(
+          "Error fetching users via SDK:",
+          sdkError instanceof Error ? sdkError.message : String(sdkError),
+        );
         throw sdkError;
       }
     }
@@ -90,16 +96,11 @@ export async function GET() {
       })),
     );
   } catch (error) {
-    console.error("Error fetching user lookup:", error);
     const msg =
       error instanceof Error
         ? error.message
         : "Failed to fetch users from PocketBase";
-    console.error("Full error details:", {
-      message: msg,
-      error: error,
-      stack: error instanceof Error ? error.stack : "No stack",
-    });
+    console.error("Error fetching user lookup:", msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

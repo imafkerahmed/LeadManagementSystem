@@ -413,9 +413,11 @@ export default function AdminDashboard() {
     } catch (error) {
       if (error instanceof Error && error.message.includes("aborted")) {
         // Request was cancelled, don't show error
-        console.debug("Stats request cancelled");
       } else {
-        console.error("Error fetching stats:", error);
+        console.error(
+          "Error fetching stats:",
+          error instanceof Error ? error.message : String(error),
+        );
         const defaultStats: DashboardStats = {
           totalLeads: 0,
           newLeads: 0,

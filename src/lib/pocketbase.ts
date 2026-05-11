@@ -73,7 +73,10 @@ export async function getPocketBaseAdminClient() {
         throw new Error("No auth token received from PocketBase");
       }
     } catch (error) {
-      console.error("Failed to authenticate as admin:", error);
+      console.error(
+        "Failed to authenticate as admin:",
+        error instanceof Error ? error.message : String(error),
+      );
       throw error;
     }
   }
@@ -218,9 +221,12 @@ export async function setupPocketBaseCollections(): Promise<void> {
       });
     }
 
-    console.log("PocketBase collections setup completed!");
+    // PocketBase collections setup completed
   } catch (error) {
-    console.error("Error setting up PocketBase collections:", error);
+    console.error(
+      "Error setting up PocketBase collections:",
+      error instanceof Error ? error.message : String(error),
+    );
     throw error;
   }
 }

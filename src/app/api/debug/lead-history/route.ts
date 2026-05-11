@@ -12,7 +12,10 @@ export async function GET() {
 
     return NextResponse.json(history || []);
   } catch (error) {
-    console.error("Debug lead-history error:", error);
+    console.error(
+      "Debug lead-history error:",
+      error instanceof Error ? error.message : String(error),
+    );
     return NextResponse.json({ error: "failed" }, { status: 500 });
   }
 }
