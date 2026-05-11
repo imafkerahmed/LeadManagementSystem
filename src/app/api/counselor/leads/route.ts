@@ -26,10 +26,23 @@ function escapeFilterValue(value: string) {
   return value.replace(/"/g, '\\"');
 }
 
+function decodeJWT(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+
+    const payload = parts[1];
+    const decoded = Buffer.from(payload, "base64").toString("utf-8");
+    const json = JSON.parse(decoded);
+    // PocketBase tokens have user data nested under a 'data' key
+    return (json.data as Record<string, unknown>) || json;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const pb = createPocketBaseClient();
-
     // Extract auth token from Authorization header
     const authHeader = request.headers.get("authorization") || "";
     const token = authHeader.replace(/^Bearer\s+/i, "");
@@ -41,27 +54,27 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Authenticate the PocketBase client with the user's token
-    pb.authStore.save(token);
+    // Decode JWT to extract user identity
+    const payload = decodeJWT(token);
 
-    // Get the authenticated user (counselor)
-    const authUser = pb.authStore.model as {
-      id?: string;
-      name?: string;
-      email?: string;
-      role?: string;
-    } | null;
-
-    if (!authUser?.id) {
+    if (!payload?.id) {
       return NextResponse.json(
         { error: "Unable to determine user identity from token" },
         { status: 401 },
       );
     }
 
+    const counselorId = payload.id as string;
+    const counselorName = (payload.name as string) || "";
+    const counselorEmail = (payload.email as string) || "";
+
+    // Create PocketBase client for querying leads
+    const pb = createPocketBaseClient();
+    pb.authStore.save(token);
+
     // Build filter: filter by multiple identity variations (id, name, email)
     // This handles legacy data that may have used different identity formats
-    const assignedValues = [authUser.id, authUser.name, authUser.email]
+    const assignedValues = [counselorId, counselorName, counselorEmail]
       .map((value) => value?.trim())
       .filter((value): value is string => Boolean(value))
       .map((value) => `assignedTo = "${escapeFilterValue(value)}"`);
@@ -91,7 +104,7 @@ export async function GET(request: NextRequest) {
       created: lead.created || "",
       updated: lead.updated || lead.created || "",
       assignedTo:
-        lead.assignedTo || authUser.id || "",
+        lead.assignedTo || counselorId || "",
     }));
 
     return NextResponse.json(formattedLeads);
