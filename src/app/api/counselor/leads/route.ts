@@ -30,19 +30,38 @@ export async function GET(request: NextRequest) {
   try {
     const pb = createPocketBaseClient();
 
-    // Get leads assigned to the logged-in counselor
-    const counselorId = request.nextUrl.searchParams.get("counselorId");
-    const counselorName = request.nextUrl.searchParams.get("counselor");
-    const counselorEmail = request.nextUrl.searchParams.get("counselorEmail");
+    // Extract auth token from Authorization header
+    const authHeader = request.headers.get("authorization") || "";
+    const token = authHeader.replace(/^Bearer\s+/i, "");
 
-    if (!counselorId && !counselorName && !counselorEmail) {
+    if (!token) {
       return NextResponse.json(
-        { error: "Counselor identity is required" },
-        { status: 400 },
+        { error: "Authentication is required" },
+        { status: 401 },
       );
     }
 
-    const assignedValues = [counselorId, counselorName, counselorEmail]
+    // Authenticate the PocketBase client with the user's token
+    pb.authStore.save(token);
+
+    // Get the authenticated user (counselor)
+    const authUser = pb.authStore.model as {
+      id?: string;
+      name?: string;
+      email?: string;
+      role?: string;
+    } | null;
+
+    if (!authUser?.id) {
+      return NextResponse.json(
+        { error: "Unable to determine user identity from token" },
+        { status: 401 },
+      );
+    }
+
+    // Build filter: filter by multiple identity variations (id, name, email)
+    // This handles legacy data that may have used different identity formats
+    const assignedValues = [authUser.id, authUser.name, authUser.email]
       .map((value) => value?.trim())
       .filter((value): value is string => Boolean(value))
       .map((value) => `assignedTo = "${escapeFilterValue(value)}"`);
@@ -60,7 +79,8 @@ export async function GET(request: NextRequest) {
       studentName: lead.studentName,
       countryCode: lead.countryCode || "+94",
       mobile: lead.mobileWithCountry || lead.mobileNo || lead.mobile || "",
-      mobileWithCountry: lead.mobileWithCountry || lead.mobileNo || lead.mobile || "",
+      mobileWithCountry:
+        lead.mobileWithCountry || lead.mobileNo || lead.mobile || "",
       email: lead.email,
       course: lead.course || lead.courseName || "",
       courseName: lead.courseName || lead.course || "",
@@ -70,7 +90,8 @@ export async function GET(request: NextRequest) {
       comments: lead.latestComment || "",
       created: lead.created || "",
       updated: lead.updated || lead.created || "",
-      assignedTo: lead.assignedTo || counselorId || counselorName || counselorEmail || "",
+      assignedTo:
+        lead.assignedTo || authUser.id || "",
     }));
 
     return NextResponse.json(formattedLeads);

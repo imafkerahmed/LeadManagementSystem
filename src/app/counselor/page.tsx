@@ -115,7 +115,6 @@ export default function CounselorPage() {
     pb.authStore.isValid && authUser?.role === "student-counsellor";
   const counselorId = authUser?.id || "";
   const counselorName = authUser?.name || "Student Counsellor";
-  const counselorEmail = authUser?.email || "";
 
   useEffect(() => {
     if (!isCounselor) {
@@ -349,20 +348,16 @@ export default function CounselorPage() {
       try {
         const pb = createPocketBaseClient();
         const token = pb.authStore.token;
-        const params = new URLSearchParams({
-          counselorId: userId,
-          counselor: counselorName,
-          counselorEmail,
-        });
 
-        const response = await fetch(`/api/counselor/leads?${params.toString()}`, {
+        const response = await fetch("/api/counselor/leads", {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });
 
         if (!response.ok) {
           const errorBody = await response.json().catch(() => ({}));
           throw new Error(
-            errorBody?.error || `Failed to fetch leads: HTTP ${response.status}`,
+            errorBody?.error ||
+              `Failed to fetch leads: HTTP ${response.status}`,
           );
         }
 
@@ -417,7 +412,7 @@ export default function CounselorPage() {
         // No loading state needed here yet.
       }
     },
-    [counselorName, counselorEmail],
+    [],
   );
 
   useEffect(() => {
