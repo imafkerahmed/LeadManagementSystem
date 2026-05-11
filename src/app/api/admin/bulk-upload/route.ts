@@ -241,6 +241,7 @@ export async function POST(request: NextRequest) {
             mobileWithCountry,
             email: lead.email || "",
             course: lead.course,
+            courseName: lead.course,
             leadSource: lead.leadSource || "Bulk Upload",
             leadSourceDetail: lead.leadSourceDetail || "",
             // write both status variants used across codebase
