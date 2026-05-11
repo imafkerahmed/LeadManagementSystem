@@ -8,6 +8,7 @@ import {
   LogOut,
   X,
   MessageSquare,
+  Loader2,
 } from "lucide-react";
 import { createPocketBaseClient } from "@/lib/pocketbase";
 import {
@@ -146,6 +147,7 @@ export default function CounselorPage() {
   const [newLeadSource, setNewLeadSource] = useState("Direct");
   const [newLeadSourceDetail, setNewLeadSourceDetail] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [showNoLeadsText, setShowNoLeadsText] = useState(false);
 
   // Duplicate detection state
   const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
@@ -668,6 +670,19 @@ export default function CounselorPage() {
     currentPage * PAGE_SIZE,
   );
 
+  const showAnimatedEmptyState = filteredLeads.length === 0;
+
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => {
+        setShowNoLeadsText(showAnimatedEmptyState);
+      },
+      showAnimatedEmptyState ? 2500 : 0,
+    );
+
+    return () => window.clearTimeout(timer);
+  }, [showAnimatedEmptyState]);
+
   const validNextStatuses = selectedLead
     ? getValidNextStatuses(selectedLead.status)
     : statusFlow;
@@ -792,8 +807,23 @@ export default function CounselorPage() {
           </div>
 
           {filteredLeads.length === 0 ? (
-            <div className="rounded-lg border border-slate-200 bg-white p-6 text-center text-sm text-slate-500 shadow-sm">
-              No leads found
+            <div className="rounded-lg border border-slate-200 bg-white p-10 shadow-sm">
+              <div className="mx-auto flex max-w-sm flex-col items-center justify-center gap-3 text-slate-500">
+                {showNoLeadsText ? (
+                  <p className="text-sm font-medium text-slate-500">
+                    No leads found
+                  </p>
+                ) : (
+                  <>
+                    <Loader2 className="h-8 w-8 animate-spin text-teal-500" />
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-teal-400 [animation-delay:-0.2s]" />
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-teal-400 [animation-delay:-0.1s]" />
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-teal-400" />
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           ) : (
             <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">

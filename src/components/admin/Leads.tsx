@@ -9,6 +9,7 @@ import {
   MessageSquare,
   ChevronLeft,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
 import { createPocketBaseClient } from "@/lib/pocketbase";
 import {
@@ -193,6 +194,7 @@ export default function AdminLeads() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [filteredLeads, setFilteredLeads] = useState<Lead[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showNoLeadsText, setShowNoLeadsText] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [counselorFilter, setCounselorFilter] = useState("");
@@ -664,6 +666,19 @@ export default function AdminLeads() {
     };
   }, []);
 
+  const showAnimatedEmptyState = !isLoading && filteredLeads.length === 0;
+
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => {
+        setShowNoLeadsText(showAnimatedEmptyState);
+      },
+      showAnimatedEmptyState ? 2500 : 0,
+    );
+
+    return () => window.clearTimeout(timer);
+  }, [showAnimatedEmptyState]);
+
   const openSidebarFor = async (
     lead: Lead | null,
     mode: "view" | "new" = "view",
@@ -1045,9 +1060,47 @@ export default function AdminLeads() {
       {/* Leads Table */}
       <div className="bg-white rounded-lg shadow overflow-x-auto">
         {isLoading ? (
-          <div className="p-8 text-center text-gray-500">Loading leads...</div>
+          <div className="p-6">
+            <div className="mb-4 flex items-center justify-center gap-2 text-sm text-gray-600">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading leads...
+            </div>
+            <div className="space-y-3">
+              {[...Array(6)].map((_, index) => (
+                <div
+                  key={`lead-loader-${index}`}
+                  className="grid grid-cols-7 gap-4 rounded-md border border-gray-100 px-4 py-3"
+                >
+                  <div className="h-4 animate-pulse rounded bg-gray-200" />
+                  <div className="h-4 animate-pulse rounded bg-gray-200" />
+                  <div className="h-4 animate-pulse rounded bg-gray-200" />
+                  <div className="h-4 animate-pulse rounded bg-gray-200" />
+                  <div className="h-4 animate-pulse rounded bg-gray-200" />
+                  <div className="h-4 animate-pulse rounded bg-gray-200" />
+                  <div className="h-4 animate-pulse rounded bg-gray-200" />
+                </div>
+              ))}
+            </div>
+          </div>
         ) : filteredLeads.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No leads found</div>
+          <div className="p-10">
+            <div className="mx-auto flex max-w-sm flex-col items-center justify-center gap-3 text-gray-500">
+              {showNoLeadsText ? (
+                <p className="text-sm font-medium text-gray-500">
+                  No leads found
+                </p>
+              ) : (
+                <>
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-blue-400 [animation-delay:-0.2s]" />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-blue-400 [animation-delay:-0.1s]" />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-blue-400" />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         ) : (
           <table className="w-full">
             <thead>
