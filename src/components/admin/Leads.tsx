@@ -57,6 +57,16 @@ interface TimelineEntry {
   created: string;
 }
 
+interface TimelineDisplayEntry {
+  id: string;
+  eventTypes: string[];
+  changedBy: string;
+  comment?: string;
+  oldValue?: string;
+  newValue?: string;
+  created: string;
+}
+
 type LeadRecord = {
   id: string;
   leadId?: string;
@@ -285,6 +295,105 @@ export default function AdminLeads() {
     },
     [usersLookup],
   );
+
+  const formatTimelineDate = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+
+    return new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).format(date);
+  };
+
+  const getTimelineNote = (entry: { comment?: string }) => {
+    if (entry.comment?.trim()) {
+      return entry.comment.trim();
+    }
+
+    return "";
+  };
+
+  const groupedTimeline = (() => {
+    const grouped = new Map<string, TimelineDisplayEntry>();
+
+    for (const entry of timeline) {
+      const groupKey = `${entry.created}::${entry.changedBy}`;
+      const existing = grouped.get(groupKey);
+
+      if (!existing) {
+        grouped.set(groupKey, {
+          id: entry.id,
+          eventTypes: [entry.eventType],
+          changedBy: entry.changedBy,
+          comment: entry.comment,
+          oldValue: entry.oldValue,
+          newValue: entry.newValue,
+          created: entry.created,
+        });
+        continue;
+      }
+
+      existing.eventTypes.push(entry.eventType);
+
+      if (!existing.comment && entry.comment) {
+        existing.comment = entry.comment;
+      }
+
+      if (!existing.oldValue && entry.oldValue) {
+        existing.oldValue = entry.oldValue;
+      }
+
+      if (!existing.newValue && entry.newValue) {
+        existing.newValue = entry.newValue;
+      }
+    }
+
+    return Array.from(grouped.values());
+  })();
+
+  const getDisplayTimelineTitle = (entry: TimelineDisplayEntry) => {
+    const eventTypes = entry.eventTypes.map((eventType) => eventType.toLowerCase());
+    const hasStatusChange = eventTypes.includes("status updated");
+    const hasComment = eventTypes.includes("comment updated") || Boolean(entry.comment?.trim());
+    const hasAssigneeChange = eventTypes.includes("assignee changed");
+
+    if (hasStatusChange && hasComment) {
+      return "Status Change + Comment";
+    }
+
+    if (hasStatusChange) {
+      return "Status Change";
+    }
+
+    if (hasComment) {
+      return "Comment";
+    }
+
+    if (hasAssigneeChange) {
+      return "Assignee Changed";
+    }
+
+    return entry.eventTypes[0] || "Timeline Event";
+  };
+
+  const getDisplayTimelineStatusChange = (entry: TimelineDisplayEntry) => {
+    const oldValue = entry.oldValue?.trim() || "";
+    const newValue = entry.newValue?.trim() || "";
+
+    if (!oldValue && !newValue) {
+      return "";
+    }
+
+    return `${oldValue || "Unknown"} → ${newValue || "Unknown"}`;
+  };
 
   const syncDraftFromLead = (lead: Lead | null) => {
     if (!lead) {
@@ -1315,28 +1424,35 @@ export default function AdminLeads() {
                               No events yet
                             </p>
                           ) : (
-                            timeline.map((t) => (
+                            groupedTimeline.map((t) => (
                               <div key={t.id} className="relative pl-5">
                                 <span className="absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full bg-slate-900" />
                                 <div className="flex flex-col gap-1 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-                                    <span className="font-medium text-slate-700">
-                                      {t.eventType}
+                                  <div className="flex flex-col gap-1">
+                                    <span className="text-sm font-semibold text-slate-900">
+                                      {getDisplayTimelineTitle(t)}
                                     </span>
-                                    <span>
-                                      {new Date(t.created).toLocaleString()}
-                                    </span>
-                                    <span>By {t.changedBy}</span>
+                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+                                      <span>
+                                        {formatTimelineDate(t.created)}
+                                      </span>
+                                      <span>By {t.changedBy}</span>
+                                    </div>
                                   </div>
-                                  {t.newValue && (
-                                    <p className="text-sm text-slate-700">
-                                      Changed to {t.newValue}
+                                  {getDisplayTimelineStatusChange(t) && (
+                                    <p className="text-sm font-medium text-slate-700">
+                                      {getDisplayTimelineStatusChange(t)}
                                     </p>
                                   )}
-                                  {t.comment && (
-                                    <p className="text-sm text-slate-700">
-                                      {t.comment}
-                                    </p>
+                                  {getTimelineNote(t) && (
+                                    <div className="rounded-md bg-white px-3 py-2 text-sm text-slate-700">
+                                      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                                        Comment entered
+                                      </p>
+                                      <p className="mt-1 whitespace-pre-wrap">
+                                        {getTimelineNote(t)}
+                                      </p>
+                                    </div>
                                   )}
                                 </div>
                               </div>
