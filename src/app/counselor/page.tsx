@@ -340,6 +340,12 @@ export default function CounselorPage() {
     loadUserLookup();
   }, []);
 
+  const resolveUserLabel = (value?: string) => {
+    const trimmedValue = value?.trim() || "";
+    if (!trimmedValue) return "";
+    return userLookup[trimmedValue] || trimmedValue;
+  };
+
   const showToast = (msg: string, type: "success" | "error") => {
     if (type === "success") toast.success(msg);
     else toast.error(msg);
@@ -472,8 +478,8 @@ export default function CounselorPage() {
           entry.expand?.studentName?.studentName ||
           entry.expand?.leadId?.studentName ||
           nextLead.name,
-        oldValue: entry.oldValue,
-        newValue: entry.newValue,
+        oldValue: resolveUserLabel(entry.oldValue),
+        newValue: resolveUserLabel(entry.newValue),
         comment: entry.comment,
         commentText:
           entry.oldValue ||
@@ -1524,19 +1530,20 @@ export default function CounselorPage() {
                               </div>
 
                               {/* Status Change part */}
-                              {group.entries[0].eventType ===
-                                "Status Change" && (
-                                <div className="text-sm font-medium text-slate-700">
-                                  {group.entries[0].oldValue
-                                    ? `${group.entries[0].oldValue} `
-                                    : ""}
-                                  {group.entries[0].oldValue &&
-                                  group.entries[0].newValue
-                                    ? "→ "
-                                    : ""}
-                                  {group.entries[0].newValue || ""}
-                                </div>
-                              )}
+                              {group.entries[0].eventType !== "Comment" &&
+                                (group.entries[0].oldValue ||
+                                  group.entries[0].newValue) && (
+                                  <div className="text-sm font-medium text-slate-700">
+                                    {group.entries[0].oldValue
+                                      ? `${group.entries[0].oldValue} `
+                                      : ""}
+                                    {group.entries[0].oldValue &&
+                                    group.entries[0].newValue
+                                      ? "→ "
+                                      : ""}
+                                    {group.entries[0].newValue || ""}
+                                  </div>
+                                )}
 
                               {/* Comment part - from either Status Change or standalone Comment entry */}
                               {group.entries.length > 1 &&

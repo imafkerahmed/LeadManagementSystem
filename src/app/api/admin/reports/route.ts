@@ -173,11 +173,19 @@ export async function GET(request: NextRequest) {
           userIdToName.set(c.id, c.name || c.email || c.id);
         });
 
+        const resolveUserValue = (value?: string) => {
+          const trimmedValue = value?.trim() || "";
+          if (!trimmedValue) return "";
+          return userIdToName.get(trimmedValue) || trimmedValue;
+        };
+
         allHistory = historyRecords.map((h) => {
           const leadData = leads.find((l) => l.id === h.leadId);
           return {
             ...h,
             studentName: leadData?.studentName || "Unknown",
+            oldValue: resolveUserValue(h.oldValue),
+            newValue: resolveUserValue(h.newValue),
             changedByName:
               userIdToName.get(h.changedBy || "") || h.changedBy || "Unknown",
           };

@@ -1,8 +1,24 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+
 export default function AdminSettings() {
+  const router = useRouter();
+
   return (
     <div className="space-y-6">
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          Manage Users
+        </h3>
+        <p className="text-sm text-gray-600 mb-4">
+          Open the full user management page.
+        </p>
+        <Button onClick={() => router.replace("/admin?tab=users")}>
+          Open User Manager
+        </Button>
+      </div>
       {/* System Info */}
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">
@@ -64,6 +80,8 @@ export default function AdminSettings() {
           </p>
         </div>
       </div>
+
+      {/* Manage Users moved to dedicated Users page */}
     </div>
   );
 }

@@ -427,8 +427,21 @@ export default function AdminLeads() {
   };
 
   const getEntryTransition = (entry: TimelineEntry) => {
-    const oldValue = entry.oldValue?.trim() || "";
-    const newValue = entry.newValue?.trim() || "";
+    const resolveValue = (value?: string) => {
+      const trimmedValue = value?.trim() || "";
+      if (!trimmedValue) return "";
+
+      const matchedUser = usersLookup.find(
+        (user) =>
+          user.id === trimmedValue ||
+          (user.name || "").toLowerCase() === trimmedValue.toLowerCase(),
+      );
+
+      return matchedUser?.name || trimmedValue;
+    };
+
+    const oldValue = resolveValue(entry.oldValue);
+    const newValue = resolveValue(entry.newValue);
 
     if (!oldValue && !newValue) {
       return "";

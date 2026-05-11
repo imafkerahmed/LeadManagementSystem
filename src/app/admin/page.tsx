@@ -15,6 +15,7 @@ import AdminLeads from "@/components/admin/Leads";
 import BulkUpload from "@/components/admin/BulkUpload";
 import AdminSettings from "@/components/admin/Settings";
 import AdminReports from "@/components/admin/Reports";
+import AdminUsers from "@/components/admin/Users";
 import { createPocketBaseClient } from "@/lib/pocketbase";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,13 +29,20 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-type AdminTab = "dashboard" | "leads" | "bulk" | "reports" | "settings";
+type AdminTab =
+  | "dashboard"
+  | "leads"
+  | "bulk"
+  | "reports"
+  | "settings"
+  | "users";
 
 const tabs: Array<{ id: AdminTab; label: string; icon: typeof MdDashboard }> = [
   { id: "dashboard", label: "Dashboard", icon: MdDashboard },
   { id: "leads", label: "All Leads", icon: MdPeople },
   { id: "bulk", label: "Bulk Upload", icon: MdCloudUpload },
   { id: "reports", label: "Reports", icon: MdAssessment },
+  { id: "users", label: "Users", icon: MdPeople },
   { id: "settings", label: "Settings", icon: MdSettings },
 ];
 
@@ -193,6 +201,7 @@ export default function AdminPage() {
                 <BulkUpload operatorId={adminId} operatorLabel={adminLabel} />
               )}
               {currentTab === "reports" && <AdminReports />}
+              {currentTab === "users" && <AdminUsers />}
               {currentTab === "settings" && <AdminSettings />}
             </div>
           </main>

@@ -15,12 +15,27 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const disabledAccountMessage =
+    "This account is disabled. Contact an administrator.";
+
   useEffect(() => {
     const pb = createPocketBaseClient();
-    const authUser = pb.authStore.model as { role?: string } | null;
+    const authUser = pb.authStore.model as {
+      role?: string;
+      accountStatus?: string;
+    } | null;
 
     if (!pb.authStore.isValid || !authUser?.role) {
       return;
+    }
+
+    if ((authUser.accountStatus || "").toLowerCase() === "disabled") {
+      pb.authStore.clear();
+      const timer = window.setTimeout(
+        () => setError(disabledAccountMessage),
+        0,
+      );
+      return () => window.clearTimeout(timer);
     }
 
     if (authUser.role === "admin") {
@@ -44,7 +59,17 @@ export default function Home() {
         .collection("users")
         .authWithPassword(form.email.trim(), form.password);
 
-      const authUser = pb.authStore.model as { role?: string } | null;
+      const authUser = pb.authStore.model as {
+        role?: string;
+        accountStatus?: string;
+      } | null;
+
+      // Block login immediately if the account is disabled
+      if ((authUser?.accountStatus || "").toLowerCase() === "disabled") {
+        pb.authStore.clear();
+        setError(disabledAccountMessage);
+        return;
+      }
 
       if (!authUser?.role) {
         pb.authStore.clear();
@@ -66,7 +91,13 @@ export default function Home() {
 
       pb.authStore.clear();
       setError("This account role is not allowed to access the system.");
-    } catch {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.toLowerCase().includes("disabled")) {
+        setError(disabledAccountMessage);
+        return;
+      }
+
       setError("Invalid email or password.");
     } finally {
       setIsLoading(false);

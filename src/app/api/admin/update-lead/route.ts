@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPocketBaseAdminClient } from "@/lib/pocketbase";
 
+type UserRecord = {
+  id: string;
+  name?: string;
+  email?: string;
+};
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -37,6 +43,19 @@ export async function POST(request: NextRequest) {
     const oldCounselor = lead.assignedTo;
     const now = new Date();
     const trimmedComment = adminComment?.trim();
+    const users = (await pb.collection("users").getFullList({
+      fields: "id,name,email",
+    })) as UserRecord[];
+    const userIdToName = new Map<string, string>();
+    users.forEach((user) => {
+      userIdToName.set(user.id, user.name || user.email || user.id);
+    });
+    const resolveUserName = (value?: string) => {
+      const trimmedValue = value?.trim() || "";
+      if (!trimmedValue) return "";
+      return userIdToName.get(trimmedValue) || trimmedValue;
+    };
+    const actorName = adminName?.trim() || adminId?.trim() || "Unknown";
 
     const updates: Record<string, unknown> = {
       lastModified: now,
@@ -65,7 +84,7 @@ export async function POST(request: NextRequest) {
         leadId: lead.id,
         studentName: lead.id,
         eventType: "Status Change",
-        changedBy: adminId || adminName,
+        changedBy: actorName,
         oldValue: oldStatus,
         newValue: newStatus,
         comment: trimmedComment || undefined,
@@ -78,9 +97,9 @@ export async function POST(request: NextRequest) {
         leadId: lead.id,
         studentName: lead.id,
         eventType: "Reassignment",
-        changedBy: adminId || adminName,
-        oldValue: oldCounselor,
-        newValue: newCounselor,
+        changedBy: actorName,
+        oldValue: resolveUserName(oldCounselor),
+        newValue: resolveUserName(newCounselor),
         comment:
           historyEntries.length === 0 ? trimmedComment || undefined : undefined,
       });
@@ -92,7 +111,7 @@ export async function POST(request: NextRequest) {
         leadId: lead.id,
         studentName: lead.id,
         eventType: "Comment",
-        changedBy: adminId || adminName,
+        changedBy: actorName,
         comment: trimmedComment,
       });
     }

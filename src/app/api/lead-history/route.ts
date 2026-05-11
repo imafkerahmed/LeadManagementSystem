@@ -43,6 +43,12 @@ export async function GET(request: Request) {
       // ignore
     }
 
+    const resolveUserValue = (value?: string) => {
+      const trimmedValue = value?.trim() || "";
+      if (!trimmedValue) return "";
+      return userIdToName.get(trimmedValue) || trimmedValue;
+    };
+
     // Get the lead to resolve student name
     let lead: { studentName?: string } | null = null;
     try {
@@ -71,8 +77,8 @@ export async function GET(request: Request) {
       id: entry.id,
       eventType: entry.eventType,
       comment: entry.comment,
-      oldValue: entry.oldValue,
-      newValue: entry.newValue,
+      oldValue: resolveUserValue(entry.oldValue),
+      newValue: resolveUserValue(entry.newValue),
       created: entry.created,
       studentName:
         entry.expand?.leadId?.studentName ||
