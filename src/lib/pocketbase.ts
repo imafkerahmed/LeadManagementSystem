@@ -151,6 +151,7 @@ export async function setupPocketBaseCollections(): Promise<void> {
           { name: "email", type: "email" },
           { name: "course", type: "text", required: true },
           { name: "leadSource", type: "text", required: true },
+          { name: "leadSourceDetail", type: "text" },
           {
             name: "status",
             type: "select",

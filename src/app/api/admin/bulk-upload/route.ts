@@ -242,6 +242,7 @@ export async function POST(request: NextRequest) {
             email: lead.email || "",
             course: lead.course,
             leadSource: lead.leadSource || "Bulk Upload",
+            leadSourceDetail: lead.leadSourceDetail || "",
             // write both status variants used across codebase
             leadStatus: "New",
             status: "New",

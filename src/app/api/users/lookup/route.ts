@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPocketBaseAdminClient } from "@/lib/pocketbase";
+import { getPocketBaseAdminClient, pocketBaseUrl } from "@/lib/pocketbase";
 
 type UserRecord = {
   id: string;
@@ -10,12 +10,70 @@ type UserRecord = {
   active?: boolean;
 };
 
+const ADMIN_EMAIL = process.env.POCKETBASE_ADMIN_EMAIL || "";
+const ADMIN_PASSWORD = process.env.POCKETBASE_ADMIN_PASSWORD || "";
+
 export async function GET() {
   try {
-    const pb = await getPocketBaseAdminClient();
-    const users = (await pb.collection("users").getFullList({
-      sort: "name",
-    })) as UserRecord[];
+    let users: UserRecord[] = [];
+
+    // Try using direct HTTP fetch to avoid SDK auto-cancellation issues
+    if (ADMIN_EMAIL && ADMIN_PASSWORD) {
+      try {
+        const authUrl = new URL(
+          "/api/admins/auth-with-password",
+          pocketBaseUrl,
+        ).toString();
+        const authResponse = await fetch(authUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            identity: ADMIN_EMAIL,
+            password: ADMIN_PASSWORD,
+          }),
+        });
+
+        if (authResponse.ok) {
+          const authData = (await authResponse.json()) as { token?: string };
+          const token = authData.token;
+
+          if (token) {
+            const usersUrl = new URL(
+              "/api/collections/users/records",
+              pocketBaseUrl,
+            ).toString();
+            const usersResponse = await fetch(usersUrl, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            });
+
+            if (usersResponse.ok) {
+              const usersData = (await usersResponse.json()) as {
+                items?: UserRecord[];
+              };
+              users = usersData.items || [];
+            }
+          }
+        }
+      } catch (fetchError) {
+        console.error("Error using direct HTTP fetch for users:", fetchError);
+        // Fall back to SDK method
+      }
+    }
+
+    // Fallback to SDK if direct fetch didn't work
+    if (users.length === 0) {
+      try {
+        const pb = await getPocketBaseAdminClient();
+        users = (await pb.collection("users").getFullList({
+          sort: "name",
+        })) as UserRecord[];
+      } catch (sdkError) {
+        console.error("Error fetching users via SDK:", sdkError);
+        throw sdkError;
+      }
+    }
 
     // Show all users with accountStatus = "enabled" or "active", regardless of role
     const assignableUsers = users.filter((user) => {

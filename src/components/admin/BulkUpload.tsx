@@ -12,6 +12,7 @@ interface Lead {
   email: string;
   course: string;
   leadSource: string;
+  leadSourceDetail?: string;
 }
 
 type CsvField = keyof Lead;
@@ -59,6 +60,7 @@ export default function BulkUpload({
     email: "",
     course: "",
     leadSource: "",
+    leadSourceDetail: "",
   });
   const [assignmentMethod, setAssignmentMethod] = useState<
     "equalSplit" | "roundRobin"
@@ -78,6 +80,7 @@ export default function BulkUpload({
     email: "Email",
     course: "Course",
     leadSource: "Lead Source",
+    leadSourceDetail: "Lead Source Detail",
   };
 
   useEffect(() => {
@@ -188,6 +191,14 @@ export default function BulkUpload({
       email: findHeader("email", "mail"),
       course: findHeader("course", "coursename"),
       leadSource: findHeader("leadsource", "source", "leadsource"),
+      leadSourceDetail: findHeader(
+        "lead sourcedetail",
+        "leadsource detail",
+        "leadsource detail",
+        "referred by",
+        "referredby",
+        "details",
+      ),
     };
   };
 
@@ -281,6 +292,7 @@ export default function BulkUpload({
           email: resolveValue("email"),
           course: resolveValue("course"),
           leadSource: resolveValue("leadSource") || "Bulk Upload",
+          leadSourceDetail: resolveValue("leadSourceDetail"),
         };
       })
       .filter(
@@ -386,7 +398,7 @@ export default function BulkUpload({
             </p>
             <p className="text-sm text-gray-500">
               Columns: Student Name, Mobile With Country, Email, Course, Lead
-              Source
+              Source, Lead Source Detail
             </p>
           </label>
         </div>
@@ -454,7 +466,8 @@ export default function BulkUpload({
                 <p className="mt-1">
                   Leads are created only after the fields are mapped. Rows
                   missing student name, mobile with country, or course will be
-                  skipped.
+                  skipped. Lead source detail is optional and is stored when
+                  mapped.
                 </p>
 
                 <div className="mt-3 max-h-72 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2">
@@ -472,6 +485,10 @@ export default function BulkUpload({
                           fieldMapping.mobileWithCountry,
                         ),
                         course: getCellValue(row, fieldMapping.course),
+                        leadSourceDetail: getCellValue(
+                          row,
+                          fieldMapping.leadSourceDetail,
+                        ),
                       };
 
                       return (
@@ -502,6 +519,14 @@ export default function BulkUpload({
                               </div>
                               <div className="font-medium">
                                 {previewRow.course || "—"}
+                              </div>
+                            </div>
+                            <div className="min-w-[160px]">
+                              <div className="text-xs text-gray-500">
+                                Lead Source Detail
+                              </div>
+                              <div className="font-medium">
+                                {previewRow.leadSourceDetail || "—"}
                               </div>
                             </div>
                           </div>
@@ -698,6 +723,7 @@ export default function BulkUpload({
                   <th className="px-4 py-2 text-left">Name</th>
                   <th className="px-4 py-2 text-left">Mobile</th>
                   <th className="px-4 py-2 text-left">Course</th>
+                  <th className="px-4 py-2 text-left">Lead Source Detail</th>
                 </tr>
               </thead>
               <tbody>
@@ -706,6 +732,9 @@ export default function BulkUpload({
                     <td className="px-4 py-2">{lead.studentName}</td>
                     <td className="px-4 py-2">{lead.mobileWithCountry}</td>
                     <td className="px-4 py-2">{lead.course}</td>
+                    <td className="px-4 py-2">
+                      {lead.leadSourceDetail || "—"}
+                    </td>
                   </tr>
                 ))}
               </tbody>

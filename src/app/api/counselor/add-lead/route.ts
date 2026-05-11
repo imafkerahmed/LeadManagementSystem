@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
       email,
       course,
       leadSource,
+      leadSourceDetail,
       counselorId,
     } = body;
 
@@ -87,6 +88,17 @@ export async function POST(request: NextRequest) {
         assignedTo: existing.assignedTo,
         assigneeName,
       };
+
+      // For counsellors we do NOT create a new lead when a duplicate exists.
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Duplicate lead exists",
+          duplicateDetected: true,
+          existingLead: duplicateLead,
+        },
+        { status: 409 },
+      );
     }
 
     // Get the last lead ID to generate new one
@@ -113,7 +125,9 @@ export async function POST(request: NextRequest) {
       mobileWithCountry,
       email,
       course: course,
+      courseName: course,
       leadSource,
+      leadSourceDetail: leadSourceDetail || "",
       status: "New",
       assignedTo: counselorId,
       latestComment: "Lead created",

@@ -28,6 +28,7 @@ export interface Lead {
   email?: string;
   course: string;
   leadSource: string;
+  leadSourceDetail?: string;
   status: LeadStatus;
   assignedTo: string; // counselor name or ID
   comments: string;
@@ -100,6 +101,7 @@ export interface BulkUploadLead {
   email?: string;
   course: string;
   leadSource: string;
+  leadSourceDetail?: string;
 }
 
 // Bulk upload result

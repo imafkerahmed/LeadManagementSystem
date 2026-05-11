@@ -11,6 +11,11 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { createPocketBaseClient } from "@/lib/pocketbase";
+import {
+  LEAD_SOURCE_OPTIONS,
+  getLeadSourceDetailLabel,
+  shouldShowLeadSourceDetail,
+} from "@/lib/lead-sources";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -33,6 +38,7 @@ interface Lead {
   email: string;
   course: string;
   leadSource: string;
+  leadSourceDetail?: string;
   status: string;
   assignedTo: string;
   assignedToId: string;
@@ -61,6 +67,7 @@ type LeadRecord = {
   course?: string;
   courseName?: string;
   leadSource?: string;
+  leadSourceDetail?: string;
   status?: string;
   leadStatus?: string;
   assignedTo?: string;
@@ -83,6 +90,7 @@ type CreateLeadPayload = {
   email?: string;
   course: string;
   leadSource?: string;
+  leadSourceDetail?: string;
   assignee?: string;
   countryCode?: string;
   mobileWithCountry?: string;
@@ -193,6 +201,7 @@ export default function AdminLeads() {
   const [draftEmail, setDraftEmail] = useState("");
   const [draftCourse, setDraftCourse] = useState("");
   const [draftLeadSource, setDraftLeadSource] = useState("");
+  const [draftLeadSourceDetail, setDraftLeadSourceDetail] = useState("");
   const [usersLookup, setUsersLookup] = useState<
     Array<{ id: string; name: string; role?: string }>
   >([]);
@@ -249,6 +258,7 @@ export default function AdminLeads() {
         email: record.email || "",
         course: record.course || record.courseName || "",
         leadSource: record.leadSource || "",
+        leadSourceDetail: record.leadSourceDetail || "",
         status: record.leadStatus || record.status || "",
         assignedTo: assignedName + (assignedRole ? ` — ${assignedRole}` : ""),
         assignedToId:
@@ -273,6 +283,7 @@ export default function AdminLeads() {
       setDraftEmail("");
       setDraftCourse("");
       setDraftLeadSource("");
+      setDraftLeadSourceDetail("");
       return;
     }
 
@@ -284,6 +295,7 @@ export default function AdminLeads() {
     setDraftEmail(lead.email);
     setDraftCourse(lead.course);
     setDraftLeadSource(lead.leadSource);
+    setDraftLeadSourceDetail(lead.leadSourceDetail || "");
   };
 
   useEffect(() => {
@@ -573,7 +585,7 @@ export default function AdminLeads() {
     const nextEmail = draftEmail.trim();
     const nextCourse = draftCourse.trim();
     const nextLeadSource = draftLeadSource.trim();
-
+    const nextLeadSourceDetail = draftLeadSourceDetail.trim();
     const statusChanged = nextStatus !== selectedLead.status;
     const assigneeChanged = nextAssignedToId !== selectedLead.assignedToId;
     const commentChanged = nextComment !== selectedLead.comments.trim();
@@ -584,6 +596,8 @@ export default function AdminLeads() {
     const emailChanged = nextEmail !== selectedLead.email;
     const courseChanged = nextCourse !== selectedLead.course;
     const leadSourceChanged = nextLeadSource !== selectedLead.leadSource;
+    const leadSourceDetailChanged =
+      nextLeadSourceDetail !== (selectedLead.leadSourceDetail || "");
 
     if (
       !statusChanged &&
@@ -593,7 +607,8 @@ export default function AdminLeads() {
       !mobileChanged &&
       !emailChanged &&
       !courseChanged &&
-      !leadSourceChanged
+      !leadSourceChanged &&
+      !leadSourceDetailChanged
     ) {
       toast.error("No changes to update");
       return;
@@ -625,6 +640,11 @@ export default function AdminLeads() {
       if (emailChanged) payload.email = nextEmail;
       if (courseChanged) payload.course = nextCourse;
       if (leadSourceChanged) payload.leadSource = nextLeadSource;
+      if (leadSourceChanged || leadSourceDetailChanged) {
+        payload.leadSourceDetail = shouldShowLeadSourceDetail(nextLeadSource)
+          ? nextLeadSourceDetail
+          : "";
+      }
 
       await pb.collection("leads").update(selectedLead.id, payload);
 
@@ -671,7 +691,8 @@ export default function AdminLeads() {
         mobileChanged ||
         emailChanged ||
         courseChanged ||
-        leadSourceChanged
+        leadSourceChanged ||
+        leadSourceDetailChanged
       ) {
         await pb.collection("leadHistory").create({
           timeStamp: new Date().toISOString(),
@@ -679,7 +700,7 @@ export default function AdminLeads() {
           eventType: "Lead Details Updated",
           changedBy: pb.authStore.model?.id || "",
           comment:
-            `Updated: ${nameChanged ? "Name, " : ""}${mobileChanged ? "Mobile, " : ""}${emailChanged ? "Email, " : ""}${courseChanged ? "Course, " : ""}${leadSourceChanged ? "Lead Source" : ""}`.replace(
+            `Updated: ${nameChanged ? "Name, " : ""}${mobileChanged ? "Mobile, " : ""}${emailChanged ? "Email, " : ""}${courseChanged ? "Course, " : ""}${leadSourceChanged ? "Lead Source, " : ""}${leadSourceDetailChanged ? "Lead Source Details" : ""}`.replace(
               /, $/,
               "",
             ),
@@ -733,6 +754,7 @@ export default function AdminLeads() {
           `${payload.countryCode || "+94"}${normalizePhone(payload.mobile)}`,
         course: payload.course,
         leadSource: payload.leadSource || "Manual",
+        leadSourceDetail: payload.leadSourceDetail || "",
         status: "New",
         leadStatus: "New",
         assignedTo: assigneeValue,
@@ -1071,25 +1093,52 @@ export default function AdminLeads() {
                         Lead Source
                       </p>
                       {isEditing ? (
-                        <select
-                          value={draftLeadSource}
-                          onChange={(e) => setDraftLeadSource(e.target.value)}
-                          disabled={isSaving}
-                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-                        >
-                          <option value="">Select Lead Source</option>
-                          <option value="Direct">Direct</option>
-                          <option value="Referral">Referral</option>
-                          <option value="Website">Website</option>
-                          <option value="Social Media">Social Media</option>
-                          <option value="Email">Email</option>
-                          <option value="Phone">Phone</option>
-                          <option value="Other">Other</option>
-                        </select>
+                        <div className="space-y-2">
+                          <select
+                            value={draftLeadSource}
+                            onChange={(e) => {
+                              const nextValue = e.target.value;
+                              setDraftLeadSource(nextValue);
+                              if (!shouldShowLeadSourceDetail(nextValue)) {
+                                setDraftLeadSourceDetail("");
+                              }
+                            }}
+                            disabled={isSaving}
+                            className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                          >
+                            <option value="">Select Lead Source</option>
+                            {LEAD_SOURCE_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                          {shouldShowLeadSourceDetail(draftLeadSource) && (
+                            <input
+                              type="text"
+                              value={draftLeadSourceDetail}
+                              onChange={(e) =>
+                                setDraftLeadSourceDetail(e.target.value)
+                              }
+                              disabled={isSaving}
+                              placeholder={getLeadSourceDetailLabel(
+                                draftLeadSource,
+                              )}
+                              className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                            />
+                          )}
+                        </div>
                       ) : (
-                        <p className="text-sm">
-                          {selectedLead.leadSource || "—"}
-                        </p>
+                        <div className="space-y-1">
+                          <p className="text-sm">
+                            {selectedLead.leadSource || "—"}
+                          </p>
+                          {selectedLead.leadSourceDetail && (
+                            <p className="text-xs text-gray-500">
+                              {selectedLead.leadSourceDetail}
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
 
@@ -1300,6 +1349,8 @@ function NewLeadForm({
   const [mobile, setMobile] = useState("");
   const [email, setEmail] = useState("");
   const [course, setCourse] = useState("");
+  const [leadSource, setLeadSource] = useState("Direct");
+  const [leadSourceDetail, setLeadSourceDetail] = useState("");
   const [assignee, setAssignee] = useState("");
 
   useEffect(() => {
@@ -1315,6 +1366,12 @@ function NewLeadForm({
       toast.error("Please fill required fields: Name, Mobile, Course");
       return;
     }
+
+    if (shouldShowLeadSourceDetail(leadSource) && !leadSourceDetail.trim()) {
+      toast.error("Please enter who referred the lead or the source details");
+      return;
+    }
+
     const cleanedMobile = normalizePhone(mobile);
     onCreate({
       studentName: name,
@@ -1324,6 +1381,10 @@ function NewLeadForm({
       assignee,
       countryCode,
       mobileWithCountry: `${countryCode}${cleanedMobile}`,
+      leadSource,
+      leadSourceDetail: shouldShowLeadSourceDetail(leadSource)
+        ? leadSourceDetail.trim()
+        : undefined,
     });
   };
 
@@ -1409,6 +1470,42 @@ function NewLeadForm({
           ))}
         </select>
       </div>
+      <div>
+        <label className="text-xs font-semibold text-gray-600 uppercase">
+          Lead Source
+        </label>
+        <select
+          value={leadSource}
+          onChange={(e) => {
+            const nextValue = e.target.value;
+            setLeadSource(nextValue);
+            if (!shouldShowLeadSourceDetail(nextValue)) {
+              setLeadSourceDetail("");
+            }
+          }}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+        >
+          <option value="">Select lead source</option>
+          {LEAD_SOURCE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      {shouldShowLeadSourceDetail(leadSource) && (
+        <div>
+          <label className="text-xs font-semibold text-gray-600 uppercase">
+            {getLeadSourceDetailLabel(leadSource)}
+          </label>
+          <input
+            value={leadSourceDetail}
+            onChange={(e) => setLeadSourceDetail(e.target.value)}
+            placeholder="Enter the person or source details"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          />
+        </div>
+      )}
       <div className="flex gap-2 pt-4">
         <button
           onClick={submit}

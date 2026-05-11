@@ -10,6 +10,11 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { createPocketBaseClient } from "@/lib/pocketbase";
+import {
+  LEAD_SOURCE_OPTIONS,
+  getLeadSourceDetailLabel,
+  shouldShowLeadSourceDetail,
+} from "@/lib/lead-sources";
 import { toast } from "sonner";
 
 interface Lead {
@@ -21,6 +26,8 @@ interface Lead {
   mobileWithCountry?: string;
   email: string;
   course: string;
+  leadSource?: string;
+  leadSourceDetail?: string;
   status: string;
   comments: string;
   created: string;
@@ -49,6 +56,8 @@ type LeadRecord = {
   email?: string;
   course?: string;
   courseName?: string;
+  leadSource?: string;
+  leadSourceDetail?: string;
   status?: string;
   latestComment?: string;
   created?: string;
@@ -135,6 +144,7 @@ export default function CounselorPage() {
   const [newEmail, setNewEmail] = useState("");
   const [newCourse, setNewCourse] = useState("");
   const [newLeadSource, setNewLeadSource] = useState("Direct");
+  const [newLeadSourceDetail, setNewLeadSourceDetail] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
   // Duplicate detection state
@@ -360,6 +370,8 @@ export default function CounselorPage() {
           mobileWithCountry: lead.mobileWithCountry || "",
           email: lead.email || "",
           course: lead.course || lead.courseName || "",
+          leadSource: lead.leadSource || "",
+          leadSourceDetail: lead.leadSourceDetail || "",
           status: lead.status || "",
           comments: lead.latestComment || "",
           created: lead.created || "",
@@ -434,6 +446,8 @@ export default function CounselorPage() {
         mobileWithCountry: latestLead.mobileWithCountry || "",
         email: latestLead.email || "",
         course: latestLead.course || latestLead.courseName || "",
+        leadSource: latestLead.leadSource || "",
+        leadSourceDetail: latestLead.leadSourceDetail || "",
         status: latestLead.status || "",
         comments: latestLead.latestComment || "",
         created: latestLead.created || "",
@@ -560,6 +574,7 @@ export default function CounselorPage() {
     const trimmedMobile = newMobile.trim().replace(/^0+/, "");
     const trimmedCourse = newCourse.trim();
     const trimmedEmail = newEmail.trim();
+    const trimmedLeadSourceDetail = newLeadSourceDetail.trim();
 
     if (!counselorId) {
       showToast("Missing counselor identity", "error");
@@ -568,6 +583,14 @@ export default function CounselorPage() {
 
     if (!trimmedName || !trimmedMobile || !trimmedCourse || !newCountryCode) {
       showToast("Name, country code, mobile, and course are required", "error");
+      return;
+    }
+
+    if (shouldShowLeadSourceDetail(newLeadSource) && !trimmedLeadSourceDetail) {
+      showToast(
+        "Please enter who referred the lead or the source details",
+        "error",
+      );
       return;
     }
 
@@ -583,6 +606,9 @@ export default function CounselorPage() {
           email: trimmedEmail || undefined,
           course: trimmedCourse,
           leadSource: newLeadSource,
+          leadSourceDetail: shouldShowLeadSourceDetail(newLeadSource)
+            ? trimmedLeadSourceDetail
+            : undefined,
           counselorName,
           counselorId,
         }),
@@ -590,21 +616,26 @@ export default function CounselorPage() {
 
       const result = await response.json();
 
-      if (response.ok && result.success) {
-        if (result.duplicateDetected && result.existingLead?.assigneeName) {
-          showToast(
-            `Lead created successfully. Similar lead already exists and is assigned to ${result.existingLead.assigneeName}.`,
-            "success",
-          );
-        } else {
-          showToast("Lead created successfully!", "success");
-        }
+      // If a duplicate is detected, do not create a new lead for counsellors.
+      if (result?.duplicateDetected) {
+        const existing = result.existingLead || {};
+        setDuplicateInfo({
+          leadId: existing.leadId || "",
+          studentName: existing.studentName || "",
+          mobile: existing.mobile || existing.mobileWithCountry || "",
+          status: existing.status || "",
+          assigneeName: existing.assigneeName || existing.assignedTo || "",
+        });
+        setDuplicateWarningOpen(true);
+      } else if (response.ok && result.success) {
+        showToast("Lead created successfully!", "success");
         setNewName("");
         setNewCountryCode("+94");
         setNewMobile("");
         setNewEmail("");
         setNewCourse("");
         setNewLeadSource("Direct");
+        setNewLeadSourceDetail("");
         setAddLeadModalOpen(false);
         await fetchLeads(counselorId);
       } else {
@@ -1178,16 +1209,38 @@ export default function CounselorPage() {
                   </label>
                   <select
                     value={newLeadSource}
-                    onChange={(e) => setNewLeadSource(e.target.value)}
+                    onChange={(e) => {
+                      const nextValue = e.target.value;
+                      setNewLeadSource(nextValue);
+                      if (!shouldShowLeadSourceDetail(nextValue)) {
+                        setNewLeadSourceDetail("");
+                      }
+                    }}
                     className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
                   >
-                    <option>Direct</option>
-                    <option>Referral</option>
-                    <option>Social Media</option>
-                    <option>Website</option>
-                    <option>Other</option>
+                    <option value="">Select lead source</option>
+                    {LEAD_SOURCE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
+
+                {shouldShowLeadSourceDetail(newLeadSource) && (
+                  <div className="space-y-2 sm:col-span-2">
+                    <label className="text-sm font-medium text-slate-700">
+                      {getLeadSourceDetailLabel(newLeadSource)}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Enter who referred the lead or where it came from"
+                      value={newLeadSourceDetail}
+                      onChange={(e) => setNewLeadSourceDetail(e.target.value)}
+                      className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                    />
+                  </div>
+                )}
 
                 <div className="sm:col-span-2">
                   <button
@@ -1240,12 +1293,12 @@ export default function CounselorPage() {
 
             <div className="grid flex-1 gap-4 overflow-y-auto px-4 py-4 sm:px-6 lg:grid-cols-[280px_1fr] lg:gap-6">
               <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                {selectedLead.mobile && (
+                {(selectedLead.mobile || selectedLead.mobileWithCountry) && (
                   <div>
                     <button
                       onClick={() =>
                         window.open(
-                          `https://wa.me/${(selectedLead.mobile || "").replace(/\D/g, "")}?text=${encodeURIComponent(`Hello, I'm ${counselorName} from Amazon College. I'm reaching out regarding your inquiry about ${selectedLead.course}. How may I assist you today?`)}`,
+                          `https://wa.me/${(selectedLead.mobileWithCountry || selectedLead.mobile || "").replace(/\D/g, "")}?text=${encodeURIComponent(`Hello, I'm ${counselorName} from Amazon College. I'm reaching out regarding your inquiry about ${selectedLead.course}. How may I assist you today?`)}`,
                           "_blank",
                         )
                       }
