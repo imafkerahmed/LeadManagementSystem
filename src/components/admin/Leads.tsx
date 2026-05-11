@@ -360,9 +360,12 @@ export default function AdminLeads() {
   })();
 
   const getDisplayTimelineTitle = (entry: TimelineDisplayEntry) => {
-    const eventTypes = entry.eventTypes.map((eventType) => eventType.toLowerCase());
+    const eventTypes = entry.eventTypes.map((eventType) =>
+      eventType.toLowerCase(),
+    );
     const hasStatusChange = eventTypes.includes("status updated");
-    const hasComment = eventTypes.includes("comment updated") || Boolean(entry.comment?.trim());
+    const hasComment =
+      eventTypes.includes("comment updated") || Boolean(entry.comment?.trim());
     const hasAssigneeChange = eventTypes.includes("assignee changed");
 
     if (hasStatusChange && hasComment) {
