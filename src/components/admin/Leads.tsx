@@ -57,14 +57,11 @@ interface TimelineEntry {
   created: string;
 }
 
-interface TimelineDisplayEntry {
+interface TimelineGroup {
   id: string;
-  eventTypes: string[];
+  entries: TimelineEntry[];
+  timestamp: string;
   changedBy: string;
-  commentText?: string;
-  statusOldValue?: string;
-  statusNewValue?: string;
-  created: string;
 }
 
 type LeadRecord = {
@@ -313,101 +310,121 @@ export default function AdminLeads() {
     }).format(date);
   };
 
-  const getTimelineNote = (entry: { commentText?: string }) => {
-    if (entry.commentText?.trim()) {
-      return entry.commentText.trim();
+  const normalizeTimelineEventType = (eventType: string) => {
+    const value = (eventType || "").trim().toLowerCase();
+
+    if (value.includes("status")) return "status change";
+    if (value.includes("comment")) return "comment";
+    if (value.includes("assignee")) return "assignee changed";
+    if (value.includes("lead details")) return "lead details updated";
+    if (value.includes("lead created")) return "lead created";
+
+    return value;
+  };
+
+  const getTimelineComment = (entry: TimelineEntry) => {
+    const comment = entry.comment?.trim();
+    if (comment) {
+      return comment;
+    }
+
+    const oldValue = entry.oldValue?.trim() || "";
+    const newValue = entry.newValue?.trim() || "";
+
+    if (normalizeTimelineEventType(entry.eventType) === "comment") {
+      if (newValue && oldValue === newValue) return newValue;
+      if (newValue && !oldValue) return newValue;
+    }
+
+    if (normalizeTimelineEventType(entry.eventType) === "lead details updated") {
+      return newValue || oldValue;
     }
 
     return "";
   };
 
-  const groupedTimeline = (() => {
-    const grouped = new Map<string, TimelineDisplayEntry>();
+  const groupTimelineEntries = (entries: TimelineEntry[]): TimelineGroup[] => {
+    const grouped: TimelineGroup[] = [];
+    const processed = new Set<string>();
 
-    for (const entry of timeline) {
-      const groupKey = `${Math.floor(new Date(entry.created).getTime() / 1000)}::${entry.changedBy}`;
-      const existing = grouped.get(groupKey);
+    const isWithinTimeWindow = (ts1: string, ts2: string) => {
+      try {
+        const date1 = new Date(ts1).getTime();
+        const date2 = new Date(ts2).getTime();
+        return Math.abs(date1 - date2) <= 2000;
+      } catch {
+        return false;
+      }
+    };
 
-      if (!existing) {
-        grouped.set(groupKey, {
-          id: entry.id,
-          eventTypes: [entry.eventType],
-          changedBy: entry.changedBy,
-          commentText:
-            (entry.eventType || "").toLowerCase() === "comment updated"
-              ? entry.comment
-              : undefined,
-          statusOldValue:
-            (entry.eventType || "").toLowerCase() === "status updated"
-              ? entry.oldValue
-              : undefined,
-          statusNewValue:
-            (entry.eventType || "").toLowerCase() === "status updated"
-              ? entry.newValue
-              : undefined,
-          created: entry.created,
+    for (let i = 0; i < entries.length; i++) {
+      const current = entries[i];
+      if (processed.has(current.id)) continue;
+
+      const next = entries[i + 1];
+      const currentType = normalizeTimelineEventType(current.eventType);
+      const nextType = next ? normalizeTimelineEventType(next.eventType) : "";
+
+      if (
+        next &&
+        !processed.has(next.id) &&
+        ((currentType === "status change" && nextType === "comment") ||
+          (currentType === "comment" && nextType === "status change")) &&
+        isWithinTimeWindow(current.created, next.created) &&
+        current.changedBy === next.changedBy
+      ) {
+        const orderedEntries =
+          currentType === "status change" ? [current, next] : [next, current];
+
+        grouped.push({
+          id: orderedEntries[0].id,
+          entries: orderedEntries,
+          timestamp: orderedEntries[0].created,
+          changedBy: current.changedBy,
         });
+
+        processed.add(current.id);
+        processed.add(next.id);
+        i++;
         continue;
       }
 
-      existing.eventTypes.push(entry.eventType);
-
-      if (
-        (entry.eventType || "").toLowerCase() === "comment updated" &&
-        entry.comment
-      ) {
-        existing.commentText = existing.commentText || entry.comment;
-      }
-
-      if (
-        (entry.eventType || "").toLowerCase() === "status updated" &&
-        entry.oldValue
-      ) {
-        existing.statusOldValue = existing.statusOldValue || entry.oldValue;
-      }
-
-      if (
-        (entry.eventType || "").toLowerCase() === "status updated" &&
-        entry.newValue
-      ) {
-        existing.statusNewValue = existing.statusNewValue || entry.newValue;
-      }
+      grouped.push({
+        id: current.id,
+        entries: [current],
+        timestamp: current.created,
+        changedBy: current.changedBy,
+      });
+      processed.add(current.id);
     }
 
-    return Array.from(grouped.values());
-  })();
-
-  const getDisplayTimelineTitle = (entry: TimelineDisplayEntry) => {
-    const eventTypes = entry.eventTypes.map((eventType) =>
-      eventType.toLowerCase(),
-    );
-    const hasStatusChange = eventTypes.includes("status updated");
-    const hasComment =
-      eventTypes.includes("comment updated") || Boolean(entry.commentText?.trim());
-    const hasAssigneeChange = eventTypes.includes("assignee changed");
-
-    if (hasStatusChange && hasComment) {
-      return "Status Change + Comment";
-    }
-
-    if (hasStatusChange) {
-      return "Status Change";
-    }
-
-    if (hasComment) {
-      return "Comment";
-    }
-
-    if (hasAssigneeChange) {
-      return "Assignee Changed";
-    }
-
-    return entry.eventTypes[0] || "Timeline Event";
+    return grouped;
   };
 
-  const getDisplayTimelineStatusChange = (entry: TimelineDisplayEntry) => {
-    const oldValue = entry.statusOldValue?.trim() || "";
-    const newValue = entry.statusNewValue?.trim() || "";
+  const groupedTimeline = groupTimelineEntries(timeline);
+
+  const getGroupTitle = (group: TimelineGroup) => {
+    const primaryType = normalizeTimelineEventType(group.entries[0].eventType);
+    const secondaryType =
+      group.entries.length > 1
+        ? normalizeTimelineEventType(group.entries[1].eventType)
+        : "";
+
+    if (primaryType === "status change" && secondaryType === "comment") {
+      return "Status Change + Comment";
+    }
+    if (primaryType === "status change") return "Status Change";
+    if (primaryType === "comment") return "Comment";
+    if (primaryType === "assignee changed") return "Assignee Changed";
+    if (primaryType === "lead details updated") return "Lead Details Updated";
+    if (primaryType === "lead created") return "Lead Created";
+
+    return group.entries[0].eventType || "Timeline Event";
+  };
+
+  const getEntryTransition = (entry: TimelineEntry) => {
+    const oldValue = entry.oldValue?.trim() || "";
+    const newValue = entry.newValue?.trim() || "";
 
     if (!oldValue && !newValue) {
       return "";
@@ -1445,36 +1462,69 @@ export default function AdminLeads() {
                               No events yet
                             </p>
                           ) : (
-                            groupedTimeline.map((t) => (
-                              <div key={t.id} className="relative pl-5">
+                            groupedTimeline.map((group) => (
+                              <div key={group.id} className="relative pl-5">
                                 <span className="absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full bg-slate-900" />
                                 <div className="flex flex-col gap-1 rounded-lg border border-slate-200 bg-slate-50 p-3">
                                   <div className="flex flex-col gap-1">
                                     <span className="text-sm font-semibold text-slate-900">
-                                      {getDisplayTimelineTitle(t)}
+                                      {getGroupTitle(group)}
                                     </span>
                                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
                                       <span>
-                                        {formatTimelineDate(t.created)}
+                                        {formatTimelineDate(group.timestamp)}
                                       </span>
-                                      <span>By {t.changedBy}</span>
+                                      <span>By {group.changedBy}</span>
                                     </div>
                                   </div>
-                                  {getDisplayTimelineStatusChange(t) && (
+                                  {normalizeTimelineEventType(
+                                    group.entries[0].eventType,
+                                  ) !== "comment" &&
+                                    getEntryTransition(group.entries[0]) && (
                                     <p className="text-sm font-medium text-slate-700">
-                                      {getDisplayTimelineStatusChange(t)}
+                                      {getEntryTransition(group.entries[0])}
                                     </p>
                                   )}
-                                  {getTimelineNote(t) && (
+                                  {(() => {
+                                    const commentSource =
+                                      group.entries.find(
+                                        (entry) =>
+                                          normalizeTimelineEventType(
+                                            entry.eventType,
+                                          ) === "comment",
+                                      ) ||
+                                      group.entries.find(
+                                        (entry) =>
+                                          normalizeTimelineEventType(
+                                            entry.eventType,
+                                          ) === "lead details updated",
+                                      );
+                                    if (!commentSource) return null;
+
+                                    const note = commentSource
+                                      ? getTimelineComment(commentSource)
+                                      : "";
+
+                                    if (!note) return null;
+
+                                    const isDetailsChanged =
+                                      normalizeTimelineEventType(
+                                        commentSource.eventType,
+                                      ) === "lead details updated";
+
+                                    return (
                                     <div className="rounded-md bg-white px-3 py-2 text-sm text-slate-700">
                                       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                                        Comment entered
+                                        {isDetailsChanged
+                                          ? "Details changed"
+                                          : "Comment entered"}
                                       </p>
                                       <p className="mt-1 whitespace-pre-wrap">
-                                        {getTimelineNote(t)}
+                                        {note}
                                       </p>
                                     </div>
-                                  )}
+                                    );
+                                  })()}
                                 </div>
                               </div>
                             ))
