@@ -669,11 +669,60 @@ export default function CounselorPage() {
       setIsUpdating(true);
       const pb = createPocketBaseClient();
 
+      const trimmedName = editedName.trim();
+      const trimmedCourse = editedCourse.trim();
+      const trimmedEmail = editedEmail.trim();
+
       await pb.collection("leads").update(selectedLead.id, {
-        studentName: editedName.trim(),
-        course: editedCourse.trim(),
-        email: editedEmail.trim(),
+        studentName: trimmedName,
+        course: trimmedCourse,
+        email: trimmedEmail,
       });
+
+      // Create history entries for each changed field
+      const now = new Date().toISOString();
+      const changedFields = [];
+
+      if (trimmedName !== selectedLead.name) {
+        changedFields.push({
+          leadId: selectedLead.id,
+          eventType: "Details Changed",
+          changedBy: counselorId,
+          oldValue: selectedLead.name,
+          newValue: trimmedName,
+          field: "studentName",
+          created: now,
+        });
+      }
+
+      if (trimmedCourse !== selectedLead.course) {
+        changedFields.push({
+          leadId: selectedLead.id,
+          eventType: "Details Changed",
+          changedBy: counselorId,
+          oldValue: selectedLead.course,
+          newValue: trimmedCourse,
+          field: "course",
+          created: now,
+        });
+      }
+
+      if (trimmedEmail !== selectedLead.email) {
+        changedFields.push({
+          leadId: selectedLead.id,
+          eventType: "Details Changed",
+          changedBy: counselorId,
+          oldValue: selectedLead.email || "",
+          newValue: trimmedEmail,
+          field: "email",
+          created: now,
+        });
+      }
+
+      // Record all changes in history
+      for (const entry of changedFields) {
+        await pb.collection("leadHistory").create(entry);
+      }
 
       toast.success("Lead details updated");
       setIsEditingLeadDetails(false);
