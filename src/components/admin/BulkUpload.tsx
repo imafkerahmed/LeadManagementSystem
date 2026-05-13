@@ -294,14 +294,12 @@ export default function BulkUpload({
           leadSourceDetail: resolveValue("leadSourceDetail"),
         };
       })
-      .filter(
-        (lead) => lead.studentName && lead.mobileWithCountry && lead.course,
-      );
+      .filter((lead) => lead.mobileWithCountry);
 
     if (mappedLeads.length === 0) {
       // Helpful feedback when mapping didn't produce any valid leads
       alert(
-        "No valid leads found with the current mapping. Ensure Student Name, Mobile With Country and Course are mapped to the correct CSV columns.",
+        "No valid leads found with the current mapping. Ensure Mobile With Country is mapped to the correct CSV column.",
       );
       return;
     }

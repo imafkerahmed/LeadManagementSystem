@@ -9,6 +9,7 @@ import {
   X,
   MessageSquare,
   Loader2,
+  Edit2,
 } from "lucide-react";
 import { createPocketBaseClient } from "@/lib/pocketbase";
 import {
@@ -135,6 +136,10 @@ export default function CounselorPage() {
   const [addLeadModalOpen, setAddLeadModalOpen] = useState(false);
   const [addLeadModalVisible, setAddLeadModalVisible] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
+  const [isEditingLeadDetails, setIsEditingLeadDetails] = useState(false);
+  const [editedName, setEditedName] = useState("");
+  const [editedCourse, setEditedCourse] = useState("");
+  const [editedEmail, setEditedEmail] = useState("");
 
   // Form states
   const [statusSelect, setStatusSelect] = useState("");
@@ -460,6 +465,9 @@ export default function CounselorPage() {
 
       setSelectedLead(nextLead);
       setStatusSelect(getDefaultModalStatus(nextLead.status));
+      setEditedName(latestLead.studentName || "");
+      setEditedCourse(latestLead.course || latestLead.courseName || "");
+      setEditedEmail(latestLead.email || "");
       const history = (await pb.collection("leadHistory").getFullList({
         filter: `leadId = "${lead.id}"`,
         sort: "-created",
@@ -649,6 +657,31 @@ export default function CounselorPage() {
       }
     } catch {
       showToast("Failed to create lead", "error");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleSaveLeadDetails = async () => {
+    if (!selectedLead) return;
+
+    try {
+      setIsUpdating(true);
+      const pb = createPocketBaseClient();
+
+      await pb.collection("leads").update(selectedLead.id, {
+        studentName: editedName.trim(),
+        course: editedCourse.trim(),
+        email: editedEmail.trim(),
+      });
+
+      toast.success("Lead details updated");
+      setIsEditingLeadDetails(false);
+      await openLeadDetails(selectedLead);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update lead",
+      );
     } finally {
       setIsUpdating(false);
     }
@@ -1333,6 +1366,48 @@ export default function CounselorPage() {
 
             <div className="grid flex-1 gap-4 overflow-y-auto px-4 py-4 sm:px-6 lg:grid-cols-[280px_1fr] lg:gap-6">
               <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Lead Information
+                  </h3>
+                  <button
+                    onClick={() => {
+                      if (isEditingLeadDetails) {
+                        setIsEditingLeadDetails(false);
+                      } else {
+                        setIsEditingLeadDetails(true);
+                      }
+                    }}
+                    className="rounded-md border border-slate-300 p-1.5 text-slate-600 hover:bg-slate-100"
+                    aria-label="Edit lead details"
+                  >
+                    {isEditingLeadDetails ? (
+                      <X className="h-4 w-4" />
+                    ) : (
+                      <Edit2 className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-slate-500">
+                    Name
+                  </div>
+                  {isEditingLeadDetails ? (
+                    <input
+                      type="text"
+                      value={editedName}
+                      onChange={(e) => setEditedName(e.target.value)}
+                      disabled={isUpdating}
+                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                    />
+                  ) : (
+                    <div className="mt-1 font-medium text-slate-900">
+                      {selectedLead.name}
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <div className="text-xs uppercase tracking-wide text-slate-500">
                     Mobile
@@ -1344,22 +1419,47 @@ export default function CounselorPage() {
                     )}
                   </div>
                 </div>
+
                 <div>
                   <div className="text-xs uppercase tracking-wide text-slate-500">
                     Course
                   </div>
-                  <div className="mt-1 font-medium text-slate-900">
-                    {selectedLead.course}
-                  </div>
+                  {isEditingLeadDetails ? (
+                    <input
+                      type="text"
+                      value={editedCourse}
+                      onChange={(e) => setEditedCourse(e.target.value)}
+                      disabled={isUpdating}
+                      placeholder="Enter course name"
+                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                    />
+                  ) : (
+                    <div className="mt-1 font-medium text-slate-900">
+                      {selectedLead.course}
+                    </div>
+                  )}
                 </div>
+
                 <div>
                   <div className="text-xs uppercase tracking-wide text-slate-500">
                     Email
                   </div>
-                  <div className="mt-1 break-all font-medium text-slate-900">
-                    {selectedLead.email || "-"}
-                  </div>
+                  {isEditingLeadDetails ? (
+                    <input
+                      type="email"
+                      value={editedEmail}
+                      onChange={(e) => setEditedEmail(e.target.value)}
+                      disabled={isUpdating}
+                      placeholder="Enter email address"
+                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                    />
+                  ) : (
+                    <div className="mt-1 break-all font-medium text-slate-900">
+                      {selectedLead.email || "-"}
+                    </div>
+                  )}
                 </div>
+
                 <div>
                   <div className="text-xs uppercase tracking-wide text-slate-500">
                     Current status
@@ -1370,6 +1470,7 @@ export default function CounselorPage() {
                     {selectedLead.status}
                   </div>
                 </div>
+
                 <div>
                   <div className="text-xs uppercase tracking-wide text-slate-500">
                     Assigned to
@@ -1380,6 +1481,7 @@ export default function CounselorPage() {
                       "-"}
                   </div>
                 </div>
+
                 {selectedLead.leadSource && (
                   <div>
                     <div className="text-xs uppercase tracking-wide text-slate-500">
@@ -1395,6 +1497,31 @@ export default function CounselorPage() {
                     )}
                   </div>
                 )}
+
+                {isEditingLeadDetails && (
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={handleSaveLeadDetails}
+                      disabled={isUpdating}
+                      className="flex-1 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                    >
+                      {isUpdating ? "Saving..." : "Save"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsEditingLeadDetails(false);
+                        setEditedName(selectedLead.name);
+                        setEditedCourse(selectedLead.course);
+                        setEditedEmail(selectedLead.email);
+                      }}
+                      disabled={isUpdating}
+                      className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+
                 {(selectedLead.mobileWithCountry ||
                   selectedLead.countryCode ||
                   selectedLead.mobile) && (

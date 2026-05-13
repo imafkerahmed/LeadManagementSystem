@@ -147,13 +147,7 @@ export async function POST(request: NextRequest) {
       try {
         const lead = leads[i];
 
-        // Validate required fields
-        if (!lead.studentName || !lead.course) {
-          errors.push({ row: i + 2, message: "Missing required fields" });
-          failedCount++;
-          continue;
-        }
-
+        // Validate required fields - only mobile number is required
         const mobileWithCountry = normalizeMobileWithCountry(
           lead.mobileWithCountry || lead.mobile || "",
         );
@@ -237,11 +231,11 @@ export async function POST(request: NextRequest) {
           const leadNow = now.toISOString();
           const createdLead = await pb.collection("leads").create({
             leadId,
-            studentName: lead.studentName,
+            studentName: lead.studentName || "Not Specified",
             mobileWithCountry,
             email: lead.email || "",
-            course: lead.course,
-            courseName: lead.course,
+            course: lead.course || "Not Specified",
+            courseName: lead.course || "Not Specified",
             leadSource: lead.leadSource || "Bulk Upload",
             leadSourceDetail: lead.leadSourceDetail || "",
             // write both status variants used across codebase
