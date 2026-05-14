@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPocketBaseAdminClient } from "@/lib/pocketbase";
 
+function normalizeLeadStatus(value: string | undefined): string {
+  const normalized = (value || "").trim().toLowerCase();
+  if (normalized === "followup" || normalized === "follow-up") {
+    return "Follow-up";
+  }
+  if (normalized === "new") return "New";
+  if (normalized === "contacted") return "Contacted";
+  if (normalized === "registered") return "Registered";
+  if (normalized === "lost") return "Lost";
+  return (value || "").trim();
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -35,20 +47,13 @@ export async function POST(request: NextRequest) {
     }
 
     const lead = leads[0];
-    const oldStatus = lead.status;
+    const oldStatus = normalizeLeadStatus(lead.status);
+    const normalizedNewStatus = normalizeLeadStatus(newStatus);
     const now = new Date().toISOString();
 
     const statusFlow = ["New", "Contacted", "Follow-up", "Registered", "Lost"];
     const oldIndex = statusFlow.indexOf(oldStatus);
-    const newIndex = statusFlow.indexOf(newStatus);
-
-    // Prevent updating terminal statuses (even comments should be disallowed)
-    if (oldStatus === "Registered" || oldStatus === "Lost") {
-      return NextResponse.json(
-        { error: "Cannot update a lead that is Registered or Lost" },
-        { status: 403 },
-      );
-    }
+    const newIndex = statusFlow.indexOf(normalizedNewStatus);
 
     type UserRoleRecord = {
       role?: string;
@@ -66,6 +71,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Unable to verify user role" },
         { status: 403 },
+          // Prevent any updates to Registered or Lost leads for non-admins
+          if (
+            (oldStatus === "Registered" || oldStatus === "Lost") &&
+            !isAdmin
+          ) {
+            return NextResponse.json(
+              { error: "Cannot update Registered or Lost leads" },
+              { status: 403 },
+            );
+          }
+
       );
     }
 
@@ -77,11 +93,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Prevent changing status for terminal states (but allow comments)
+    if (
+      (oldStatus === "Registered" || oldStatus === "Lost") &&
+      normalizedNewStatus !== oldStatus &&
+      !isAdmin
+    ) {
+      return NextResponse.json(
+        { error: "Cannot change status of Registered or Lost leads" },
+        { status: 403 },
+      );
+    }
+
     // Require that the first status change from "New" must be to "Contacted"
     if (
       oldStatus === "New" &&
-      newStatus !== "New" &&
-      newStatus !== "Contacted" &&
+      normalizedNewStatus !== "New" &&
+      normalizedNewStatus !== "Contacted" &&
       !isAdmin
     ) {
       return NextResponse.json(
@@ -98,21 +126,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (normalizedNewStatus === "Follow-up" && !lead.followup1Date) {
+      return NextResponse.json(
+        {
+          error:
+            "Set the first follow-up date before moving the lead to Follow-up",
+        },
+        { status: 400 },
+      );
+    }
+
     // Update the lead: allow same-status updates (for comments) or forward moves
     const updatePayload: Record<string, unknown> = {
       latestComment: trimmedComment || "",
       updated: now,
     };
 
-    if (oldStatus !== newStatus) {
-      updatePayload.status = newStatus;
+    if (oldStatus !== normalizedNewStatus) {
+      updatePayload.status = normalizedNewStatus;
     }
 
     await pb.collection("leads").update(lead.id, updatePayload);
 
     const historyEntries: Array<Record<string, unknown>> = [];
 
-    if (oldStatus !== newStatus) {
+    if (oldStatus !== normalizedNewStatus) {
       historyEntries.push({
         timeStamp: now,
         leadId: lead.id,
@@ -120,7 +158,7 @@ export async function POST(request: NextRequest) {
         eventType: "Status Change",
         changedBy: counselorId,
         oldValue: oldStatus,
-        newValue: newStatus,
+        newValue: normalizedNewStatus,
         comment: trimmedComment || "",
       });
     }
@@ -147,16 +185,14 @@ export async function POST(request: NextRequest) {
             ? historyError.message
             : String(historyError),
         );
-        throw new Error(
-          `Failed to log history: ${historyError instanceof Error ? historyError.message : String(historyError)}`,
-        );
       }
     }
 
     return NextResponse.json({
       success: true,
       message: "Updated successfully!",
-      updatedStatus: oldStatus !== newStatus ? newStatus : oldStatus,
+      updatedStatus:
+        oldStatus !== normalizedNewStatus ? normalizedNewStatus : oldStatus,
       latestComment: trimmedComment || "",
     });
   } catch (error) {

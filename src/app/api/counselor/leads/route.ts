@@ -22,6 +22,18 @@ type LeadRecord = {
   assignedTo?: string;
 };
 
+function normalizeLeadStatus(value: string | undefined): string {
+  const normalized = (value || "").trim().toLowerCase();
+  if (normalized === "followup" || normalized === "follow-up") {
+    return "Follow-up";
+  }
+  if (normalized === "new") return "New";
+  if (normalized === "contacted") return "Contacted";
+  if (normalized === "registered") return "Registered";
+  if (normalized === "lost") return "Lost";
+  return (value || "").trim();
+}
+
 function escapeFilterValue(value: string) {
   return value.replace(/"/g, '\\"');
 }
@@ -82,7 +94,7 @@ export async function GET(request: NextRequest) {
     const leads = (await pb.collection("leads").getFullList({
       filter:
         `(${assignedValues.join(" || ")}) && ` +
-        `(status = "New" || status = "Contacted" || status = "Follow-Up")`,
+        `(status = "New" || status = "Contacted" || status = "Follow-Up" || status = "Follow-up" || status = "Followup" || status = "Registered" || status = "Lost")`,
       sort: "-created",
     })) as LeadRecord[];
 
@@ -99,7 +111,7 @@ export async function GET(request: NextRequest) {
       courseName: lead.courseName || lead.course || "",
       leadSource: lead.leadSource || "",
       leadSourceDetail: lead.leadSourceDetail || "",
-      status: lead.leadStatus || lead.status || "",
+      status: normalizeLeadStatus(lead.leadStatus || lead.status || ""),
       comments: lead.latestComment || "",
       created: lead.created || "",
       updated: lead.updated || lead.created || "",

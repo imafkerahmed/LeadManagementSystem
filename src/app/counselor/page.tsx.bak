@@ -1,4 +1,5 @@
 "use client";
+
 import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -157,7 +158,6 @@ export default function CounselorPage() {
   const [followup2Completed, setFollowup2Completed] = useState(false);
   const [followup3Date, setFollowup3Date] = useState("");
   const [followup3Completed, setFollowup3Completed] = useState(false);
-  const [savingFollowup, setSavingFollowup] = useState<1 | 2 | 3 | null>(null);
 
   // Form states
   const [statusSelect, setStatusSelect] = useState("");
@@ -225,12 +225,12 @@ export default function CounselorPage() {
     const normalizedCurrentStatus = normalizeLeadStatus(currentStatus);
     const currentIndex = statusFlow.indexOf(normalizedCurrentStatus);
     if (currentIndex === -1) return statusFlow;
-    // If already in a terminal state, can only stay in same status (for comments)
+    // If already in a terminal state, no updates allowed
     if (
       normalizedCurrentStatus === "Registered" ||
       normalizedCurrentStatus === "Lost"
     )
-      return [normalizedCurrentStatus];
+      return [];
     // Include the current status so comment-only submissions are allowed,
     // then allow forward statuses (no going back).
     return [normalizedCurrentStatus, ...statusFlow.slice(currentIndex + 1)];
@@ -275,16 +275,6 @@ export default function CounselorPage() {
         return "bg-orange-100 text-orange-700 border-orange-300";
       default:
         return "bg-slate-100 text-slate-700 border-slate-300";
-    }
-  };
-
-  const formatDateForInput = (dateStr: string | undefined): string => {
-    if (!dateStr) return "";
-    try {
-      const date = new Date(dateStr);
-      return date.toISOString().split("T")[0];
-    } catch {
-      return "";
     }
   };
 
@@ -559,11 +549,11 @@ export default function CounselorPage() {
       setEditedName(latestLead.studentName || "");
       setEditedCourse(latestLead.course || latestLead.courseName || "");
       setEditedEmail(latestLead.email || "");
-      setFollowup1Date(formatDateForInput(latestLead.followup1Date));
+      setFollowup1Date(latestLead.followup1Date || "");
       setFollowup1Completed(latestLead.followup1Completed || false);
-      setFollowup2Date(formatDateForInput(latestLead.followup2Date));
+      setFollowup2Date(latestLead.followup2Date || "");
       setFollowup2Completed(latestLead.followup2Completed || false);
-      setFollowup3Date(formatDateForInput(latestLead.followup3Date));
+      setFollowup3Date(latestLead.followup3Date || "");
       setFollowup3Completed(latestLead.followup3Completed || false);
       const history = (await pb.collection("leadHistory").getFullList({
         filter: `leadId = "${lead.id}"`,
@@ -615,6 +605,15 @@ export default function CounselorPage() {
       return;
     }
 
+    // If in a terminal state, disallow any updates (server also enforces)
+    if (
+      selectedLead.status === "Registered" ||
+      selectedLead.status === "Lost"
+    ) {
+      showToast("Cannot update a Registered or Lost lead", "error");
+      return;
+    }
+
     if (statusSelect === selectedLead.status && !trimmedComment) {
       showToast("Change the status or add a comment", "error");
       return;
@@ -633,14 +632,6 @@ export default function CounselorPage() {
     // Validate that the selected status is allowed (can't go backward)
     if (!validNextStatuses.includes(statusSelect)) {
       showToast("You cannot change to a previous status", "error");
-      return;
-    }
-
-    if (statusSelect === "Follow-up" && !selectedLead.followup1Date) {
-      showToast(
-        "Set the first follow-up date before moving the lead to Follow-up",
-        "error",
-      );
       return;
     }
 
@@ -761,15 +752,6 @@ export default function CounselorPage() {
   const handleSaveLeadDetails = async () => {
     if (!selectedLead) return;
 
-    // Prevent editing details for Registered or Lost leads
-    if (
-      selectedLead.status === "Registered" ||
-      selectedLead.status === "Lost"
-    ) {
-      showToast("Cannot edit details of Registered or Lost leads", "error");
-      return;
-    }
-
     try {
       setIsUpdating(true);
       const pb = createPocketBaseClient();
@@ -841,135 +823,100 @@ export default function CounselorPage() {
     }
   };
 
-  const handleSaveIndividualFollowup = async (followupNum: 1 | 2 | 3) => {
+  const handleSaveFollowups = async () => {
     if (!selectedLead) return;
 
     try {
-      setSavingFollowup(followupNum);
+      setIsUpdating(true);
       const pb = createPocketBaseClient();
 
-      // Get the date and existing value for this followup
-      const dateMap = { 1: followup1Date, 2: followup2Date, 3: followup3Date };
-      const existingMap = {
-        1: selectedLead.followup1Date,
-        2: selectedLead.followup2Date,
-        3: selectedLead.followup3Date,
-      };
-      const fieldName = `followup${followupNum}Date`;
-
-      const newDate = dateMap[followupNum];
-      const existingDate = existingMap[followupNum];
-
-      // Check if counselor is trying to modify already-set follow-up date
+      // Check if counselor is trying to modify already-set follow-up dates
       // Only admins can modify existing follow-up dates
-      const isAdmin =
-        authUser?.role === "admin" || pb.authStore.model?.role === "admin";
-
-      if (!isAdmin && existingDate && existingDate !== newDate) {
-        showToast(
-          "Cannot modify existing follow-up dates. Contact admin.",
-          "error",
-        );
-        return;
-      }
-
-      // Only update if date changed
-      if ((existingDate || "") !== newDate) {
-        const updateData = { [fieldName]: newDate || null };
-        await pb.collection("leads").update(selectedLead.id, updateData);
-
-        // Create history entry
-        const now = new Date().toISOString();
-        try {
-          await pb.collection("leadHistory").create({
-            leadId: selectedLead.id,
-            eventType: "Follow-up Scheduled",
-            changedBy: counselorId,
-            oldValue: existingDate || "Not set",
-            newValue: newDate || "Cleared",
-            field: fieldName,
-            created: now,
-          });
-        } catch (err) {
-          // Non-blocking: log but don't fail the update
-          console.error("History logging failed:", err);
+      const isAdmin = authUser?.role === "admin" || pb.authStore.model?.role === "admin";
+      
+      if (!isAdmin) {
+        // For counselors: only allow setting dates that are currently empty
+        if (selectedLead.followup1Date && selectedLead.followup1Date !== followup1Date) {
+          showToast("Cannot modify existing follow-up dates. Contact admin.", "error");
+          return;
         }
-
-        toast.success(`Follow-up ${followupNum} date saved`);
+        if (selectedLead.followup2Date && selectedLead.followup2Date !== followup2Date) {
+          showToast("Cannot modify existing follow-up dates. Contact admin.", "error");
+          return;
+        }
+        if (selectedLead.followup3Date && selectedLead.followup3Date !== followup3Date) {
+          showToast("Cannot modify existing follow-up dates. Contact admin.", "error");
+          return;
+        }
       }
 
-      // Refresh lead details
-      await openLeadDetails(selectedLead);
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : `Failed to save follow-up ${followupNum}`,
-      );
-    } finally {
-      setSavingFollowup(null);
-    }
-  };
-
-  const handleSaveFollowupCompletion = async (followupNum: 1 | 2 | 3) => {
-    if (!selectedLead) return;
-
-    try {
-      setSavingFollowup(followupNum);
-      const pb = createPocketBaseClient();
-
-      // Get current completion state
-      const completedMap = {
-        1: followup1Completed,
-        2: followup2Completed,
-        3: followup3Completed,
+      const updateData: Record<string, unknown> = {
+        followup1Date: followup1Date || null,
+        followup1Completed: followup1Completed,
+        followup2Date: followup2Date || null,
+        followup2Completed: followup2Completed,
+        followup3Date: followup3Date || null,
+        followup3Completed: followup3Completed,
       };
-      const fieldName = `followup${followupNum}Completed`;
-      const newCompleted = !completedMap[followupNum];
 
-      // Update the completion status in database
-      const updateData = { [fieldName]: newCompleted };
       await pb.collection("leads").update(selectedLead.id, updateData);
 
-      // Update local state
-      if (followupNum === 1) {
-        setFollowup1Completed(newCompleted);
-      } else if (followupNum === 2) {
-        setFollowup2Completed(newCompleted);
-      } else if (followupNum === 3) {
-        setFollowup3Completed(newCompleted);
-      }
-
-      // Create history entry
+      // Create history entries for follow-up changes
       const now = new Date().toISOString();
-      try {
-        await pb.collection("leadHistory").create({
+      const changes = [];
+
+      // Check follow-up 1
+      if ((selectedLead.followup1Date || "") !== followup1Date) {
+        changes.push({
           leadId: selectedLead.id,
-          eventType: "Follow-up Completed",
+          eventType: "Follow-up Scheduled",
           changedBy: counselorId,
-          oldValue: completedMap[followupNum] ? "Completed" : "Pending",
-          newValue: newCompleted ? "Completed" : "Pending",
-          field: fieldName,
+          oldValue: selectedLead.followup1Date || "Not set",
+          newValue: followup1Date || "Cleared",
+          field: "followup1Date",
           created: now,
         });
-      } catch (err) {
-        console.error("History logging failed:", err);
       }
 
-      toast.success(
-        `Follow-up ${followupNum} ${newCompleted ? "marked done" : "marked pending"}`,
-      );
+      // Check follow-up 2
+      if ((selectedLead.followup2Date || "") !== followup2Date) {
+        changes.push({
+          leadId: selectedLead.id,
+          eventType: "Follow-up Scheduled",
+          changedBy: counselorId,
+          oldValue: selectedLead.followup2Date || "Not set",
+          newValue: followup2Date || "Cleared",
+          field: "followup2Date",
+          created: now,
+        });
+      }
 
-      // Refresh lead details
+      // Check follow-up 3
+      if ((selectedLead.followup3Date || "") !== followup3Date) {
+        changes.push({
+          leadId: selectedLead.id,
+          eventType: "Follow-up Scheduled",
+          changedBy: counselorId,
+          oldValue: selectedLead.followup3Date || "Not set",
+          newValue: followup3Date || "Cleared",
+          field: "followup3Date",
+          created: now,
+        });
+      }
+
+      // Record changes in history
+      for (const entry of changes) {
+        await pb.collection("leadHistory").create(entry);
+      }
+
+      toast.success("Follow-ups updated");
       await openLeadDetails(selectedLead);
     } catch (error) {
       toast.error(
-        error instanceof Error
-          ? error.message
-          : `Failed to save follow-up ${followupNum} status`,
+        error instanceof Error ? error.message : "Failed to update follow-ups",
       );
     } finally {
-      setSavingFollowup(null);
+      setIsUpdating(false);
     }
   };
 
@@ -1664,11 +1611,7 @@ export default function CounselorPage() {
                         setIsEditingLeadDetails(true);
                       }
                     }}
-                    disabled={
-                      selectedLead.status === "Registered" ||
-                      selectedLead.status === "Lost"
-                    }
-                    className="rounded-md border border-slate-300 p-1.5 text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="rounded-md border border-slate-300 p-1.5 text-slate-600 hover:bg-slate-100"
                     aria-label="Edit lead details"
                   >
                     {isEditingLeadDetails ? (
@@ -1900,184 +1843,123 @@ export default function CounselorPage() {
                   </div>
                 </div>
 
-                {selectedLead &&
-                  (statusSelect === "Follow-up" ||
-                    Boolean(
-                      selectedLead.followup1Date ||
-                      selectedLead.followup2Date ||
-                      selectedLead.followup3Date,
-                    )) && (
-                    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                      <div className="mb-4 flex items-center justify-between">
-                        <h3 className="text-sm font-semibold text-slate-900">
-                          Follow-ups
-                        </h3>
-                        <span className="text-xs text-slate-500">
-                          {
-                            [
-                              followup1Date,
-                              followup2Date,
-                              followup3Date,
-                            ].filter(Boolean).length
-                          }
-                          /3 set
-                        </span>
-                      </div>
+                {selectedLead && statusSelect === "Follow-up" && (
+                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="mb-4 flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-slate-900">
+                        Follow-ups
+                      </h3>
+                      <span className="text-xs text-slate-500">
+                        {
+                          [followup1Date, followup2Date, followup3Date].filter(
+                            Boolean,
+                          ).length
+                        }
+                        /3 set
+                      </span>
+                    </div>
 
-                      <p className="mb-3 text-xs text-slate-500">
-                        The first follow-up date is required before moving a
-                        lead to Follow-up.
-                      </p>
-
-                      <div className="space-y-3">
-                        {[
-                          {
-                            num: 1,
-                            date: followup1Date,
-                            setDate: setFollowup1Date,
-                            completed: followup1Completed,
-                            setCompleted: setFollowup1Completed,
-                            savedDate: selectedLead?.followup1Date,
-                            savedCompleted: selectedLead?.followup1Completed,
-                          },
-                          {
-                            num: 2,
-                            date: followup2Date,
-                            setDate: setFollowup2Date,
-                            completed: followup2Completed,
-                            setCompleted: setFollowup2Completed,
-                            savedDate: selectedLead?.followup2Date,
-                            savedCompleted: selectedLead?.followup2Completed,
-                            requiresPrevious: !followup1Completed,
-                          },
-                          {
-                            num: 3,
-                            date: followup3Date,
-                            setDate: setFollowup3Date,
-                            completed: followup3Completed,
-                            setCompleted: setFollowup3Completed,
-                            savedDate: selectedLead?.followup3Date,
-                            savedCompleted: selectedLead?.followup3Completed,
-                            requiresPrevious: !followup2Completed,
-                          },
-                        ].map((followup) => {
-                          const status = getFollowupStatus(
-                            followup.savedDate || "",
-                            followup.savedCompleted || false,
-                          );
-                          const statusLabel =
-                            status === "completed"
-                              ? "Completed"
-                              : status === "overdue"
-                                ? "Overdue"
-                                : status === "today"
-                                  ? "Today"
-                                  : status === "upcoming"
-                                    ? "Soon"
-                                    : "Scheduled";
-                          const isAdmin =
-                            authUser?.role === "admin" ||
-                            pb.authStore.model?.role === "admin";
-                          const isCounselorModifyingExisting =
-                            !isAdmin &&
-                            followup.savedDate &&
-                            followup.savedDate !== "";
-                          const isDisabled =
-                            (followup as any).requiresPrevious ||
-                            isCounselorModifyingExisting;
-
-                          // Check if date has been saved to the database
-                          const isDateSaved =
-                            followup.date ===
-                            formatDateForInput(followup.savedDate);
-                          // Check if there's an unsaved date change
-                          const hasUnsavedDate = followup.date && !isDateSaved;
-
-                          return (
-                            <div
-                              key={followup.num}
-                              className="flex flex-col gap-2"
-                            >
-                              <div className="flex items-center justify-between">
-                                <label className="text-xs font-medium text-slate-600">
-                                  Follow-up {followup.num}
-                                  {isDisabled && followup.num > 1 && (
-                                    <span className="ml-1 text-red-600">
-                                      (requires follow-up {followup.num - 1}{" "}
-                                      completion)
-                                    </span>
-                                  )}
-                                </label>
-                                {followup.savedDate && (
-                                  <span
-                                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium border ${getFollowupStatusColor(status)}`}
-                                  >
-                                    {statusLabel}
+                    <div className="space-y-3">
+                      {[
+                        {
+                          num: 1,
+                          date: followup1Date,
+                          setDate: setFollowup1Date,
+                          completed: followup1Completed,
+                          setCompleted: setFollowup1Completed,
+                        },
+                        {
+                          num: 2,
+                          date: followup2Date,
+                          setDate: setFollowup2Date,
+                          completed: followup2Completed,
+                          setCompleted: setFollowup2Completed,
+                          requiresPrevious: !followup1Completed,
+                        },
+                        {
+                          num: 3,
+                          date: followup3Date,
+                          setDate: setFollowup3Date,
+                          completed: followup3Completed,
+                          setCompleted: setFollowup3Completed,
+                          requiresPrevious: !followup2Completed,
+                        },
+                      ].map((followup) => {
+                        const status = getFollowupStatus(
+                          followup.date,
+                          followup.completed,
+                        );
+                        const statusLabel =
+                          status === "completed"
+                            ? "✓ Done"
+                            : status === "overdue"
+                              ? "Overdue"
+                              : status === "today"
+                                ? "Today"
+                                : status === "upcoming"
+                                  ? "Soon"
+                                  : "Scheduled";
+                        const isAdmin = authUser?.role === \"admin\" || pb.authStore.model?.role === \"admin\";\n                        const isCounselorModifyingExisting = !isAdmin && followup.date && followup.date !== \"\";\n                        const isDisabled = ((followup as any).requiresPrevious || isCounselorModifyingExisting);\n\n                        return ("}}]
+                          <div
+                            key={followup.num}
+                            className="flex flex-col gap-2"
+                          >
+                            <div className="flex items-center justify-between">
+                              <label className="text-xs font-medium text-slate-600">
+                                Follow-up {followup.num}
+                                {isDisabled && (
+                                  <span className="ml-1 text-red-600">
+                                    (requires follow-up {followup.num - 1}{" "}
+                                    completion)
                                   </span>
                                 )}
-                              </div>
-                              <div className="flex gap-2">
-                                <input
-                                  type="date"
-                                  value={followup.date}
-                                  onChange={(e) =>
-                                    followup.setDate(e.target.value)
-                                  }
-                                  disabled={isUpdating || isDisabled}
-                                  className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-400 focus:ring-2 focus:ring-slate-200 disabled:opacity-50"
-                                />
-                                {hasUnsavedDate ? (
-                                  <button
-                                    onClick={() =>
-                                      handleSaveIndividualFollowup(
-                                        followup.num as 1 | 2 | 3,
-                                      )
-                                    }
-                                    disabled={
-                                      savingFollowup ===
-                                      (followup.num as 1 | 2 | 3)
-                                    }
-                                    className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
-                                  >
-                                    {savingFollowup ===
-                                    (followup.num as 1 | 2 | 3)
-                                      ? "Setting..."
-                                      : "Set"}
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() =>
-                                      handleSaveFollowupCompletion(
-                                        followup.num as 1 | 2 | 3,
-                                      )
-                                    }
-                                    disabled={
-                                      !followup.savedDate ||
-                                      savingFollowup ===
-                                        (followup.num as 1 | 2 | 3) ||
-                                      followup.completed
-                                    }
-                                    className={`rounded-md px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
-                                      followup.completed
-                                        ? "bg-green-600 text-white cursor-not-allowed"
-                                        : "border border-slate-300 text-slate-700 hover:bg-slate-100"
-                                    }`}
-                                  >
-                                    {savingFollowup ===
-                                    (followup.num as 1 | 2 | 3)
-                                      ? "Saving..."
-                                      : followup.completed
-                                        ? "✓ Done"
-                                        : "Mark done"}
-                                  </button>
-                                )}
-                              </div>
+                              </label>
+                              {followup.date && (
+                                <span
+                                  className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium border ${getFollowupStatusColor(status)}`}
+                                >
+                                  {statusLabel}
+                                </span>
+                              )}
                             </div>
-                          );
-                        })}
-                      </div>
+                            <div className="flex gap-2">
+                              <input
+                                type="date"
+                                value={followup.date}
+                                onChange={(e) =>
+                                  followup.setDate(e.target.value)
+                                }
+                                disabled={isUpdating || isDisabled}
+                                className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-400 focus:ring-2 focus:ring-slate-200 disabled:opacity-50"
+                              />
+                              <button
+                                onClick={() =>
+                                  followup.setCompleted(!followup.completed)
+                                }
+                                disabled={!followup.date || isUpdating}
+                                className={`rounded-md px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
+                                  followup.completed
+                                    ? "bg-green-600 text-white hover:bg-green-700"
+                                    : "border border-slate-300 text-slate-700 hover:bg-slate-100"
+                                }`}
+                              >
+                                {followup.completed ? "✓ Done" : "Mark done"}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  )}
+
+                    <button
+                      onClick={handleSaveFollowups}
+                      disabled={isUpdating}
+                      className="mt-4 w-full rounded-md bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
+                    >
+                      {isUpdating ? "Saving..." : "Save Follow-ups"}
+                    </button>
+                  </div>
+                )}
 
                 <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
                   <button

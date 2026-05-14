@@ -46,6 +46,12 @@ interface Lead {
   assignedToId: string;
   assignedToName?: string;
   comments: string;
+  followup1Date?: string;
+  followup1Completed?: boolean;
+  followup2Date?: string;
+  followup2Completed?: boolean;
+  followup3Date?: string;
+  followup3Completed?: boolean;
 }
 
 interface TimelineEntry {
@@ -84,6 +90,12 @@ type LeadRecord = {
   assignedToName?: string;
   assignedToId?: string;
   latestComment?: string;
+  followup1Date?: string;
+  followup1Completed?: boolean;
+  followup2Date?: string;
+  followup2Completed?: boolean;
+  followup3Date?: string;
+  followup3Completed?: boolean;
   expand?: {
     assignedTo?: {
       id?: string;
@@ -173,6 +185,18 @@ function splitPhoneParts(
   };
 }
 
+function normalizeLeadStatus(value: string | undefined): string {
+  const normalized = (value || "").trim().toLowerCase();
+  if (normalized === "followup" || normalized === "follow-up") {
+    return "Follow-up";
+  }
+  if (normalized === "new") return "New";
+  if (normalized === "contacted") return "Contacted";
+  if (normalized === "registered") return "Registered";
+  if (normalized === "lost") return "Lost";
+  return (value || "").trim();
+}
+
 function parseLeadSequence(leadId?: string): number {
   if (!leadId) return 0;
   const match = leadId.match(/AMZ\/LEAD\/(\d+)/i);
@@ -187,9 +211,11 @@ export default function AdminLeads() {
   const authModel = createPocketBaseClient().authStore.model as {
     name?: string;
     email?: string;
+    role?: string;
   } | null;
   const currentUserName =
     authModel?.name || authModel?.email || "Amazon College Team";
+  const isAdmin = authModel?.role === "admin";
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [filteredLeads, setFilteredLeads] = useState<Lead[]>([]);
@@ -217,6 +243,13 @@ export default function AdminLeads() {
   const [draftCourse, setDraftCourse] = useState("");
   const [draftLeadSource, setDraftLeadSource] = useState("");
   const [draftLeadSourceDetail, setDraftLeadSourceDetail] = useState("");
+  const [followup1Date, setFollowup1Date] = useState("");
+  const [followup1Completed, setFollowup1Completed] = useState(false);
+  const [followup2Date, setFollowup2Date] = useState("");
+  const [followup2Completed, setFollowup2Completed] = useState(false);
+  const [followup3Date, setFollowup3Date] = useState("");
+  const [followup3Completed, setFollowup3Completed] = useState(false);
+  const [savingFollowup, setSavingFollowup] = useState<1 | 2 | 3 | null>(null);
   const [usersLookup, setUsersLookup] = useState<
     Array<{ id: string; name: string; role?: string }>
   >([]);
@@ -279,7 +312,7 @@ export default function AdminLeads() {
         courseName: record.courseName || record.course || "",
         leadSource: record.leadSource || "",
         leadSourceDetail: record.leadSourceDetail || "",
-        status: record.leadStatus || record.status || "",
+        status: normalizeLeadStatus(record.leadStatus || record.status || ""),
         assignedTo: assignedName + (assignedRole ? ` — ${assignedRole}` : ""),
         assignedToId:
           record.assignedToId ||
@@ -290,6 +323,12 @@ export default function AdminLeads() {
           "",
         assignedToName: assignedName,
         comments: record.latestComment || "",
+        followup1Date: record.followup1Date || "",
+        followup1Completed: record.followup1Completed || false,
+        followup2Date: record.followup2Date || "",
+        followup2Completed: record.followup2Completed || false,
+        followup3Date: record.followup3Date || "",
+        followup3Completed: record.followup3Completed || false,
       };
     },
     [usersLookup],
@@ -461,6 +500,12 @@ export default function AdminLeads() {
       setDraftCourse("");
       setDraftLeadSource("");
       setDraftLeadSourceDetail("");
+      setFollowup1Date("");
+      setFollowup1Completed(false);
+      setFollowup2Date("");
+      setFollowup2Completed(false);
+      setFollowup3Date("");
+      setFollowup3Completed(false);
       return;
     }
 
@@ -473,6 +518,12 @@ export default function AdminLeads() {
     setDraftCourse(lead.course);
     setDraftLeadSource(lead.leadSource);
     setDraftLeadSourceDetail(lead.leadSourceDetail || "");
+    setFollowup1Date(lead.followup1Date || "");
+    setFollowup1Completed(lead.followup1Completed || false);
+    setFollowup2Date(lead.followup2Date || "");
+    setFollowup2Completed(lead.followup2Completed || false);
+    setFollowup3Date(lead.followup3Date || "");
+    setFollowup3Completed(lead.followup3Completed || false);
   };
 
   useEffect(() => {
@@ -837,6 +888,13 @@ export default function AdminLeads() {
       return;
     }
 
+    if (nextStatus === "Follow-up" && !selectedLead.followup1Date) {
+      toast.error(
+        "Set the first follow-up date before moving the lead to Follow-up",
+      );
+      return;
+    }
+
     setIsSaving(true);
     try {
       const pb = createPocketBaseClient();
@@ -945,6 +1003,217 @@ export default function AdminLeads() {
     }
   };
 
+  const getFollowupStatus = (
+    dateStr: string | undefined,
+    isCompleted: boolean | undefined,
+  ): string | null => {
+    if (!dateStr) return null;
+    if (isCompleted) return "completed";
+
+    const date = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    date.setHours(0, 0, 0, 0);
+
+    const diffTime = date.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) return "overdue";
+    if (diffDays === 0) return "today";
+    if (diffDays <= 3) return "upcoming";
+    return "scheduled";
+  };
+
+  const getFollowupStatusColor = (status: string | null): string => {
+    switch (status) {
+      case "completed":
+        return "bg-green-100 text-green-800 border border-green-300";
+      case "overdue":
+        return "bg-red-100 text-red-800 border border-red-300";
+      case "today":
+        return "bg-yellow-100 text-yellow-800 border border-yellow-300";
+      case "upcoming":
+        return "bg-orange-100 text-orange-800 border border-orange-300";
+      case "scheduled":
+        return "bg-blue-100 text-blue-800 border border-blue-300";
+      default:
+        return "bg-gray-100 text-gray-800 border border-gray-300";
+    }
+  };
+
+  const handleSaveFollowups = async () => {
+    if (!selectedLead) return;
+
+    try {
+      setIsSaving(true);
+      const pb = createPocketBaseClient();
+
+      // Check if user is admin
+      const userRole = pb.authStore.model?.role;
+      const isAdmin = userRole === "admin";
+
+      // Non-admins can only set dates that are currently empty
+      if (!isAdmin) {
+        if (
+          selectedLead.followup1Date &&
+          selectedLead.followup1Date !== followup1Date
+        ) {
+          toast.error("Cannot modify existing follow-up dates. Contact admin.");
+          return;
+        }
+        if (
+          selectedLead.followup2Date &&
+          selectedLead.followup2Date !== followup2Date
+        ) {
+          toast.error("Cannot modify existing follow-up dates. Contact admin.");
+          return;
+        }
+        if (
+          selectedLead.followup3Date &&
+          selectedLead.followup3Date !== followup3Date
+        ) {
+          toast.error("Cannot modify existing follow-up dates. Contact admin.");
+          return;
+        }
+      }
+
+      const updateData: Record<string, unknown> = {
+        followup1Date: followup1Date || null,
+        followup1Completed: followup1Completed,
+        followup2Date: followup2Date || null,
+        followup2Completed: followup2Completed,
+        followup3Date: followup3Date || null,
+        followup3Completed: followup3Completed,
+      };
+
+      await pb.collection("leads").update(selectedLead.id, updateData);
+
+      // Create history entries for follow-up changes
+      const now = new Date().toISOString();
+      const changes = [];
+
+      // Check follow-up 1
+      if ((selectedLead.followup1Date || "") !== followup1Date) {
+        changes.push({
+          leadId: selectedLead.id,
+          eventType: "Follow-up Scheduled",
+          changedBy: pb.authStore.model?.id || "",
+          oldValue: selectedLead.followup1Date || "Not set",
+          newValue: followup1Date || "Cleared",
+          field: "followup1Date",
+          created: now,
+        });
+      }
+
+      // Check follow-up 2
+      if ((selectedLead.followup2Date || "") !== followup2Date) {
+        changes.push({
+          leadId: selectedLead.id,
+          eventType: "Follow-up Scheduled",
+          changedBy: pb.authStore.model?.id || "",
+          oldValue: selectedLead.followup2Date || "Not set",
+          newValue: followup2Date || "Cleared",
+          field: "followup2Date",
+          created: now,
+        });
+      }
+
+      // Check follow-up 3
+      if ((selectedLead.followup3Date || "") !== followup3Date) {
+        changes.push({
+          leadId: selectedLead.id,
+          eventType: "Follow-up Scheduled",
+          changedBy: pb.authStore.model?.id || "",
+          oldValue: selectedLead.followup3Date || "Not set",
+          newValue: followup3Date || "Cleared",
+          field: "followup3Date",
+          created: now,
+        });
+      }
+
+      // Record changes in history
+      for (const entry of changes) {
+        await pb.collection("leadHistory").create(entry);
+      }
+
+      toast.success("Follow-ups updated");
+      await openSidebarFor(selectedLead);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update follow-ups",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveIndividualFollowup = async (followupNum: 1 | 2 | 3) => {
+    if (!selectedLead) return;
+
+    try {
+      setSavingFollowup(followupNum);
+      const pb = createPocketBaseClient();
+
+      // Get the date and existing value for this followup
+      const dateMap = { 1: followup1Date, 2: followup2Date, 3: followup3Date };
+      const existingMap = {
+        1: selectedLead.followup1Date,
+        2: selectedLead.followup2Date,
+        3: selectedLead.followup3Date,
+      };
+      const fieldName = `followup${followupNum}Date`;
+
+      const newDate = dateMap[followupNum];
+      const existingDate = existingMap[followupNum];
+
+      // Check if user is admin
+      const userRole = pb.authStore.model?.role;
+      const isAdmin = userRole === "admin";
+
+      // Non-admins can't modify existing dates
+      if (!isAdmin && existingDate && existingDate !== newDate) {
+        toast.error("Cannot modify existing follow-up dates. Contact admin.");
+        return;
+      }
+
+      // Only update if date changed
+      if ((existingDate || "") !== newDate) {
+        const updateData = { [fieldName]: newDate || null };
+        await pb.collection("leads").update(selectedLead.id, updateData);
+
+        // Create history entry
+        const now = new Date().toISOString();
+        try {
+          await pb.collection("leadHistory").create({
+            leadId: selectedLead.id,
+            eventType: "Follow-up Scheduled",
+            changedBy: pb.authStore.model?.id || "",
+            oldValue: existingDate || "Not set",
+            newValue: newDate || "Cleared",
+            field: fieldName,
+            created: now,
+          });
+        } catch (err) {
+          // Non-blocking: log but don't fail the update
+          console.error("History logging failed:", err);
+        }
+
+        toast.success(`Follow-up ${followupNum} date saved`);
+      }
+
+      // Refresh lead details
+      await openSidebarFor(selectedLead);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : `Failed to save follow-up ${followupNum}`,
+      );
+    } finally {
+      setSavingFollowup(null);
+    }
+  };
+
   const handleCreateLead = async (payload: CreateLeadPayload) => {
     setIsSaving(true);
     try {
@@ -1008,11 +1277,11 @@ export default function AdminLeads() {
     }
   };
 
-  const statuses = ["New", "Contacted", "Follow-Up", "Registered", "Lost"];
+  const statuses = ["New", "Contacted", "Follow-up", "Registered", "Lost"];
   const statusColors: Record<string, string> = {
     New: "bg-blue-100 text-blue-800",
     Contacted: "bg-yellow-100 text-yellow-800",
-    "Follow-Up": "bg-orange-100 text-orange-800",
+    "Follow-up": "bg-orange-100 text-orange-800",
     Registered: "bg-green-100 text-green-800",
     Lost: "bg-red-100 text-red-800",
   };
@@ -1478,6 +1747,282 @@ export default function AdminLeads() {
                           placeholder="Add a note"
                         />
                       </div>
+
+                      {selectedLead && draftStatus === "Follow-up" && (
+                        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                          <h3 className="text-sm font-semibold text-slate-900 mb-4">
+                            Follow-ups
+                          </h3>
+
+                          <div className="space-y-4">
+                            {/* Follow-up 1 */}
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <label className="text-sm font-medium text-gray-700">
+                                  Follow-up 1
+                                </label>
+                                {selectedLead?.followup1Date && (
+                                  <span
+                                    className={`px-2 py-1 rounded text-xs font-semibold ${getFollowupStatusColor(getFollowupStatus(selectedLead.followup1Date, selectedLead.followup1Completed))}`}
+                                  >
+                                    {selectedLead.followup1Completed
+                                      ? "Completed"
+                                      : getFollowupStatus(
+                                            selectedLead.followup1Date,
+                                            selectedLead.followup1Completed,
+                                          ) === "overdue"
+                                        ? "Overdue"
+                                        : getFollowupStatus(
+                                              selectedLead.followup1Date,
+                                              selectedLead.followup1Completed,
+                                            ) === "today"
+                                          ? "Today"
+                                          : getFollowupStatus(
+                                                selectedLead.followup1Date,
+                                                selectedLead.followup1Completed,
+                                              ) === "upcoming"
+                                            ? "Soon"
+                                            : "Scheduled"}
+                                  </span>
+                                )}
+                              </div>
+                              <input
+                                type="date"
+                                value={followup1Date}
+                                onChange={(e) =>
+                                  setFollowup1Date(e.target.value)
+                                }
+                                disabled={
+                                  isSaving ||
+                                  (!isAdmin && !!selectedLead?.followup1Date)
+                                }
+                                className="w-full px-3 py-2 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                              />
+                              {followup1Date &&
+                              followup1Date !== selectedLead?.followup1Date ? (
+                                <button
+                                  onClick={() =>
+                                    handleSaveIndividualFollowup(1)
+                                  }
+                                  disabled={savingFollowup === 1}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                  {savingFollowup === 1 ? "Setting..." : "Set"}
+                                </button>
+                              ) : (
+                                selectedLead?.followup1Date && (
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      id="followup1Completed"
+                                      checked={followup1Completed}
+                                      onChange={(e) =>
+                                        setFollowup1Completed(e.target.checked)
+                                      }
+                                      disabled={
+                                        !followup1Date ||
+                                        isSaving ||
+                                        followup1Completed
+                                      }
+                                      className="rounded"
+                                    />
+                                    <label
+                                      htmlFor="followup1Completed"
+                                      className="text-sm text-gray-600 cursor-pointer"
+                                    >
+                                      Mark as completed
+                                    </label>
+                                  </div>
+                                )
+                              )}
+                            </div>
+
+                            {/* Follow-up 2 */}
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <label className="text-sm font-medium text-gray-700">
+                                  Follow-up 2
+                                  {!followup1Completed && (
+                                    <span className="ml-1 text-red-600">
+                                      (requires follow-up 1 completion)
+                                    </span>
+                                  )}
+                                </label>
+                                {selectedLead?.followup2Date && (
+                                  <span
+                                    className={`px-2 py-1 rounded text-xs font-semibold ${getFollowupStatusColor(getFollowupStatus(selectedLead.followup2Date, selectedLead.followup2Completed))}`}
+                                  >
+                                    {selectedLead.followup2Completed
+                                      ? "Completed"
+                                      : getFollowupStatus(
+                                            selectedLead.followup2Date,
+                                            selectedLead.followup2Completed,
+                                          ) === "overdue"
+                                        ? "Overdue"
+                                        : getFollowupStatus(
+                                              selectedLead.followup2Date,
+                                              selectedLead.followup2Completed,
+                                            ) === "today"
+                                          ? "Today"
+                                          : getFollowupStatus(
+                                                selectedLead.followup2Date,
+                                                selectedLead.followup2Completed,
+                                              ) === "upcoming"
+                                            ? "Soon"
+                                            : "Scheduled"}
+                                  </span>
+                                )}
+                              </div>
+                              <input
+                                type="date"
+                                value={followup2Date}
+                                onChange={(e) =>
+                                  setFollowup2Date(e.target.value)
+                                }
+                                disabled={
+                                  !followup1Completed ||
+                                  isSaving ||
+                                  (!isAdmin && !!selectedLead?.followup2Date)
+                                }
+                                className="w-full px-3 py-2 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                              />
+                              {followup2Date &&
+                              followup2Date !== selectedLead?.followup2Date ? (
+                                <button
+                                  onClick={() =>
+                                    handleSaveIndividualFollowup(2)
+                                  }
+                                  disabled={savingFollowup === 2}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                  {savingFollowup === 2 ? "Setting..." : "Set"}
+                                </button>
+                              ) : (
+                                selectedLead?.followup2Date && (
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      id="followup2Completed"
+                                      checked={followup2Completed}
+                                      onChange={(e) =>
+                                        setFollowup2Completed(e.target.checked)
+                                      }
+                                      disabled={
+                                        !followup2Date ||
+                                        isSaving ||
+                                        followup2Completed
+                                      }
+                                      className="rounded"
+                                    />
+                                    <label
+                                      htmlFor="followup2Completed"
+                                      className="text-sm text-gray-600 cursor-pointer"
+                                    >
+                                      Mark as completed
+                                    </label>
+                                  </div>
+                                )
+                              )}
+                            </div>
+
+                            {/* Follow-up 3 */}
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <label className="text-sm font-medium text-gray-700">
+                                  Follow-up 3
+                                  {!followup2Completed && (
+                                    <span className="ml-1 text-red-600">
+                                      (requires follow-up 2 completion)
+                                    </span>
+                                  )}
+                                </label>
+                                {selectedLead?.followup3Date && (
+                                  <span
+                                    className={`px-2 py-1 rounded text-xs font-semibold ${getFollowupStatusColor(getFollowupStatus(selectedLead.followup3Date, selectedLead.followup3Completed))}`}
+                                  >
+                                    {selectedLead.followup3Completed
+                                      ? "Completed"
+                                      : getFollowupStatus(
+                                            selectedLead.followup3Date,
+                                            selectedLead.followup3Completed,
+                                          ) === "overdue"
+                                        ? "Overdue"
+                                        : getFollowupStatus(
+                                              selectedLead.followup3Date,
+                                              selectedLead.followup3Completed,
+                                            ) === "today"
+                                          ? "Today"
+                                          : getFollowupStatus(
+                                                selectedLead.followup3Date,
+                                                selectedLead.followup3Completed,
+                                              ) === "upcoming"
+                                            ? "Soon"
+                                            : "Scheduled"}
+                                  </span>
+                                )}
+                              </div>
+                              <input
+                                type="date"
+                                value={followup3Date}
+                                onChange={(e) =>
+                                  setFollowup3Date(e.target.value)
+                                }
+                                disabled={
+                                  !followup2Completed ||
+                                  isSaving ||
+                                  (!isAdmin && !!selectedLead?.followup3Date)
+                                }
+                                className="w-full px-3 py-2 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                              />
+                              {followup3Date &&
+                              followup3Date !== selectedLead?.followup3Date ? (
+                                <button
+                                  onClick={() =>
+                                    handleSaveIndividualFollowup(3)
+                                  }
+                                  disabled={savingFollowup === 3}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                  {savingFollowup === 3 ? "Setting..." : "Set"}
+                                </button>
+                              ) : (
+                                selectedLead?.followup3Date && (
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      id="followup3Completed"
+                                      checked={followup3Completed}
+                                      onChange={(e) =>
+                                        setFollowup3Completed(e.target.checked)
+                                      }
+                                      disabled={
+                                        !followup3Date ||
+                                        isSaving ||
+                                        followup3Completed
+                                      }
+                                      className="rounded"
+                                    />
+                                    <label
+                                      htmlFor="followup3Completed"
+                                      className="text-sm text-gray-600 cursor-pointer"
+                                    >
+                                      Mark as completed
+                                    </label>
+                                  </div>
+                                )
+                              )}
+                            </div>
+
+                            <button
+                              onClick={handleSaveFollowups}
+                              disabled={isSaving}
+                              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm disabled:opacity-50"
+                            >
+                              {isSaving ? "Saving..." : "Save Follow-ups"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                       {isEditing && (
                         <button

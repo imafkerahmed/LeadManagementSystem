@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPocketBaseAdminClient } from "@/lib/pocketbase";
 
+function normalizeLeadStatus(value: string | undefined): string {
+  const normalized = (value || "").trim().toLowerCase();
+  if (normalized === "followup" || normalized === "follow-up") {
+    return "Follow-up";
+  }
+  if (normalized === "new") return "New";
+  if (normalized === "contacted") return "Contacted";
+  if (normalized === "registered") return "Registered";
+  if (normalized === "lost") return "Lost";
+  return (value || "").trim();
+}
+
 type UserRecord = {
   id: string;
   name?: string;
@@ -39,7 +51,7 @@ export async function POST(request: NextRequest) {
     }
 
     const lead = leads[0];
-    const oldStatus = lead.status;
+    const oldStatus = normalizeLeadStatus(lead.status);
     const oldCounselor = lead.assignedTo;
     const now = new Date();
     const trimmedComment = adminComment?.trim();
@@ -61,8 +73,20 @@ export async function POST(request: NextRequest) {
       lastModified: now,
     };
 
-    if (newStatus) {
-      updates.status = newStatus;
+    const normalizedNewStatus = normalizeLeadStatus(newStatus);
+
+    if (normalizedNewStatus === "Follow-up" && !lead.followup1Date) {
+      return NextResponse.json(
+        {
+          error:
+            "Set the first follow-up date before moving the lead to Follow-up",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (normalizedNewStatus) {
+      updates.status = normalizedNewStatus;
     }
 
     if (newCounselor) {
@@ -78,15 +102,15 @@ export async function POST(request: NextRequest) {
 
     const historyEntries: Array<Record<string, unknown>> = [];
 
-    if (newStatus && newStatus !== oldStatus) {
+    if (normalizedNewStatus && normalizedNewStatus !== oldStatus) {
       historyEntries.push({
         timeStamp: now,
         leadId: lead.id,
         studentName: lead.id,
         eventType: "Status Change",
-        changedBy: actorName,
+        changedBy: adminId?.trim() || actorName,
         oldValue: oldStatus,
-        newValue: newStatus,
+        newValue: normalizedNewStatus,
         comment: trimmedComment || undefined,
       });
     }
@@ -97,7 +121,7 @@ export async function POST(request: NextRequest) {
         leadId: lead.id,
         studentName: lead.id,
         eventType: "Reassignment",
-        changedBy: actorName,
+        changedBy: adminId?.trim() || actorName,
         oldValue: resolveUserName(oldCounselor),
         newValue: resolveUserName(newCounselor),
         comment:
@@ -111,13 +135,22 @@ export async function POST(request: NextRequest) {
         leadId: lead.id,
         studentName: lead.id,
         eventType: "Comment",
-        changedBy: actorName,
+        changedBy: adminId?.trim() || actorName,
         comment: trimmedComment,
       });
     }
 
     for (const entry of historyEntries) {
-      await pb.collection("leadHistory").create(entry);
+      try {
+        await pb.collection("leadHistory").create(entry);
+      } catch (historyError) {
+        console.error(
+          "Lead history creation error:",
+          historyError instanceof Error
+            ? historyError.message
+            : String(historyError),
+        );
+      }
     }
 
     return NextResponse.json({
