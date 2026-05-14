@@ -236,7 +236,7 @@ export default function CounselorPage() {
     return [normalizedCurrentStatus, ...statusFlow.slice(currentIndex + 1)];
   };
 
-  const getDefaultModalStatus = (currentStatus: string) => {
+  const getDefaultModalStatus = useCallback((currentStatus: string) => {
     const normalizedCurrentStatus = normalizeLeadStatus(currentStatus);
 
     if (normalizedCurrentStatus === "New") {
@@ -244,7 +244,7 @@ export default function CounselorPage() {
     }
 
     return normalizedCurrentStatus;
-  };
+  }, []);
 
   const getFollowupStatus = (dateStr: string, isCompleted: boolean) => {
     if (!dateStr) return null;
@@ -510,7 +510,7 @@ export default function CounselorPage() {
         // No loading state needed here yet.
       }
     },
-    [],
+    [getDefaultModalStatus],
   );
 
   useEffect(() => {
@@ -1979,11 +1979,9 @@ export default function CounselorPage() {
                             authUser?.role === "admin" ||
                             pb.authStore.model?.role === "admin";
                           const isCounselorModifyingExisting =
-                            !isAdmin &&
-                            followup.savedDate &&
-                            followup.savedDate !== "";
+                            !isAdmin && Boolean(followup.savedDate);
                           const isDisabled =
-                            (followup as any).requiresPrevious ||
+                            Boolean(followup.requiresPrevious) ||
                             isCounselorModifyingExisting;
 
                           // Check if date has been saved to the database

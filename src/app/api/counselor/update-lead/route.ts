@@ -71,17 +71,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Unable to verify user role" },
         { status: 403 },
-          // Prevent any updates to Registered or Lost leads for non-admins
-          if (
-            (oldStatus === "Registered" || oldStatus === "Lost") &&
-            !isAdmin
-          ) {
-            return NextResponse.json(
-              { error: "Cannot update Registered or Lost leads" },
-              { status: 403 },
-            );
-          }
+      );
+    }
 
+    // Prevent any updates to Registered or Lost leads for non-admins
+    if ((oldStatus === "Registered" || oldStatus === "Lost") && !isAdmin) {
+      return NextResponse.json(
+        { error: "Cannot update Registered or Lost leads" },
+        { status: 403 },
       );
     }
 
@@ -90,18 +87,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Invalid status value provided" },
         { status: 400 },
-      );
-    }
-
-    // Prevent changing status for terminal states (but allow comments)
-    if (
-      (oldStatus === "Registered" || oldStatus === "Lost") &&
-      normalizedNewStatus !== oldStatus &&
-      !isAdmin
-    ) {
-      return NextResponse.json(
-        { error: "Cannot change status of Registered or Lost leads" },
-        { status: 403 },
       );
     }
 
