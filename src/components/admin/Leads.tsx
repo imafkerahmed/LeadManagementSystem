@@ -207,6 +207,20 @@ function formatLeadId(sequence: number): string {
   return `AMZ/LEAD/${String(sequence).padStart(4, "0")}`;
 }
 
+function toDateInputValue(value?: string): string {
+  if (!value) return "";
+  try {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  } catch {
+    return "";
+  }
+}
+
 export default function AdminLeads() {
   const authModel = createPocketBaseClient().authStore.model as {
     name?: string;
@@ -323,11 +337,17 @@ export default function AdminLeads() {
           "",
         assignedToName: assignedName,
         comments: record.latestComment || "",
-        followup1Date: record.followup1Date || "",
+        followup1Date: record.followup1Date
+          ? toDateInputValue(record.followup1Date)
+          : "",
         followup1Completed: record.followup1Completed || false,
-        followup2Date: record.followup2Date || "",
+        followup2Date: record.followup2Date
+          ? toDateInputValue(record.followup2Date)
+          : "",
         followup2Completed: record.followup2Completed || false,
-        followup3Date: record.followup3Date || "",
+        followup3Date: record.followup3Date
+          ? toDateInputValue(record.followup3Date)
+          : "",
         followup3Completed: record.followup3Completed || false,
       };
     },
@@ -922,6 +942,49 @@ export default function AdminLeads() {
           : "";
       }
 
+      // Follow-up fields: enforce same non-admin restrictions as individual save
+      const userRole = pb.authStore.model?.role;
+      const isAdminUser = userRole === "admin";
+
+      if (!isAdminUser) {
+        if (
+          selectedLead.followup1Date &&
+          selectedLead.followup1Date !== followup1Date
+        ) {
+          toast.error("Cannot modify existing follow-up dates. Contact admin.");
+          return;
+        }
+        if (
+          selectedLead.followup2Date &&
+          selectedLead.followup2Date !== followup2Date
+        ) {
+          toast.error("Cannot modify existing follow-up dates. Contact admin.");
+          return;
+        }
+        if (
+          selectedLead.followup3Date &&
+          selectedLead.followup3Date !== followup3Date
+        ) {
+          toast.error("Cannot modify existing follow-up dates. Contact admin.");
+          return;
+        }
+      }
+
+      if ((selectedLead.followup1Date || "") !== (followup1Date || "")) {
+        payload.followup1Date = followup1Date || null;
+      }
+      payload.followup1Completed = followup1Completed;
+
+      if ((selectedLead.followup2Date || "") !== (followup2Date || "")) {
+        payload.followup2Date = followup2Date || null;
+      }
+      payload.followup2Completed = followup2Completed;
+
+      if ((selectedLead.followup3Date || "") !== (followup3Date || "")) {
+        payload.followup3Date = followup3Date || null;
+      }
+      payload.followup3Completed = followup3Completed;
+
       await pb.collection("leads").update(selectedLead.id, payload);
 
       if (statusChanged) {
@@ -983,6 +1046,45 @@ export default function AdminLeads() {
         });
       }
 
+      // Create history entries for any follow-up date changes
+      const now = new Date().toISOString();
+
+      if ((selectedLead.followup1Date || "") !== (followup1Date || "")) {
+        await pb.collection("leadHistory").create({
+          timeStamp: now,
+          leadId: selectedLead.id,
+          eventType: "Follow-up Scheduled",
+          changedBy: pb.authStore.model?.id || "",
+          oldValue: selectedLead.followup1Date || "Not set",
+          newValue: followup1Date || "Cleared",
+          field: "followup1Date",
+        });
+      }
+
+      if ((selectedLead.followup2Date || "") !== (followup2Date || "")) {
+        await pb.collection("leadHistory").create({
+          timeStamp: now,
+          leadId: selectedLead.id,
+          eventType: "Follow-up Scheduled",
+          changedBy: pb.authStore.model?.id || "",
+          oldValue: selectedLead.followup2Date || "Not set",
+          newValue: followup2Date || "Cleared",
+          field: "followup2Date",
+        });
+      }
+
+      if ((selectedLead.followup3Date || "") !== (followup3Date || "")) {
+        await pb.collection("leadHistory").create({
+          timeStamp: now,
+          leadId: selectedLead.id,
+          eventType: "Follow-up Scheduled",
+          changedBy: pb.authStore.model?.id || "",
+          oldValue: selectedLead.followup3Date || "Not set",
+          newValue: followup3Date || "Cleared",
+          field: "followup3Date",
+        });
+      }
+
       await fetchLeads(page);
       const updated = await pb.collection("leads").getOne(selectedLead.id, {
         expand: "assignedTo",
@@ -1009,8 +1111,17 @@ export default function AdminLeads() {
   ): string | null => {
     if (!dateStr) return null;
     if (isCompleted) return "completed";
-
-    const date = new Date(dateStr);
+    let date: Date;
+    // Prefer parsing YYYY-MM-DD as local date to avoid timezone shifts
+    const isoDateMatch = (dateStr || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (isoDateMatch) {
+      const y = Number(isoDateMatch[1]);
+      const m = Number(isoDateMatch[2]);
+      const d = Number(isoDateMatch[3]);
+      date = new Date(y, m - 1, d);
+    } else {
+      date = new Date(dateStr);
+    }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     date.setHours(0, 0, 0, 0);
@@ -1039,6 +1150,39 @@ export default function AdminLeads() {
       default:
         return "bg-gray-100 text-gray-800 border border-gray-300";
     }
+  };
+
+  const formatFollowupDateOnly = (value?: string) => {
+    if (!value) return "";
+    try {
+      return new Intl.DateTimeFormat("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      }).format(new Date(value));
+    } catch {
+      return value;
+    }
+  };
+
+  const getNextFollowup = (lead: Lead) => {
+    const candidates: Array<{ date?: string; completed?: boolean }> = [
+      { date: lead.followup1Date, completed: lead.followup1Completed },
+      { date: lead.followup2Date, completed: lead.followup2Completed },
+      { date: lead.followup3Date, completed: lead.followup3Completed },
+    ].filter((c) => c.date && c.date.trim());
+
+    if (candidates.length === 0) return null;
+
+    candidates.sort((a, b) => {
+      const da = new Date(a.date || 0).getTime();
+      const db = new Date(b.date || 0).getTime();
+      return da - db;
+    });
+
+    const notCompleted = candidates.find((c) => !c.completed && c.date);
+    const chosen = notCompleted || candidates[0];
+    return chosen;
   };
 
   const handleSaveFollowups = async () => {
@@ -1351,8 +1495,9 @@ export default function AdminLeads() {
               {[...Array(6)].map((_, index) => (
                 <div
                   key={`lead-loader-${index}`}
-                  className="grid grid-cols-7 gap-4 rounded-md border border-gray-100 px-4 py-3"
+                  className="grid grid-cols-8 gap-4 rounded-md border border-gray-100 px-4 py-3"
                 >
+                  <div className="h-4 animate-pulse rounded bg-gray-200" />
                   <div className="h-4 animate-pulse rounded bg-gray-200" />
                   <div className="h-4 animate-pulse rounded bg-gray-200" />
                   <div className="h-4 animate-pulse rounded bg-gray-200" />
@@ -1400,6 +1545,9 @@ export default function AdminLeads() {
                   Course
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                  Next Follow-up
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
@@ -1428,6 +1576,21 @@ export default function AdminLeads() {
                   </td>
                   <td className="px-6 py-3 text-sm text-gray-600">
                     {lead.course}
+                  </td>
+                  <td className="px-6 py-3 text-sm">
+                    {(() => {
+                      const nf = getNextFollowup(lead);
+                      if (!nf || !nf.date)
+                        return <span className="text-sm text-gray-400">-</span>;
+                      const status = getFollowupStatus(nf.date, nf.completed);
+                      return (
+                        <span
+                          className={`inline-block px-2 py-1 rounded text-xs font-medium ${getFollowupStatusColor(status)}`}
+                        >
+                          {formatFollowupDateOnly(nf.date)}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="px-6 py-3">
                     <span
@@ -2013,13 +2176,7 @@ export default function AdminLeads() {
                               )}
                             </div>
 
-                            <button
-                              onClick={handleSaveFollowups}
-                              disabled={isSaving}
-                              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm disabled:opacity-50"
-                            >
-                              {isSaving ? "Saving..." : "Save Follow-ups"}
-                            </button>
+                            {/* Follow-ups are saved as part of the main Update action */}
                           </div>
                         </div>
                       )}

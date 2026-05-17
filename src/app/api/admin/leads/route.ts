@@ -134,6 +134,12 @@ export async function GET(request: NextRequest) {
         lead.assignedTo ||
         "",
       comments: lead.comments,
+      followup1Date: (lead as any).followup1Date || null,
+      followup1Completed: (lead as any).followup1Completed || false,
+      followup2Date: (lead as any).followup2Date || null,
+      followup2Completed: (lead as any).followup2Completed || false,
+      followup3Date: (lead as any).followup3Date || null,
+      followup3Completed: (lead as any).followup3Completed || false,
       created: lead.created,
       updated: lead.updated,
     }));
