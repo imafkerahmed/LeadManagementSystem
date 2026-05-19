@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
     const statusFilter = request.nextUrl.searchParams.get("status");
     const counselorFilter = request.nextUrl.searchParams.get("counselor");
     const searchTerm = request.nextUrl.searchParams.get("search");
+    const loadAll = request.nextUrl.searchParams.get("all") === "1";
     const page = request.nextUrl.searchParams.get("page") || "1";
     const limit = request.nextUrl.searchParams.get("limit") || "50";
 
@@ -98,14 +99,21 @@ export async function GET(request: NextRequest) {
       filter = filters.join(" && ");
     }
 
-    const leads = await pb
-      .collection("leads")
-      .getList(parseInt(page), parseInt(limit), {
-        filter,
-        sort: "-created",
-      });
+    const leadsResult = loadAll
+      ? await pb.collection("leads").getFullList({
+          filter,
+          sort: "-created",
+        })
+      : await pb.collection("leads").getList(parseInt(page), parseInt(limit), {
+          filter,
+          sort: "-created",
+        });
 
-    const formattedLeads = leads.items.map((lead: LeadRecord) => ({
+    const leadItems = Array.isArray(leadsResult)
+      ? leadsResult
+      : leadsResult.items;
+
+    const formattedLeads = leadItems.map((lead: LeadRecord) => ({
       id: lead.id,
       leadId: lead.leadId,
       studentName: lead.studentName,
@@ -146,10 +154,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       items: formattedLeads,
-      page: leads.page,
-      perPage: leads.perPage,
-      totalItems: leads.totalItems,
-      totalPages: leads.totalPages,
+      page: loadAll ? 1 : leadsResult.page,
+      perPage: loadAll ? formattedLeads.length : leadsResult.perPage,
+      totalItems: loadAll ? formattedLeads.length : leadsResult.totalItems,
+      totalPages: loadAll ? 1 : leadsResult.totalPages,
     });
   } catch (error) {
     // Handle abort errors gracefully - these are expected when client cancels

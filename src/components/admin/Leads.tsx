@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { type DateRange } from "react-day-picker";
 import {
   Search,
   Plus,
@@ -17,6 +18,7 @@ import {
   getLeadSourceDetailLabel,
   shouldShowLeadSourceDetail,
 } from "@/lib/lead-sources";
+import { DatePickerWithRange } from "@/components/ui/date-picker-range";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -52,6 +54,7 @@ interface Lead {
   followup2Completed?: boolean;
   followup3Date?: string;
   followup3Completed?: boolean;
+  created?: string;
 }
 
 interface TimelineEntry {
@@ -96,6 +99,7 @@ type LeadRecord = {
   followup2Completed?: boolean;
   followup3Date?: string;
   followup3Completed?: boolean;
+  created?: string;
   expand?: {
     assignedTo?: {
       id?: string;
@@ -221,6 +225,36 @@ function toDateInputValue(value?: string): string {
   }
 }
 
+function dateStringToDate(dateStr: string): Date | null {
+  if (!dateStr) return null;
+  const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) {
+    const y = Number(match[1]);
+    const m = Number(match[2]);
+    const d = Number(match[3]);
+    return new Date(y, m - 1, d, 0, 0, 0, 0);
+  }
+  return null;
+}
+
+function isDateInRange(
+  dateStr: string | undefined,
+  range: DateRange | undefined,
+): boolean {
+  if (!dateStr || !range) return false;
+
+  const date = dateStringToDate(dateStr);
+  if (!date || !range.from) return false;
+
+  if (date < range.from) return false;
+  if (range.to) {
+    const endOfTo = new Date(range.to);
+    endOfTo.setDate(endOfTo.getDate() + 1);
+    if (date >= endOfTo) return false;
+  }
+  return true;
+}
+
 export default function AdminLeads() {
   const authModel = createPocketBaseClient().authStore.model as {
     name?: string;
@@ -238,6 +272,10 @@ export default function AdminLeads() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [counselorFilter, setCounselorFilter] = useState("");
+  const [dateFilterField, setDateFilterField] = useState("created"); // "nextFollowup" or "created"
+  const [dateFilterRange, setDateFilterRange] = useState<
+    DateRange | undefined
+  >();
   const [counselors, setCounselors] = useState<
     Array<{ id: string; name: string; role?: string }>
   >([]);
@@ -349,6 +387,7 @@ export default function AdminLeads() {
           ? toDateInputValue(record.followup3Date)
           : "",
         followup3Completed: record.followup3Completed || false,
+        created: record.created ? toDateInputValue(record.created) : "",
       };
     },
     [usersLookup],
@@ -726,20 +765,148 @@ export default function AdminLeads() {
     [statusFilter, counselorFilter, searchTerm, mapLead],
   );
 
-  // When any filter/search changes, reload the first page of results
+  const fetchAllLeads = useCallback(async () => {
+    setIsLoading(true);
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
+    try {
+      const params = new URLSearchParams({
+        all: "1",
+      });
+
+      if (statusFilter) params.set("status", statusFilter);
+      if (counselorFilter) params.set("counselor", counselorFilter);
+      if (searchTerm) params.set("search", searchTerm);
+
+      const response = await fetch(`/api/admin/leads?${params.toString()}`, {
+        signal: abortControllerRef.current.signal,
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(
+          errorBody?.error || `Failed to fetch leads: HTTP ${response.status}`,
+        );
+      }
+
+      const list = (await response.json()) as {
+        items?: LeadRecord[];
+        page?: number;
+        totalPages?: number;
+        totalItems?: number;
+      };
+
+      const rawItems = (list.items || []) as LeadRecord[];
+      const items: Lead[] = rawItems.map((record) => mapLead(record));
+
+      const seen = new Set<string>();
+      const dedupItems = items.filter((lead) => {
+        if (seen.has(lead.id)) return false;
+        seen.add(lead.id);
+        return true;
+      });
+
+      setLeads(dedupItems);
+      setFilteredLeads(dedupItems);
+      setTotalPages(Math.max(1, Math.ceil(dedupItems.length / PAGE_SIZE)));
+      setPage(1);
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        // Request was cancelled, don't show error
+      } else if (error instanceof Error && error.message.includes("aborted")) {
+        // Request was cancelled, don't show error
+      } else {
+        console.error(
+          "Error fetching leads:",
+          error instanceof Error ? error.message : String(error),
+        );
+        setLeads([]);
+        setFilteredLeads([]);
+        setTotalPages(1);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [statusFilter, counselorFilter, searchTerm, mapLead]);
+
+  // When any filter/search changes, reload the appropriate dataset.
   useEffect(() => {
-    // call asynchronously to avoid synchronous setState inside effect
+    if (dateFilterRange) {
+      setTimeout(() => {
+        void fetchAllLeads();
+      }, 0);
+      return;
+    }
+
+    if (page !== 1) {
+      setPage(1);
+      return;
+    }
+
     setTimeout(() => {
       void fetchLeads(1);
     }, 0);
-  }, [statusFilter, counselorFilter, searchTerm, fetchLeads]);
+  }, [
+    statusFilter,
+    counselorFilter,
+    searchTerm,
+    dateFilterRange,
+    fetchLeads,
+    fetchAllLeads,
+  ]);
 
   useEffect(() => {
-    // call asynchronously to avoid synchronous setState inside effect
+    if (dateFilterRange) {
+      return;
+    }
+
     setTimeout(() => {
       void fetchLeads(page);
     }, 0);
-  }, [page, fetchLeads]);
+  }, [page, dateFilterRange, fetchLeads]);
+
+  // Apply date filtering and sorting
+  useEffect(() => {
+    if (!leads.length) {
+      setFilteredLeads([]);
+      if (dateFilterRange) {
+        setTotalPages(1);
+      }
+      return;
+    }
+
+    const sourceLeads = [...leads];
+    let filtered = sourceLeads;
+
+    // Apply date filter
+    if (dateFilterRange) {
+      filtered = filtered.filter((lead) => {
+        const dateField =
+          dateFilterField === "created"
+            ? lead.created
+            : getNextFollowup(lead)?.date;
+        return isDateInRange(dateField, dateFilterRange);
+      });
+    }
+
+    if (dateFilterRange) {
+      const nextFiltered =
+        dateFilterField === "nextFollowup"
+          ? sortLeadsByNextFollowup(filtered)
+          : filtered;
+
+      setFilteredLeads(nextFiltered);
+      setTotalPages(Math.max(1, Math.ceil(nextFiltered.length / PAGE_SIZE)));
+      return;
+    }
+
+    // Keep the default view sorted by next follow-up.
+    setFilteredLeads(sortLeadsByNextFollowup(filtered));
+  }, [leads, dateFilterField, dateFilterRange]);
 
   // Cleanup: cancel pending requests when component unmounts
   useEffect(() => {
@@ -750,7 +917,10 @@ export default function AdminLeads() {
     };
   }, []);
 
-  const showAnimatedEmptyState = !isLoading && filteredLeads.length === 0;
+  const visibleLeads = dateFilterRange
+    ? filteredLeads.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+    : filteredLeads;
+  const showAnimatedEmptyState = !isLoading && visibleLeads.length === 0;
 
   useEffect(() => {
     const timer = window.setTimeout(
@@ -1185,6 +1355,24 @@ export default function AdminLeads() {
     return chosen;
   };
 
+  const sortLeadsByNextFollowup = (leadsToSort: Lead[]): Lead[] => {
+    return leadsToSort.sort((a, b) => {
+      const nfA = getNextFollowup(a);
+      const nfB = getNextFollowup(b);
+
+      // No follow-up dates go to the end
+      if (!nfA && !nfB) return 0;
+      if (!nfA) return 1;
+      if (!nfB) return -1;
+
+      // Compare dates
+      const dateA = dateStringToDate(nfA.date || "");
+      const dateB = dateStringToDate(nfB.date || "");
+      if (!dateA || !dateB) return 0;
+      return dateA.getTime() - dateB.getTime();
+    });
+  };
+
   const handleSaveFollowups = async () => {
     if (!selectedLead) return;
 
@@ -1431,56 +1619,81 @@ export default function AdminLeads() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Top Bar with Search & New Button */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 flex-1">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Name, mobile, email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Name, mobile, email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <button
+          onClick={() => openSidebarFor(null, "new")}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap"
+        >
+          <Plus className="w-4 h-4" />
+          New Lead
+        </button>
+      </div>
+
+      {/* Filters Row */}
+      <div className="flex flex-wrap gap-2">
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+        >
+          <option value="">All Statuses</option>
+          {statuses.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={counselorFilter}
+          onChange={(e) => setCounselorFilter(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+        >
+          <option value="">All Counselors</option>
+          {counselors.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+
+        {/* Date Filter */}
+        <select
+          value={dateFilterField}
+          onChange={(e) => setDateFilterField(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+        >
+          <option value="nextFollowup">Filter by Next Follow-up</option>
+          <option value="created">Filter by Created Date</option>
+        </select>
+
+        <DatePickerWithRange
+          value={dateFilterRange}
+          onValueChange={setDateFilterRange}
+        />
+
+        {dateFilterRange && (
           <button
-            onClick={() => openSidebarFor(null, "new")}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            onClick={() => {
+              setDateFilterRange(undefined);
+            }}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-100"
           >
-            <Plus className="w-4 h-4" />
-            New Lead
+            Clear Filter
           </button>
-        </div>
-
-        <div className="flex gap-2">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-          >
-            <option value="">All Statuses</option>
-            {statuses.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={counselorFilter}
-            onChange={(e) => setCounselorFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-          >
-            <option value="">All Counselors</option>
-            {counselors.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        )}
       </div>
 
       {/* Leads Table */}
@@ -1509,7 +1722,7 @@ export default function AdminLeads() {
               ))}
             </div>
           </div>
-        ) : filteredLeads.length === 0 ? (
+        ) : visibleLeads.length === 0 ? (
           <div className="p-10">
             <div className="mx-auto flex max-w-sm flex-col items-center justify-center gap-3 text-gray-500">
               {showNoLeadsText ? (
@@ -1559,7 +1772,7 @@ export default function AdminLeads() {
               </tr>
             </thead>
             <tbody>
-              {filteredLeads.map((lead) => (
+              {visibleLeads.map((lead) => (
                 <tr
                   key={lead.id}
                   className="border-b border-gray-100 hover:bg-gray-50 transition"
@@ -1620,7 +1833,8 @@ export default function AdminLeads() {
       {/* Pagination */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-gray-600">
-          Page {page} of {totalPages} ({leads.length} leads)
+          Page {page} of {totalPages} (
+          {dateFilterRange ? filteredLeads.length : leads.length} leads)
         </div>
         <div className="flex gap-2">
           <button
