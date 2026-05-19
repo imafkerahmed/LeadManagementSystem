@@ -255,6 +255,41 @@ function isDateInRange(
   return true;
 }
 
+function getNextFollowup(lead: Lead) {
+  const candidates: Array<{ date?: string; completed?: boolean }> = [
+    { date: lead.followup1Date, completed: lead.followup1Completed },
+    { date: lead.followup2Date, completed: lead.followup2Completed },
+    { date: lead.followup3Date, completed: lead.followup3Completed },
+  ].filter((c) => c.date && c.date.trim());
+
+  if (candidates.length === 0) return null;
+
+  candidates.sort((a, b) => {
+    const da = new Date(a.date || 0).getTime();
+    const db = new Date(b.date || 0).getTime();
+    return da - db;
+  });
+
+  const notCompleted = candidates.find((c) => !c.completed && c.date);
+  return notCompleted || candidates[0];
+}
+
+function sortLeadsByNextFollowup(leadsToSort: Lead[]): Lead[] {
+  return leadsToSort.sort((a, b) => {
+    const nfA = getNextFollowup(a);
+    const nfB = getNextFollowup(b);
+
+    if (!nfA && !nfB) return 0;
+    if (!nfA) return 1;
+    if (!nfB) return -1;
+
+    const dateA = dateStringToDate(nfA.date || "");
+    const dateB = dateStringToDate(nfB.date || "");
+    if (!dateA || !dateB) return 0;
+    return dateA.getTime() - dateB.getTime();
+  });
+}
+
 export default function AdminLeads() {
   const authModel = createPocketBaseClient().authStore.model as {
     name?: string;
@@ -843,7 +878,9 @@ export default function AdminLeads() {
     }
 
     if (page !== 1) {
-      setPage(1);
+      setTimeout(() => {
+        setPage(1);
+      }, 0);
       return;
     }
 
@@ -855,6 +892,7 @@ export default function AdminLeads() {
     counselorFilter,
     searchTerm,
     dateFilterRange,
+    page,
     fetchLeads,
     fetchAllLeads,
   ]);
@@ -872,10 +910,12 @@ export default function AdminLeads() {
   // Apply date filtering and sorting
   useEffect(() => {
     if (!leads.length) {
-      setFilteredLeads([]);
-      if (dateFilterRange) {
-        setTotalPages(1);
-      }
+      setTimeout(() => {
+        setFilteredLeads([]);
+        if (dateFilterRange) {
+          setTotalPages(1);
+        }
+      }, 0);
       return;
     }
 
@@ -899,13 +939,17 @@ export default function AdminLeads() {
           ? sortLeadsByNextFollowup(filtered)
           : filtered;
 
-      setFilteredLeads(nextFiltered);
-      setTotalPages(Math.max(1, Math.ceil(nextFiltered.length / PAGE_SIZE)));
+      setTimeout(() => {
+        setFilteredLeads(nextFiltered);
+        setTotalPages(Math.max(1, Math.ceil(nextFiltered.length / PAGE_SIZE)));
+      }, 0);
       return;
     }
 
     // Keep the default view sorted by next follow-up.
-    setFilteredLeads(sortLeadsByNextFollowup(filtered));
+    setTimeout(() => {
+      setFilteredLeads(sortLeadsByNextFollowup(filtered));
+    }, 0);
   }, [leads, dateFilterField, dateFilterRange]);
 
   // Cleanup: cancel pending requests when component unmounts
@@ -1332,150 +1376,6 @@ export default function AdminLeads() {
       }).format(new Date(value));
     } catch {
       return value;
-    }
-  };
-
-  const getNextFollowup = (lead: Lead) => {
-    const candidates: Array<{ date?: string; completed?: boolean }> = [
-      { date: lead.followup1Date, completed: lead.followup1Completed },
-      { date: lead.followup2Date, completed: lead.followup2Completed },
-      { date: lead.followup3Date, completed: lead.followup3Completed },
-    ].filter((c) => c.date && c.date.trim());
-
-    if (candidates.length === 0) return null;
-
-    candidates.sort((a, b) => {
-      const da = new Date(a.date || 0).getTime();
-      const db = new Date(b.date || 0).getTime();
-      return da - db;
-    });
-
-    const notCompleted = candidates.find((c) => !c.completed && c.date);
-    const chosen = notCompleted || candidates[0];
-    return chosen;
-  };
-
-  const sortLeadsByNextFollowup = (leadsToSort: Lead[]): Lead[] => {
-    return leadsToSort.sort((a, b) => {
-      const nfA = getNextFollowup(a);
-      const nfB = getNextFollowup(b);
-
-      // No follow-up dates go to the end
-      if (!nfA && !nfB) return 0;
-      if (!nfA) return 1;
-      if (!nfB) return -1;
-
-      // Compare dates
-      const dateA = dateStringToDate(nfA.date || "");
-      const dateB = dateStringToDate(nfB.date || "");
-      if (!dateA || !dateB) return 0;
-      return dateA.getTime() - dateB.getTime();
-    });
-  };
-
-  const handleSaveFollowups = async () => {
-    if (!selectedLead) return;
-
-    try {
-      setIsSaving(true);
-      const pb = createPocketBaseClient();
-
-      // Check if user is admin
-      const userRole = pb.authStore.model?.role;
-      const isAdmin = userRole === "admin";
-
-      // Non-admins can only set dates that are currently empty
-      if (!isAdmin) {
-        if (
-          selectedLead.followup1Date &&
-          selectedLead.followup1Date !== followup1Date
-        ) {
-          toast.error("Cannot modify existing follow-up dates. Contact admin.");
-          return;
-        }
-        if (
-          selectedLead.followup2Date &&
-          selectedLead.followup2Date !== followup2Date
-        ) {
-          toast.error("Cannot modify existing follow-up dates. Contact admin.");
-          return;
-        }
-        if (
-          selectedLead.followup3Date &&
-          selectedLead.followup3Date !== followup3Date
-        ) {
-          toast.error("Cannot modify existing follow-up dates. Contact admin.");
-          return;
-        }
-      }
-
-      const updateData: Record<string, unknown> = {
-        followup1Date: followup1Date || null,
-        followup1Completed: followup1Completed,
-        followup2Date: followup2Date || null,
-        followup2Completed: followup2Completed,
-        followup3Date: followup3Date || null,
-        followup3Completed: followup3Completed,
-      };
-
-      await pb.collection("leads").update(selectedLead.id, updateData);
-
-      // Create history entries for follow-up changes
-      const now = new Date().toISOString();
-      const changes = [];
-
-      // Check follow-up 1
-      if ((selectedLead.followup1Date || "") !== followup1Date) {
-        changes.push({
-          leadId: selectedLead.id,
-          eventType: "Follow-up Scheduled",
-          changedBy: pb.authStore.model?.id || "",
-          oldValue: selectedLead.followup1Date || "Not set",
-          newValue: followup1Date || "Cleared",
-          field: "followup1Date",
-          created: now,
-        });
-      }
-
-      // Check follow-up 2
-      if ((selectedLead.followup2Date || "") !== followup2Date) {
-        changes.push({
-          leadId: selectedLead.id,
-          eventType: "Follow-up Scheduled",
-          changedBy: pb.authStore.model?.id || "",
-          oldValue: selectedLead.followup2Date || "Not set",
-          newValue: followup2Date || "Cleared",
-          field: "followup2Date",
-          created: now,
-        });
-      }
-
-      // Check follow-up 3
-      if ((selectedLead.followup3Date || "") !== followup3Date) {
-        changes.push({
-          leadId: selectedLead.id,
-          eventType: "Follow-up Scheduled",
-          changedBy: pb.authStore.model?.id || "",
-          oldValue: selectedLead.followup3Date || "Not set",
-          newValue: followup3Date || "Cleared",
-          field: "followup3Date",
-          created: now,
-        });
-      }
-
-      // Record changes in history
-      for (const entry of changes) {
-        await pb.collection("leadHistory").create(entry);
-      }
-
-      toast.success("Follow-ups updated");
-      await openSidebarFor(selectedLead);
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to update follow-ups",
-      );
-    } finally {
-      setIsSaving(false);
     }
   };
 

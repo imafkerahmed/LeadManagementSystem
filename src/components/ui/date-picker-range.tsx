@@ -23,14 +23,7 @@ export function DatePickerWithRange({
   value,
   onValueChange,
 }: DatePickerWithRangeProps) {
-  const [date, setDate] = React.useState<DateRange | undefined>(value);
-
-  React.useEffect(() => {
-    setDate(value);
-  }, [value]);
-
   const handleSelect = (newDate: DateRange | undefined) => {
-    setDate(newDate);
     onValueChange?.(newDate);
   };
 
@@ -42,18 +35,18 @@ export function DatePickerWithRange({
             variant="outline"
             className={cn(
               "min-w-[320px] justify-start text-left font-normal",
-              !date && "text-muted-foreground",
+              !value && "text-muted-foreground",
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
-            {date?.from ? (
-              date.to ? (
+            {value?.from ? (
+              value.to ? (
                 <>
-                  {format(date.from, "LLL dd, y")} -{" "}
-                  {format(date.to, "LLL dd, y")}
+                  {format(value.from, "LLL dd, y")} -{" "}
+                  {format(value.to, "LLL dd, y")}
                 </>
               ) : (
-                format(date.from, "LLL dd, y")
+                format(value.from, "LLL dd, y")
               )
             ) : (
               <span>Pick a date range</span>
@@ -68,8 +61,8 @@ export function DatePickerWithRange({
       >
         <Calendar
           mode="range"
-          defaultMonth={date?.from}
-          selected={date}
+          defaultMonth={value?.from}
+          selected={value}
           onSelect={handleSelect}
           numberOfMonths={2}
           className="rounded-lg [--cell-radius:var(--radius-lg)] [--cell-size:--spacing(9)]"

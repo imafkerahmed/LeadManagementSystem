@@ -20,6 +20,12 @@ type LeadRecord = {
   created?: string;
   updated?: string;
   assignedTo?: string;
+  followup1Date?: string;
+  followup1Completed?: boolean;
+  followup2Date?: string;
+  followup2Completed?: boolean;
+  followup3Date?: string;
+  followup3Completed?: boolean;
 };
 
 function normalizeLeadStatus(value: string | undefined): string {
@@ -36,6 +42,24 @@ function normalizeLeadStatus(value: string | undefined): string {
 
 function escapeFilterValue(value: string) {
   return value.replace(/"/g, '\\"');
+}
+
+function getNextFollowup(lead: LeadRecord) {
+  const candidates: Array<{ date?: string; completed?: boolean }> = [
+    { date: lead.followup1Date, completed: lead.followup1Completed },
+    { date: lead.followup2Date, completed: lead.followup2Completed },
+    { date: lead.followup3Date, completed: lead.followup3Completed },
+  ].filter((candidate) => candidate.date && candidate.date.trim());
+
+  if (candidates.length === 0) return null;
+
+  candidates.sort((a, b) => {
+    const dateA = new Date(a.date || 0).getTime();
+    const dateB = new Date(b.date || 0).getTime();
+    return dateA - dateB;
+  });
+
+  return candidates.find((candidate) => !candidate.completed) || null;
 }
 
 function decodeJWT(token: string): Record<string, unknown> | null {
@@ -116,6 +140,8 @@ export async function GET(request: NextRequest) {
       created: lead.created || "",
       updated: lead.updated || lead.created || "",
       assignedTo: lead.assignedTo || counselorId || "",
+      nextFollowupDate: getNextFollowup(lead)?.date || "",
+      nextFollowupCompleted: getNextFollowup(lead)?.completed || false,
     }));
 
     return NextResponse.json(formattedLeads);

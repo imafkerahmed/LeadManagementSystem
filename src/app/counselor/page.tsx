@@ -40,6 +40,8 @@ interface Lead {
   followup2Completed?: boolean;
   followup3Date?: string;
   followup3Completed?: boolean;
+  nextFollowupDate?: string;
+  nextFollowupCompleted?: boolean;
 }
 
 interface HistoryEntry {
@@ -77,6 +79,8 @@ type LeadRecord = {
   followup2Completed?: boolean;
   followup3Date?: string;
   followup3Completed?: boolean;
+  nextFollowupDate?: string;
+  nextFollowupCompleted?: boolean;
 };
 
 type HistoryRecord = {
@@ -266,16 +270,56 @@ export default function CounselorPage() {
     if (!status) return "";
     switch (status) {
       case "completed":
-        return "bg-green-100 text-green-700 border-green-300";
+        return "bg-green-100 text-green-800 border border-green-300";
       case "overdue":
-        return "bg-red-100 text-red-700 border-red-300";
+        return "bg-red-100 text-red-800 border border-red-300";
       case "today":
-        return "bg-yellow-100 text-yellow-700 border-yellow-300";
+        return "bg-yellow-100 text-yellow-800 border border-yellow-300";
       case "upcoming":
-        return "bg-orange-100 text-orange-700 border-orange-300";
+        return "bg-orange-100 text-orange-800 border border-orange-300";
+      case "scheduled":
+        return "bg-blue-100 text-blue-800 border border-blue-300";
       default:
-        return "bg-slate-100 text-slate-700 border-slate-300";
+        return "bg-gray-100 text-gray-800 border border-gray-300";
     }
+  };
+
+  const formatFollowupDateOnly = (value?: string) => {
+    if (!value) return "";
+
+    try {
+      return new Intl.DateTimeFormat("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      }).format(new Date(value));
+    } catch {
+      return value;
+    }
+  };
+
+  const getNextFollowup = (lead: Lead) => {
+    const candidates: Array<{ date?: string; completed?: boolean }> = [
+      { date: lead.followup1Date, completed: lead.followup1Completed },
+      { date: lead.followup2Date, completed: lead.followup2Completed },
+      { date: lead.followup3Date, completed: lead.followup3Completed },
+    ].filter((candidate) => candidate.date && candidate.date.trim());
+
+    if (candidates.length === 0) return null;
+
+    candidates.sort((a, b) => {
+      const dateA = new Date(a.date || 0).getTime();
+      const dateB = new Date(b.date || 0).getTime();
+      return dateA - dateB;
+    });
+
+    return candidates.find((candidate) => !candidate.completed) || null;
+  };
+
+  const getLeadNextFollowupDate = (lead: Lead) => {
+    return (
+      lead.nextFollowupDate?.trim() || getNextFollowup(lead)?.date?.trim() || ""
+    );
   };
 
   const formatDateForInput = (dateStr: string | undefined): string => {
@@ -477,6 +521,8 @@ export default function CounselorPage() {
           followup2Completed: lead.followup2Completed,
           followup3Date: lead.followup3Date,
           followup3Completed: lead.followup3Completed,
+          nextFollowupDate: lead.nextFollowupDate,
+          nextFollowupCompleted: lead.nextFollowupCompleted,
         }));
 
         setLeads(nextLeads);
@@ -988,14 +1034,28 @@ export default function CounselorPage() {
     );
   });
 
-  const totalPages = Math.max(1, Math.ceil(filteredLeads.length / PAGE_SIZE));
+  const displayedLeads =
+    statusFilter === "Follow-up"
+      ? [...filteredLeads].sort((a, b) => {
+          const dateA = getLeadNextFollowupDate(a);
+          const dateB = getLeadNextFollowupDate(b);
+
+          if (!dateA && !dateB) return 0;
+          if (!dateA) return 1;
+          if (!dateB) return -1;
+
+          return new Date(dateA).getTime() - new Date(dateB).getTime();
+        })
+      : filteredLeads;
+
+  const totalPages = Math.max(1, Math.ceil(displayedLeads.length / PAGE_SIZE));
   const currentPage = Math.min(tablePage, totalPages);
-  const paginatedLeads = filteredLeads.slice(
+  const paginatedLeads = displayedLeads.slice(
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE,
   );
 
-  const showAnimatedEmptyState = filteredLeads.length === 0;
+  const showAnimatedEmptyState = displayedLeads.length === 0;
 
   useEffect(() => {
     const timer = window.setTimeout(
@@ -1165,6 +1225,7 @@ export default function CounselorPage() {
                       <th className="px-4 py-3 font-medium">Lead</th>
                       <th className="px-4 py-3 font-medium">Mobile</th>
                       <th className="px-4 py-3 font-medium">Course</th>
+                      <th className="px-4 py-3 font-medium">Next Follow-up</th>
                       <th className="px-4 py-3 font-medium">Status</th>
                       <th className="px-4 py-3 font-medium">Updated</th>
                       <th className="px-4 py-3 font-medium">Action</th>
@@ -1189,6 +1250,39 @@ export default function CounselorPage() {
                         </td>
                         <td className="px-4 py-3 text-slate-700">
                           {lead.course}
+                        </td>
+                        <td className="px-4 py-3">
+                          {(() => {
+                            const nextFollowup =
+                              lead.nextFollowupDate &&
+                              lead.nextFollowupDate.trim()
+                                ? {
+                                    date: lead.nextFollowupDate,
+                                    completed:
+                                      lead.nextFollowupCompleted || false,
+                                  }
+                                : getNextFollowup(lead);
+                            if (!nextFollowup || !nextFollowup.date) {
+                              return (
+                                <span className="text-sm text-slate-400">
+                                  -
+                                </span>
+                              );
+                            }
+
+                            const followupStatus = getFollowupStatus(
+                              nextFollowup.date,
+                              nextFollowup.completed || false,
+                            );
+
+                            return (
+                              <span
+                                className={`inline-flex rounded px-2 py-1 text-xs font-medium ${getFollowupStatusColor(followupStatus)}`}
+                              >
+                                {formatFollowupDateOnly(nextFollowup.date)}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-3">
                           <span
