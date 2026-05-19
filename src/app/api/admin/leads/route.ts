@@ -152,12 +152,29 @@ export async function GET(request: NextRequest) {
       updated: lead.updated,
     }));
 
+    if (loadAll) {
+      return NextResponse.json({
+        items: formattedLeads,
+        page: 1,
+        perPage: formattedLeads.length,
+        totalItems: formattedLeads.length,
+        totalPages: 1,
+      });
+    }
+
+    const pagedLeads = leadsResult as {
+      page: number;
+      perPage: number;
+      totalItems: number;
+      totalPages: number;
+    };
+
     return NextResponse.json({
       items: formattedLeads,
-      page: loadAll ? 1 : leadsResult.page,
-      perPage: loadAll ? formattedLeads.length : leadsResult.perPage,
-      totalItems: loadAll ? formattedLeads.length : leadsResult.totalItems,
-      totalPages: loadAll ? 1 : leadsResult.totalPages,
+      page: pagedLeads.page,
+      perPage: pagedLeads.perPage,
+      totalItems: pagedLeads.totalItems,
+      totalPages: pagedLeads.totalPages,
     });
   } catch (error) {
     // Handle abort errors gracefully - these are expected when client cancels
