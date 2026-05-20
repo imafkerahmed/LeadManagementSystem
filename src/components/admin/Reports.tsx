@@ -60,6 +60,15 @@ interface PresetRange {
 
 const LEAD_STATUSES = ["New", "Contacted", "Follow-Up", "Registered", "Lost"];
 
+const STATUS_COLORS: Record<string, string> = {
+  New: "bg-blue-100 text-blue-800",
+  Contacted: "bg-yellow-100 text-yellow-800",
+  "Follow-Up": "bg-orange-100 text-orange-800",
+  "Follow-up": "bg-orange-100 text-orange-800",
+  Registered: "bg-green-100 text-green-800",
+  Lost: "bg-red-100 text-red-800",
+};
+
 const formatLocalDate = (date: Date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -472,10 +481,10 @@ export default function AdminReports() {
 
                 <div className="p-4 rounded-lg bg-muted/50 border border-border">
                   <div className="text-sm text-muted-foreground">
-                    Conversion Rate
+                    Enrollment Rate
                   </div>
                   <div className="text-2xl font-bold mt-1 text-green-600">
-                    {reportData.stats.conversionRate}%
+                    {reportData.stats.enrollmentRate}%
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
                     {reportData.stats.byStatus["Registered"] || 0} registered
@@ -599,7 +608,7 @@ export default function AdminReports() {
                             </td>
                             <td className="px-4 py-3">{lead.course}</td>
                             <td className="px-4 py-3">
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[lead.status] || "bg-gray-100 text-gray-800"}`}>
                                 {lead.status}
                               </span>
                             </td>

@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
     const statusFilter = request.nextUrl.searchParams.get("status");
     const counselorFilter = request.nextUrl.searchParams.get("counselor");
     const searchTerm = request.nextUrl.searchParams.get("search");
+    const followupFilter = request.nextUrl.searchParams.get("followupFilter");
     const loadAll = request.nextUrl.searchParams.get("all") === "1";
     const page = request.nextUrl.searchParams.get("page") || "1";
     const limit = request.nextUrl.searchParams.get("limit") || "50";
@@ -97,6 +98,17 @@ export async function GET(request: NextRequest) {
           `email ~ "${escapedSearch}" || ` +
           `course ~ "${escapedSearch}" || ` +
           `courseName ~ "${escapedSearch}"` +
+          `)`,
+      );
+    }
+
+    if (followupFilter === "due") {
+      const todayLimit = new Date().toISOString().split("T")[0] + " 23:59:59";
+      filters.push(
+        `(` +
+          `(followup1Date != null && followup1Date != "" && followup1Date <= "${todayLimit}" && followup1Completed != true) || ` +
+          `(followup2Date != null && followup2Date != "" && followup2Date <= "${todayLimit}" && followup2Completed != true) || ` +
+          `(followup3Date != null && followup3Date != "" && followup3Date <= "${todayLimit}" && followup3Completed != true)` +
           `)`,
       );
     }

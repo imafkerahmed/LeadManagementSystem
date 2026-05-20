@@ -118,7 +118,6 @@ export default function DailyReports() {
       Registered: report.statusRegistered,
       Lost: report.statusLost,
       "Overdue Follow-ups": report.overdueFollowups,
-      "Conversion Rate": `${report.conversionRate.toFixed(1)}%`,
     }));
 
   const handleExportXlsx = async () => {
@@ -327,9 +326,6 @@ export default function DailyReports() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider text-center">
                     Overdue Follow-ups
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider text-center">
-                    Conversion Rate
-                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -375,32 +371,12 @@ export default function DailyReports() {
                       <span
                         className={`inline-flex items-center justify-center w-8 h-8 rounded-full ${
                           report.overdueFollowups > 0
-                            ? "bg-red-100 text-red-800 font-semibold"
-                            : "bg-green-100 text-green-800"
+                             ? "bg-red-100 text-red-800 font-semibold"
+                             : "bg-green-100 text-green-800"
                         }`}
                       >
                         {report.overdueFollowups}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-center">
-                      <div className="flex items-center justify-center">
-                        <div className="flex items-center gap-1">
-                          <div className="w-16 bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-blue-500 h-2 rounded-full"
-                              style={{
-                                width: `${Math.min(
-                                  report.conversionRate,
-                                  100,
-                                )}%`,
-                              }}
-                            ></div>
-                          </div>
-                          <span className="text-sm font-semibold text-gray-700 min-w-[40px]">
-                            {report.conversionRate.toFixed(1)}%
-                          </span>
-                        </div>
-                      </div>
                     </td>
                   </tr>
                 ))}
@@ -431,18 +407,17 @@ export default function DailyReports() {
             this date
           </li>
           <li>
+            <strong>New:</strong> Leads created on this date that are still in New status (deducted if converted to a different status)
+          </li>
+          <li>
             <strong>
-              Status Columns (New, Contacted, Follow-Up, Registered, Lost):
+              Status Columns (Contacted, Follow-Up, Registered, Lost):
             </strong>{" "}
-            Current status distribution of all leads
+            Leads transitioned to these statuses on this date
           </li>
           <li>
             <strong>Overdue Follow-ups:</strong> Number of scheduled follow-ups
             past the due date and not yet completed (shown in red when present)
-          </li>
-          <li>
-            <strong>Conversion Rate:</strong> Percentage of today&apos;s new
-            leads that have been registered
           </li>
         </ul>
         <p className="mt-3 text-xs text-gray-600">

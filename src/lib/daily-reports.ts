@@ -71,7 +71,7 @@ export function aggregateDailyMetrics(
   // Count new leads per counselor
   const newLeadsByCounselor = new Map<string, number>();
 
-  // Count leads by status per counselor for today's activity
+  // Count leads by status per counselor across the dataset (for current status distribution)
   const statusCountsByCounselor = new Map<
     string,
     {
@@ -83,6 +83,18 @@ export function aggregateDailyMetrics(
     }
   >();
 
+  // Helper to normalize various status strings into the canonical keys used across the app
+  const normalizeStatus = (value?: string) => {
+    const v = (value || "").trim().toLowerCase();
+    if (v === "followup" || v === "follow-up" || v === "follow\-up")
+      return "Follow-Up";
+    if (v === "new") return "New";
+    if (v === "contacted") return "Contacted";
+    if (v === "registered") return "Registered";
+    if (v === "lost") return "Lost";
+    return (value || "").trim();
+  };
+
   leads.forEach((lead) => {
     if (lead.assignedTo) {
       activeCounselorIds.add(lead.assignedTo);
@@ -93,37 +105,77 @@ export function aggregateDailyMetrics(
         (newLeadsByCounselor.get(lead.assignedTo) || 0) + 1,
       );
 
-      // Initialize status counts for this counselor if not exists
-      if (!statusCountsByCounselor.has(lead.assignedTo)) {
-        statusCountsByCounselor.set(lead.assignedTo, {
-          New: 0,
-          Contacted: 0,
-          "Follow-Up": 0,
-          Registered: 0,
-          Lost: 0,
-        });
-      }
-
-      // Increment count for this lead's current status
-      const status = (lead.status || "New") as string;
-      const counts = statusCountsByCounselor.get(lead.assignedTo)!;
-      if (status in counts) {
-        counts[status as keyof typeof counts]++;
-      }
+      // (old logic counted statuses only for today's leads) --- keep newLeads count above
     }
   });
 
-  // Count all "New" status leads across the full dataset when available
-  const globalNewStatusByCounselor = new Map<string, number>();
-  const leadsForGlobalStatus = allLeadsForOverdue || leads;
+  // Find target date's end of day.
+  let endOfTargetDay = new Date().toISOString();
+  if (leads.length > 0 && leads[0].created) {
+    endOfTargetDay = getEndOfDay(new Date(leads[0].created));
+  } else if (history.length > 0 && history[0].created) {
+    endOfTargetDay = getEndOfDay(new Date(history[0].created));
+  }
 
-  leadsForGlobalStatus.forEach((lead) => {
-    if (lead.assignedTo && (lead.status || "New") === "New") {
+  // Count current New leads across the full dataset so the New column shows all
+  // leads that are still in New status, regardless of when they were created,
+  // but only if they were present on (created on or before) the target day.
+  // If they were subsequently converted to a different status, they are deducted (not counted in New).
+  const globalNewStatusByCounselor = new Map<string, number>();
+  const leadLookup = new Map<string, LeadRecord>();
+  const leadsToIndex = allLeadsForOverdue || leads;
+  leadsToIndex.forEach((l) => {
+    if (l.id) leadLookup.set(l.id, l);
+    if (
+      l.assignedTo &&
+      normalizeStatus(l.status || "New") === "New" &&
+      l.created &&
+      l.created <= endOfTargetDay
+    ) {
       globalNewStatusByCounselor.set(
-        lead.assignedTo,
-        (globalNewStatusByCounselor.get(lead.assignedTo) || 0) + 1,
+        l.assignedTo,
+        (globalNewStatusByCounselor.get(l.assignedTo) || 0) + 1,
       );
+      activeCounselorIds.add(l.assignedTo);
     }
+  });
+
+  // Initialize counters for any counselor we encounter via history
+  history.forEach((h) => {
+    if (!h || h.eventType !== "Status Change") return;
+    const newStatus = normalizeStatus(h.newValue || "");
+    if (
+      !["New", "Contacted", "Follow-Up", "Registered", "Lost"].includes(
+        newStatus,
+      )
+    ) {
+      return;
+    }
+
+    // Determine counselor: prefer the lead's assignedTo, fallback to changedBy
+    let counselorId: string | undefined;
+    if (h.leadId) {
+      const lead = leadLookup.get(h.leadId);
+      if (lead && lead.assignedTo) counselorId = lead.assignedTo;
+    }
+    if (!counselorId && h.changedBy) counselorId = h.changedBy;
+    if (!counselorId) return;
+
+    if (!statusCountsByCounselor.has(counselorId)) {
+      statusCountsByCounselor.set(counselorId, {
+        New: 0,
+        Contacted: 0,
+        "Follow-Up": 0,
+        Registered: 0,
+        Lost: 0,
+      });
+    }
+
+    const counts = statusCountsByCounselor.get(counselorId)!;
+    if (newStatus in counts) counts[newStatus as keyof typeof counts]++;
+
+    // Mark counselor as active for report inclusion
+    activeCounselorIds.add(counselorId);
   });
 
   // Count overdue follow-ups (dates in past and not completed)
@@ -193,9 +245,6 @@ export function aggregateDailyMetrics(
     };
     const followups = overdueFollowupsByCounselor.get(counselorId) || 0;
 
-    const conversionRate =
-      newLeads > 0 ? (statusCounts.Registered / newLeads) * 100 : 0;
-
     metricsMap.set(counselorId, {
       counselorId,
       counselorName: counselor?.name || counselor?.email || "Unknown",
@@ -206,7 +255,6 @@ export function aggregateDailyMetrics(
       statusRegistered: statusCounts.Registered,
       statusLost: statusCounts.Lost,
       overdueFollowups: followups,
-      conversionRate: Math.round(conversionRate * 100) / 100, // Round to 2 decimal places
       hoursTracked: 0, // Placeholder for future enhancement
     });
   });

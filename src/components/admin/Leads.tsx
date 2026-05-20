@@ -290,6 +290,36 @@ function sortLeadsByNextFollowup(leadsToSort: Lead[]): Lead[] {
   });
 }
 
+function getFollowupStatus(
+  dateStr: string | undefined,
+  isCompleted: boolean | undefined,
+): string | null {
+  if (!dateStr) return null;
+  if (isCompleted) return "completed";
+  let date: Date;
+  // Prefer parsing YYYY-MM-DD as local date to avoid timezone shifts
+  const isoDateMatch = (dateStr || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoDateMatch) {
+    const y = Number(isoDateMatch[1]);
+    const m = Number(isoDateMatch[2]);
+    const d = Number(isoDateMatch[3]);
+    date = new Date(y, m - 1, d);
+  } else {
+    date = new Date(dateStr);
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  date.setHours(0, 0, 0, 0);
+
+  const diffTime = date.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) return "overdue";
+  if (diffDays === 0) return "today";
+  if (diffDays <= 3) return "upcoming";
+  return "scheduled";
+}
+
 export default function AdminLeads() {
   const authModel = createPocketBaseClient().authStore.model as {
     name?: string;
@@ -741,6 +771,9 @@ export default function AdminLeads() {
         if (statusFilter) params.set("status", statusFilter);
         if (counselorFilter) params.set("counselor", counselorFilter);
         if (searchTerm) params.set("search", searchTerm);
+        if (dateFilterField === "dueFollowup") {
+          params.set("followupFilter", "due");
+        }
 
         const response = await fetch(`/api/admin/leads?${params.toString()}`, {
           signal: abortControllerRef.current.signal,
@@ -797,7 +830,7 @@ export default function AdminLeads() {
         setIsLoading(false);
       }
     },
-    [statusFilter, counselorFilter, searchTerm, mapLead],
+    [statusFilter, counselorFilter, searchTerm, dateFilterField, mapLead],
   );
 
   const fetchAllLeads = useCallback(async () => {
@@ -816,6 +849,9 @@ export default function AdminLeads() {
       if (statusFilter) params.set("status", statusFilter);
       if (counselorFilter) params.set("counselor", counselorFilter);
       if (searchTerm) params.set("search", searchTerm);
+      if (dateFilterField === "dueFollowup") {
+        params.set("followupFilter", "due");
+      }
 
       const response = await fetch(`/api/admin/leads?${params.toString()}`, {
         signal: abortControllerRef.current.signal,
@@ -866,7 +902,7 @@ export default function AdminLeads() {
     } finally {
       setIsLoading(false);
     }
-  }, [statusFilter, counselorFilter, searchTerm, mapLead]);
+  }, [statusFilter, counselorFilter, searchTerm, dateFilterField, mapLead]);
 
   // When filters change, reset to page 1 and reload the appropriate dataset.
   useEffect(() => {
@@ -886,6 +922,7 @@ export default function AdminLeads() {
     statusFilter,
     counselorFilter,
     searchTerm,
+    dateFilterField,
     dateFilterRange,
     fetchLeads,
     fetchAllLeads,
@@ -919,17 +956,25 @@ export default function AdminLeads() {
     // Apply date filter
     if (dateFilterRange) {
       filtered = filtered.filter((lead) => {
+        const nf = getNextFollowup(lead);
         const dateField =
           dateFilterField === "created"
             ? lead.created
-            : getNextFollowup(lead)?.date;
+            : nf?.date;
+
+        if (dateFilterField === "dueFollowup") {
+          if (!nf || nf.completed) return false;
+          const status = getFollowupStatus(nf.date, nf.completed);
+          if (status !== "overdue" && status !== "today") return false;
+        }
+
         return isDateInRange(dateField, dateFilterRange);
       });
     }
 
     if (dateFilterRange) {
       const nextFiltered =
-        dateFilterField === "nextFollowup"
+        dateFilterField === "nextFollowup" || dateFilterField === "dueFollowup"
           ? sortLeadsByNextFollowup(filtered)
           : filtered;
 
@@ -1313,36 +1358,6 @@ export default function AdminLeads() {
     }
   };
 
-  const getFollowupStatus = (
-    dateStr: string | undefined,
-    isCompleted: boolean | undefined,
-  ): string | null => {
-    if (!dateStr) return null;
-    if (isCompleted) return "completed";
-    let date: Date;
-    // Prefer parsing YYYY-MM-DD as local date to avoid timezone shifts
-    const isoDateMatch = (dateStr || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (isoDateMatch) {
-      const y = Number(isoDateMatch[1]);
-      const m = Number(isoDateMatch[2]);
-      const d = Number(isoDateMatch[3]);
-      date = new Date(y, m - 1, d);
-    } else {
-      date = new Date(dateStr);
-    }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    date.setHours(0, 0, 0, 0);
-
-    const diffTime = date.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 0) return "overdue";
-    if (diffDays === 0) return "today";
-    if (diffDays <= 3) return "upcoming";
-    return "scheduled";
-  };
-
   const getFollowupStatusColor = (status: string | null): string => {
     switch (status) {
       case "completed":
@@ -1569,8 +1584,9 @@ export default function AdminLeads() {
           onChange={(e) => setDateFilterField(e.target.value)}
           className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
         >
-          <option value="nextFollowup">Filter by Next Follow-up</option>
           <option value="created">Filter by Created Date</option>
+          <option value="nextFollowup">Filter by Next Follow-up</option>
+          <option value="dueFollowup">Filter by Due Follow-up</option>
         </select>
 
         <DatePickerWithRange

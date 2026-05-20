@@ -124,7 +124,6 @@ export interface DailyReportMetrics {
   statusRegistered: number;
   statusLost: number;
   overdueFollowups: number;
-  conversionRate: number;
   hoursTracked: number;
 }
 
