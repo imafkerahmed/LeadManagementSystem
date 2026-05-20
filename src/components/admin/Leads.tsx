@@ -1879,21 +1879,21 @@ export default function AdminLeads() {
       {/* Sidebar Drawer */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-50 flex">
-          <div className="flex-1 bg-black/30" onClick={closeSidebar} />
-          <div className="w-full max-w-md bg-white border-l border-gray-200 shadow-2xl overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">
+          <div className="flex-1 bg-slate-900/40 backdrop-blur-sm transition-all duration-300" onClick={closeSidebar} />
+          <div className="w-full max-w-md bg-white border-l border-slate-100 shadow-2xl overflow-y-auto flex flex-col h-full animate-in slide-in-from-right duration-300">
+            <div className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-slate-100 p-5 flex items-center justify-between z-10">
+              <h2 className="text-base font-extrabold text-slate-800 tracking-tight">
                 {sidebarMode === "new" ? "New Lead" : selectedLead?.studentName}
               </h2>
               <button
                 onClick={closeSidebar}
-                className="p-1 rounded hover:bg-gray-100"
+                className="p-2 rounded-xl text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-all border border-transparent hover:border-slate-100"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-6 flex-1">
               {sidebarMode === "new" ? (
                 <NewLeadForm
                   users={usersLookup}
@@ -1904,17 +1904,17 @@ export default function AdminLeads() {
               ) : selectedLead ? (
                 <>
                   {/* Details Section */}
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <div>
-                      <p className="text-xs font-semibold text-gray-600 uppercase">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
                         Lead ID
                       </p>
-                      <p className="font-mono text-sm font-medium">
+                      <p className="font-mono text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-100/50 rounded-xl px-3.5 py-2.5 select-all">
                         {selectedLead.leadId}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-gray-600 uppercase">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
                         Name
                       </p>
                       {isEditing ? (
@@ -1923,16 +1923,16 @@ export default function AdminLeads() {
                           value={draftName}
                           onChange={(e) => setDraftName(e.target.value)}
                           disabled={isSaving}
-                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
                         />
                       ) : (
-                        <p className="text-sm font-medium">
+                        <p className="text-sm font-semibold text-slate-700 bg-slate-50 border border-slate-100/50 rounded-xl px-3.5 py-2.5">
                           {selectedLead.studentName}
                         </p>
                       )}
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-gray-600 uppercase">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
                         Mobile
                       </p>
                       {isEditing ? (
@@ -1941,17 +1941,17 @@ export default function AdminLeads() {
                           value={draftMobile}
                           onChange={(e) => setDraftMobile(e.target.value)}
                           disabled={isSaving}
-                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
                         />
                       ) : (
-                        <p className="text-sm">
+                        <p className="text-sm font-semibold text-slate-700 bg-slate-50 border border-slate-100/50 rounded-xl px-3.5 py-2.5">
                           {selectedLead.mobileWithCountry ||
                             `${selectedLead.countryCode}${selectedLead.mobile}`}
                         </p>
                       )}
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-gray-600 uppercase">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
                         Email
                       </p>
                       {isEditing ? (
@@ -1960,14 +1960,16 @@ export default function AdminLeads() {
                           value={draftEmail}
                           onChange={(e) => setDraftEmail(e.target.value)}
                           disabled={isSaving}
-                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
                         />
                       ) : (
-                        <p className="text-sm">{selectedLead.email || "—"}</p>
+                        <p className="text-sm font-semibold text-slate-700 bg-slate-50 border border-slate-100/50 rounded-xl px-3.5 py-2.5">
+                          {selectedLead.email || "—"}
+                        </p>
                       )}
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-gray-600 uppercase">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
                         Course
                       </p>
                       {isEditing ? (
@@ -1976,14 +1978,16 @@ export default function AdminLeads() {
                           value={draftCourse}
                           onChange={(e) => setDraftCourse(e.target.value)}
                           disabled={isSaving}
-                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
                         />
                       ) : (
-                        <p className="text-sm">{selectedLead.course}</p>
+                        <p className="text-sm font-semibold text-slate-700 bg-slate-50 border border-slate-100/50 rounded-xl px-3.5 py-2.5">
+                          {selectedLead.course}
+                        </p>
                       )}
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-gray-600 uppercase">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
                         Lead Source
                       </p>
                       {isEditing ? (
@@ -1998,7 +2002,7 @@ export default function AdminLeads() {
                               }
                             }}
                             disabled={isSaving}
-                            className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
                           >
                             <option value="">Select Lead Source</option>
                             {LEAD_SOURCE_OPTIONS.map((option) => (
@@ -2018,17 +2022,17 @@ export default function AdminLeads() {
                               placeholder={getLeadSourceDetailLabel(
                                 draftLeadSource,
                               )}
-                              className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
                             />
                           )}
                         </div>
                       ) : (
-                        <div className="space-y-1">
-                          <p className="text-sm">
+                        <div className="space-y-1 bg-slate-50 border border-slate-100/50 rounded-xl px-3.5 py-2.5">
+                          <p className="text-sm font-semibold text-slate-700">
                             {selectedLead.leadSource || "—"}
                           </p>
                           {selectedLead.leadSourceDetail && (
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs font-semibold text-slate-400">
                               {selectedLead.leadSourceDetail}
                             </p>
                           )}
@@ -2036,37 +2040,37 @@ export default function AdminLeads() {
                       )}
                     </div>
 
-                    <div className="flex gap-2 pt-2">
+                    <div className="flex gap-3 pt-2">
                       <button
                         onClick={() => {
                           setIsEditing((current) => !current);
                           syncDraftFromLead(selectedLead);
                         }}
-                        className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm"
+                        className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm transition-all"
                       >
-                        {isEditing ? "Cancel Edit" : "Edit"}
+                        {isEditing ? "Cancel Edit" : "Edit Details"}
                       </button>
                       <button
                         onClick={() => handleDelete(selectedLead.id)}
-                        className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 text-sm"
+                        className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-rose-100 bg-rose-50/50 text-rose-600 hover:bg-rose-50 px-4 py-2.5 text-xs font-bold shadow-sm transition-all"
                       >
-                        <Trash2 className="w-4 h-4" />
-                        Delete
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Delete Lead
                       </button>
                     </div>
                   </div>
 
-                  <div className="border-t pt-4">
-                    <div className="space-y-3">
+                  <div className="border-t border-slate-100 pt-6">
+                    <div className="space-y-4">
                       <div>
-                        <p className="text-xs font-semibold text-gray-600 uppercase mb-2">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
                           Status
                         </p>
                         <select
                           value={draftStatus}
                           onChange={(e) => setDraftStatus(e.target.value)}
                           disabled={!isEditing || isSaving}
-                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm disabled:bg-gray-50"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all disabled:bg-slate-50/80 disabled:text-slate-400"
                         >
                           {statuses.map((s) => (
                             <option key={s} value={s}>
@@ -2077,14 +2081,14 @@ export default function AdminLeads() {
                       </div>
 
                       <div>
-                        <p className="text-xs font-semibold text-gray-600 uppercase mb-2">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
                           Assigned To
                         </p>
                         <select
                           value={draftAssignedToId}
                           onChange={(e) => setDraftAssignedToId(e.target.value)}
                           disabled={!isEditing || isSaving}
-                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm disabled:bg-gray-50"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all disabled:bg-slate-50/80 disabled:text-slate-400"
                         >
                           <option value="" disabled>
                             Select counselor
@@ -2099,34 +2103,34 @@ export default function AdminLeads() {
                       </div>
 
                       <div>
-                        <p className="text-xs font-semibold text-gray-600 uppercase mb-2">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
                           Latest Comment
                         </p>
                         <textarea
                           value={draftComment}
                           onChange={(e) => setDraftComment(e.target.value)}
                           disabled={!isEditing || isSaving}
-                          className="w-full min-h-24 px-3 py-2 border border-gray-300 rounded text-sm disabled:bg-gray-50"
+                          className="w-full min-h-24 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all disabled:bg-slate-50/80 disabled:text-slate-400"
                           placeholder="Add a note"
                         />
                       </div>
 
                       {selectedLead && draftStatus === "Follow-up" && (
-                        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                          <h3 className="text-sm font-semibold text-slate-900 mb-4">
-                            Follow-ups
+                        <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm space-y-4">
+                          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                            Follow-ups Schedule
                           </h3>
 
                           <div className="space-y-4">
                             {/* Follow-up 1 */}
                             <div className="space-y-2">
                               <div className="flex items-center justify-between">
-                                <label className="text-sm font-medium text-gray-700">
+                                <label className="text-xs font-bold text-slate-500">
                                   Follow-up 1
                                 </label>
                                 {selectedLead?.followup1Date && (
                                   <span
-                                    className={`px-2 py-1 rounded text-xs font-semibold ${getFollowupStatusColor(getFollowupStatus(selectedLead.followup1Date, selectedLead.followup1Completed))}`}
+                                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${getFollowupStatusColor(getFollowupStatus(selectedLead.followup1Date, selectedLead.followup1Completed))}`}
                                   >
                                     {selectedLead.followup1Completed
                                       ? "Completed"
@@ -2159,7 +2163,7 @@ export default function AdminLeads() {
                                   isSaving ||
                                   (!isAdmin && !!selectedLead?.followup1Date)
                                 }
-                                className="w-full px-3 py-2 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                               />
                               {followup1Date &&
                               followup1Date !== selectedLead?.followup1Date ? (
@@ -2168,13 +2172,13 @@ export default function AdminLeads() {
                                     handleSaveIndividualFollowup(1)
                                   }
                                   disabled={savingFollowup === 1}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50"
+                                  className="w-full rounded-xl border border-slate-200 bg-white hover:bg-slate-50 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all"
                                 >
-                                  {savingFollowup === 1 ? "Setting..." : "Set"}
+                                  {savingFollowup === 1 ? "Setting..." : "Set Date"}
                                 </button>
                               ) : (
                                 selectedLead?.followup1Date && (
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 px-1">
                                     <input
                                       type="checkbox"
                                       id="followup1Completed"
@@ -2186,11 +2190,11 @@ export default function AdminLeads() {
                                         !followup1Date ||
                                         isSaving
                                       }
-                                      className="rounded"
+                                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                                     />
                                     <label
                                       htmlFor="followup1Completed"
-                                      className="text-sm text-gray-600 cursor-pointer"
+                                      className="text-xs font-semibold text-slate-500 cursor-pointer"
                                     >
                                       Mark as completed
                                     </label>
@@ -2202,17 +2206,17 @@ export default function AdminLeads() {
                             {/* Follow-up 2 */}
                             <div className="space-y-2">
                               <div className="flex items-center justify-between">
-                                <label className="text-sm font-medium text-gray-700">
+                                <label className="text-xs font-bold text-slate-500">
                                   Follow-up 2
                                   {!followup1Completed && (
-                                    <span className="ml-1 text-red-600">
+                                    <span className="ml-1 text-rose-500 text-[10px] font-normal lowercase">
                                       (requires follow-up 1 completion)
                                     </span>
                                   )}
                                 </label>
                                 {selectedLead?.followup2Date && (
                                   <span
-                                    className={`px-2 py-1 rounded text-xs font-semibold ${getFollowupStatusColor(getFollowupStatus(selectedLead.followup2Date, selectedLead.followup2Completed))}`}
+                                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${getFollowupStatusColor(getFollowupStatus(selectedLead.followup2Date, selectedLead.followup2Completed))}`}
                                   >
                                     {selectedLead.followup2Completed
                                       ? "Completed"
@@ -2246,7 +2250,7 @@ export default function AdminLeads() {
                                   isSaving ||
                                   (!isAdmin && !!selectedLead?.followup2Date)
                                 }
-                                className="w-full px-3 py-2 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                               />
                               {followup2Date &&
                               followup2Date !== selectedLead?.followup2Date ? (
@@ -2255,13 +2259,13 @@ export default function AdminLeads() {
                                     handleSaveIndividualFollowup(2)
                                   }
                                   disabled={savingFollowup === 2}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50"
+                                  className="w-full rounded-xl border border-slate-200 bg-white hover:bg-slate-50 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all"
                                 >
-                                  {savingFollowup === 2 ? "Setting..." : "Set"}
+                                  {savingFollowup === 2 ? "Setting..." : "Set Date"}
                                 </button>
                               ) : (
                                 selectedLead?.followup2Date && (
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 px-1">
                                     <input
                                       type="checkbox"
                                       id="followup2Completed"
@@ -2273,11 +2277,11 @@ export default function AdminLeads() {
                                         !followup2Date ||
                                         isSaving
                                       }
-                                      className="rounded"
+                                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                                     />
                                     <label
                                       htmlFor="followup2Completed"
-                                      className="text-sm text-gray-600 cursor-pointer"
+                                      className="text-xs font-semibold text-slate-500 cursor-pointer"
                                     >
                                       Mark as completed
                                     </label>
@@ -2289,17 +2293,17 @@ export default function AdminLeads() {
                             {/* Follow-up 3 */}
                             <div className="space-y-2">
                               <div className="flex items-center justify-between">
-                                <label className="text-sm font-medium text-gray-700">
+                                <label className="text-xs font-bold text-slate-500">
                                   Follow-up 3
                                   {!followup2Completed && (
-                                    <span className="ml-1 text-red-600">
+                                    <span className="ml-1 text-rose-500 text-[10px] font-normal lowercase">
                                       (requires follow-up 2 completion)
                                     </span>
                                   )}
                                 </label>
                                 {selectedLead?.followup3Date && (
                                   <span
-                                    className={`px-2 py-1 rounded text-xs font-semibold ${getFollowupStatusColor(getFollowupStatus(selectedLead.followup3Date, selectedLead.followup3Completed))}`}
+                                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${getFollowupStatusColor(getFollowupStatus(selectedLead.followup3Date, selectedLead.followup3Completed))}`}
                                   >
                                     {selectedLead.followup3Completed
                                       ? "Completed"
@@ -2333,7 +2337,7 @@ export default function AdminLeads() {
                                   isSaving ||
                                   (!isAdmin && !!selectedLead?.followup3Date)
                                 }
-                                className="w-full px-3 py-2 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                               />
                               {followup3Date &&
                               followup3Date !== selectedLead?.followup3Date ? (
@@ -2342,13 +2346,13 @@ export default function AdminLeads() {
                                     handleSaveIndividualFollowup(3)
                                   }
                                   disabled={savingFollowup === 3}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50"
+                                  className="w-full rounded-xl border border-slate-200 bg-white hover:bg-slate-50 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all"
                                 >
-                                  {savingFollowup === 3 ? "Setting..." : "Set"}
+                                  {savingFollowup === 3 ? "Setting..." : "Set Date"}
                                 </button>
                               ) : (
                                 selectedLead?.followup3Date && (
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 px-1">
                                     <input
                                       type="checkbox"
                                       id="followup3Completed"
@@ -2360,11 +2364,11 @@ export default function AdminLeads() {
                                         !followup3Date ||
                                         isSaving
                                       }
-                                      className="rounded"
+                                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                                     />
                                     <label
                                       htmlFor="followup3Completed"
-                                      className="text-sm text-gray-600 cursor-pointer"
+                                      className="text-xs font-semibold text-slate-500 cursor-pointer"
                                     >
                                       Mark as completed
                                     </label>
@@ -2372,8 +2376,6 @@ export default function AdminLeads() {
                                 )
                               )}
                             </div>
-
-                            {/* Follow-ups are saved as part of the main Update action */}
                           </div>
                         </div>
                       )}
@@ -2382,9 +2384,9 @@ export default function AdminLeads() {
                         <button
                           onClick={handleLeadUpdate}
                           disabled={isSaving}
-                          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm disabled:opacity-50"
+                          className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-3 text-xs font-bold text-white shadow-md shadow-blue-500/10 transition-all disabled:opacity-50"
                         >
-                          {isSaving ? "Updating..." : "Update"}
+                          {isSaving ? "Saving changes..." : "Save Changes"}
                         </button>
                       )}
 
@@ -2401,46 +2403,47 @@ export default function AdminLeads() {
                             "_blank",
                           )
                         }
-                        className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+                        className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 py-3 text-xs font-bold text-white shadow-md shadow-emerald-500/10 transition-all"
                       >
-                        <MessageSquare className="w-4 h-4" />
-                        WhatsApp
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        Connect via WhatsApp
                       </button>
                     </div>
                   </div>
 
-                  <div className="border-t pt-4">
-                    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+                  <div className="border-t border-slate-100 pt-6">
+                    <div className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
                       <button
                         onClick={() => setTimelineOpen((current) => !current)}
-                        className="flex w-full items-center justify-between border-b border-slate-200 px-4 py-3 text-left"
+                        className="flex w-full items-center justify-between border-b border-slate-100 px-4 py-3.5 text-left bg-slate-50/50 hover:bg-slate-50 transition-all"
                       >
-                        <h3 className="text-sm font-semibold text-slate-900">
-                          Timeline
+                        <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                          Change Log Timeline
                         </h3>
-                        <span className="text-xs font-medium text-slate-500">
-                          {timelineOpen ? "Hide" : "Show"}
+                        <span className="text-xs font-bold text-blue-600">
+                          {timelineOpen ? "Collapse" : "Expand"}
                         </span>
                       </button>
                       {timelineOpen && (
-                        <div className="space-y-4 px-4 py-4 max-h-96 overflow-y-auto">
+                        <div className="space-y-4 px-4 py-4 max-h-96 overflow-y-auto bg-slate-50/20">
                           {timeline.length === 0 ? (
-                            <p className="text-sm text-slate-500">
-                              No events yet
+                            <p className="text-xs font-semibold text-slate-400 text-center py-4">
+                              No history events recorded yet
                             </p>
                           ) : (
                             groupedTimeline.map((group) => (
-                              <div key={group.id} className="relative pl-5">
-                                <span className="absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full bg-slate-900" />
-                                <div className="flex flex-col gap-1 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                              <div key={group.id} className="relative pl-5 border-l border-slate-100 ml-2 py-0.5">
+                                <span className="absolute -left-[5px] top-2 h-2.5 w-2.5 rounded-full bg-blue-500 ring-4 ring-white" />
+                                <div className="flex flex-col gap-2 rounded-xl border border-slate-100 bg-white p-3.5 shadow-sm">
                                   <div className="flex flex-col gap-1">
-                                    <span className="text-sm font-semibold text-slate-900">
+                                    <span className="text-xs font-bold text-slate-800">
                                       {getGroupTitle(group)}
                                     </span>
-                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                                       <span>
                                         {formatTimelineDate(group.timestamp)}
                                       </span>
+                                      <span>•</span>
                                       <span>By {group.changedBy}</span>
                                     </div>
                                   </div>
@@ -2448,7 +2451,7 @@ export default function AdminLeads() {
                                     group.entries[0].eventType,
                                   ) !== "comment" &&
                                     getEntryTransition(group.entries[0]) && (
-                                      <p className="text-sm font-medium text-slate-700">
+                                      <p className="text-xs font-semibold text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-100 break-all select-all">
                                         {getEntryTransition(group.entries[0])}
                                       </p>
                                     )}
@@ -2480,13 +2483,13 @@ export default function AdminLeads() {
                                       ) === "lead details updated";
 
                                     return (
-                                      <div className="rounded-md bg-white px-3 py-2 text-sm text-slate-700">
-                                        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                                      <div className="rounded-lg bg-slate-50 border border-slate-100 p-2.5 text-xs text-slate-600">
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                                           {isDetailsChanged
-                                            ? "Details changed"
-                                            : "Comment entered"}
+                                            ? "Details modifications"
+                                            : "Comment log note"}
                                         </p>
-                                        <p className="mt-1 whitespace-pre-wrap">
+                                        <p className="mt-1 whitespace-pre-wrap font-medium">
                                           {note}
                                         </p>
                                       </div>
@@ -2592,24 +2595,24 @@ function NewLeadForm({
   return (
     <div className="space-y-4">
       <div>
-        <label className="text-xs font-semibold text-gray-600 uppercase">
+        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
           Name *
         </label>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Student name"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
         />
       </div>
       <div>
-        <label className="text-xs font-semibold text-gray-600 uppercase">
+        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
           Country Code *
         </label>
         <select
           value={countryCode}
           onChange={(e) => setCountryCode(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
         >
           <option value="+94">+94 (Sri Lanka)</option>
           <option value="+1">+1 (US/Canada)</option>
@@ -2620,18 +2623,18 @@ function NewLeadForm({
         </select>
       </div>
       <div>
-        <label className="text-xs font-semibold text-gray-600 uppercase">
+        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
           Mobile *
         </label>
         <input
           value={mobile}
           onChange={(e) => setMobile(e.target.value)}
           placeholder="Phone number"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
         />
       </div>
       <div>
-        <label className="text-xs font-semibold text-gray-600 uppercase">
+        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
           Email
         </label>
         <input
@@ -2639,28 +2642,28 @@ function NewLeadForm({
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Email address"
           type="email"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
         />
       </div>
       <div>
-        <label className="text-xs font-semibold text-gray-600 uppercase">
+        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
           Course *
         </label>
         <input
           value={course}
           onChange={(e) => setCourse(e.target.value)}
           placeholder="Course name"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
         />
       </div>
       <div>
-        <label className="text-xs font-semibold text-gray-600 uppercase">
+        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
           Assign To
         </label>
         <select
           value={assignee}
           onChange={(e) => setAssignee(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
         >
           <option value="">Select counselor</option>
           {users.map((u) => (
@@ -2672,7 +2675,7 @@ function NewLeadForm({
         </select>
       </div>
       <div>
-        <label className="text-xs font-semibold text-gray-600 uppercase">
+        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
           Lead Source
         </label>
         <select
@@ -2684,7 +2687,7 @@ function NewLeadForm({
               setLeadSourceDetail("");
             }
           }}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
         >
           <option value="">Select lead source</option>
           {LEAD_SOURCE_OPTIONS.map((option) => (
@@ -2696,28 +2699,28 @@ function NewLeadForm({
       </div>
       {shouldShowLeadSourceDetail(leadSource) && (
         <div>
-          <label className="text-xs font-semibold text-gray-600 uppercase">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
             {getLeadSourceDetailLabel(leadSource)}
           </label>
           <input
             value={leadSourceDetail}
             onChange={(e) => setLeadSourceDetail(e.target.value)}
             placeholder="Enter the person or source details"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
           />
         </div>
       )}
-      <div className="flex gap-2 pt-4">
+      <div className="flex gap-3 pt-4">
         <button
           onClick={submit}
           disabled={saving}
-          className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+          className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/10 transition-all disabled:opacity-50"
         >
           {saving ? "Creating..." : "Create Lead"}
         </button>
         <button
           onClick={onCancel}
-          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium"
+          className="flex-1 px-4 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold shadow-sm transition-all"
         >
           Cancel
         </button>

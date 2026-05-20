@@ -437,12 +437,12 @@ export default function BulkUpload({
   return (
     <div className="space-y-6">
       {/* File Upload */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+        <h3 className="text-lg font-bold text-slate-900 mb-4 tracking-tight">
           Upload CSV/Excel
         </h3>
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-          <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+        <div className="border-2 border-dashed border-slate-300 bg-slate-50/50 rounded-2xl p-8 text-center transition hover:bg-slate-50">
+          <Upload className="w-12 h-12 text-slate-400 mx-auto mb-4" />
           <input
             type="file"
             accept=".csv,.xlsx"
@@ -454,11 +454,11 @@ export default function BulkUpload({
             className="hidden"
             id="fileInput"
           />
-          <label htmlFor="fileInput" className="cursor-pointer">
-            <p className="text-gray-700 font-medium">
+          <label htmlFor="fileInput" className="cursor-pointer block">
+            <p className="text-slate-700 font-semibold">
               Click to upload CSV or Excel file
             </p>
-            <p className="text-sm text-gray-500">
+            <p className="text-[13px] font-medium text-slate-500 mt-1">
               Columns: Student Name, Mobile With Country, Email, Course, Lead
               Source, Lead Source Detail
             </p>
@@ -636,8 +636,8 @@ export default function BulkUpload({
 
       {/* Assignment Settings */}
       {leads.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h3 className="text-lg font-bold text-slate-900 mb-4 tracking-tight">
             Assignment Method
           </h3>
           <div className="space-y-4">
@@ -774,8 +774,8 @@ export default function BulkUpload({
 
       {/* Duplicate Scan Status */}
       {leads.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h3 className="text-lg font-bold text-slate-900 mb-4 tracking-tight">
             Duplicate Verification
           </h3>
           {duplicateScanResult.scanning ? (
@@ -856,9 +856,9 @@ export default function BulkUpload({
 
       {/* Preview */}
       {leads.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">
+            <h3 className="text-lg font-bold text-slate-900 tracking-tight">
               {getUniqueLeads().length} Leads Ready to Upload
             </h3>
             {duplicateScanResult.duplicates.length > 0 && (
@@ -901,7 +901,7 @@ export default function BulkUpload({
           <button
             onClick={handleUpload}
             disabled={isUploading || isBatchUploaded || getUniqueLeads().length === 0 || duplicateScanResult.scanning}
-            className="mt-4 w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 transition font-medium"
+            className="mt-4 w-full px-6 py-3.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 transition shadow-sm font-bold tracking-wide"
           >
             {isUploading
               ? "Uploading..."

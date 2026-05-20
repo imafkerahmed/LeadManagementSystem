@@ -14,8 +14,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Lead Management System",
-  description: "Next.js app connected to PocketBase for lead management.",
+  title: "Amazon College | Lead Management",
+  description: "Lead Management System for Amazon College",
+  icons: {
+    icon: "/images/amazon-logo.jpeg",
+    shortcut: "/images/amazon-logo.jpeg",
+    apple: "/images/amazon-logo.jpeg",
+  },
 };
 
 export default function RootLayout({

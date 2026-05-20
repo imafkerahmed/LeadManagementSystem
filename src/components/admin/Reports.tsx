@@ -2,15 +2,9 @@
 
 import { useEffect, useState } from "react";
 import * as XLSX from "xlsx";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import {
-  MdDownload,
-  MdRefresh,
-  MdCheckCircle,
-  MdSchedule,
-} from "react-icons/md";
 import DailyReports from "@/components/admin/DailyReports";
+import { Download, RefreshCw, PieChart, Users, Table, Calendar } from "lucide-react";
 
 interface CounselorOption {
   id: string;
@@ -327,26 +321,26 @@ export default function AdminReports() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2 rounded-lg border bg-white p-1 w-fit">
+      <div className="flex items-center gap-1.5 rounded-2xl border border-slate-100 bg-white p-1.5 w-fit shadow-sm">
         <button
           onClick={() => setReportView("summary")}
-          className={`rounded-md px-4 py-2 text-sm font-medium transition ${
+          className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition-all duration-200 ${
             reportView === "summary"
-              ? "bg-blue-600 text-white"
-              : "text-gray-600 hover:bg-gray-100"
+              ? "bg-blue-600 text-white shadow-sm"
+              : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
           }`}
         >
-          Summary Report
+          Summary Analytics
         </button>
         <button
           onClick={() => setReportView("daily")}
-          className={`rounded-md px-4 py-2 text-sm font-medium transition ${
+          className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition-all duration-200 ${
             reportView === "daily"
-              ? "bg-blue-600 text-white"
-              : "text-gray-600 hover:bg-gray-100"
+              ? "bg-blue-600 text-white shadow-sm"
+              : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
           }`}
         >
-          Daily Report
+          Daily Timeline
         </button>
       </div>
 
@@ -357,27 +351,29 @@ export default function AdminReports() {
           {/* Preset Date Range Buttons */}
           <div className="flex flex-wrap gap-2">
             {PRESET_RANGES.map((range) => (
-              <Button
+              <button
                 key={range.id}
-                variant={selectedPreset === range.id ? "default" : "outline"}
-                size="sm"
                 onClick={() => {
                   const dates = range.getDates();
                   setStartDate(dates.start);
                   setEndDate(dates.end);
                   setSelectedPreset(range.id);
                 }}
+                className={`rounded-xl px-4 py-2 text-xs font-bold transition-all shadow-sm ${
+                  selectedPreset === range.id
+                    ? "bg-blue-600 text-white"
+                    : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                }`}
               >
                 {range.label}
-              </Button>
+              </button>
             ))}
           </div>
 
           {/* Filters Grid */}
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {/* Start Date */}
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4 bg-white border border-slate-100 shadow-sm rounded-2xl p-5">
             <div>
-              <label className="block text-sm font-medium mb-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-1.5">
                 Start Date
               </label>
               <input
@@ -387,13 +383,14 @@ export default function AdminReports() {
                   setStartDate(e.target.value);
                   setSelectedPreset(null);
                 }}
-                className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-mono"
               />
             </div>
 
-            {/* End Date */}
             <div>
-              <label className="block text-sm font-medium mb-2">End Date</label>
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-1.5">
+                End Date
+              </label>
               <input
                 type="date"
                 value={endDate}
@@ -401,19 +398,18 @@ export default function AdminReports() {
                   setEndDate(e.target.value);
                   setSelectedPreset(null);
                 }}
-                className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-mono"
               />
             </div>
 
-            {/* Counselor Filter */}
             <div>
-              <label className="block text-sm font-medium mb-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-1.5">
                 Filter by Counselor
               </label>
               <select
                 value={selectedCounselor}
                 onChange={(e) => setSelectedCounselor(e.target.value)}
-                className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
               >
                 <option value="all">All Counselors</option>
                 {counselors.map((c) => (
@@ -424,20 +420,19 @@ export default function AdminReports() {
               </select>
             </div>
 
-            {/* Status Filter */}
             <div>
-              <label className="block text-sm font-medium mb-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-1.5">
                 Filter by Status
               </label>
               <select
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
               >
                 <option value="all">All Statuses</option>
                 {LEAD_STATUSES.map((status) => (
                   <option key={status} value={status}>
-                    {status.replace(/_/g, " ")}
+                    {status.replace(/-/g, " ")}
                   </option>
                 ))}
               </select>
@@ -445,25 +440,24 @@ export default function AdminReports() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-3">
-            <Button
+          <div className="flex gap-2">
+            <button
               onClick={handleGenerateReport}
               disabled={isLoading}
-              className="flex items-center gap-2"
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all disabled:opacity-50"
             >
-              <MdRefresh className="w-4 h-4" />
+              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
               {isLoading ? "Generating..." : "Generate Report"}
-            </Button>
+            </button>
 
             {hasGenerated && reportData && (
-              <Button
+              <button
                 onClick={handleExportToXLSX}
-                variant="outline"
-                className="flex items-center gap-2"
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-600 shadow-sm transition-all"
               >
-                <MdDownload className="w-4 h-4" />
+                <Download className="h-4 w-4 text-slate-500" />
                 Export to XLSX
-              </Button>
+              </button>
             )}
           </div>
 
@@ -472,84 +466,83 @@ export default function AdminReports() {
             <div className="space-y-6">
               {/* Stats Cards */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
-                <div className="p-4 rounded-lg bg-muted/50 border border-border">
-                  <div className="text-sm text-muted-foreground">
+                <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-5 hover:shadow-md transition-all duration-300">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                     Total Leads
                   </div>
-                  <div className="text-2xl font-bold mt-1">
+                  <div className="text-2xl font-black mt-2 text-slate-800">
                     {reportData.stats.totalLeads}
                   </div>
                 </div>
 
-                <div className="p-4 rounded-lg bg-muted/50 border border-border">
-                  <div className="text-sm text-muted-foreground">
+                <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-5 hover:shadow-md transition-all duration-300">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                     Enrollment Rate
                   </div>
-                  <div className="text-2xl font-bold mt-1 text-green-600">
+                  <div className="text-2xl font-black mt-2 text-emerald-600">
                     {reportData.stats.enrollmentRate}%
                   </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {reportData.stats.byStatus["Registered"] || 0} registered
+                  <div className="text-[10px] text-slate-400 font-medium mt-1">
+                    {reportData.stats.byStatus["Registered"] || 0} registered leads
                   </div>
                 </div>
 
-                <div className="p-4 rounded-lg bg-muted/50 border border-border">
-                  <div className="text-sm text-muted-foreground">
+                <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-5 hover:shadow-md transition-all duration-300">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                     Counselors Involved
                   </div>
-                  <div className="text-2xl font-bold mt-1">
+                  <div className="text-2xl font-black mt-2 text-slate-800">
                     {Object.keys(reportData.stats.byCounselor).length}
                   </div>
                 </div>
 
-                <div className="p-4 rounded-lg bg-muted/50 border border-border">
-                  <div className="text-sm text-muted-foreground">
+                <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-5 hover:shadow-md transition-all duration-300">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                     Avg Leads/Counselor
                   </div>
-                  <div className="text-2xl font-bold mt-1">
+                  <div className="text-2xl font-black mt-2 text-slate-800">
                     {reportData.stats.avgLeadsPerCounselor}
                   </div>
                 </div>
 
-                <div className="p-4 rounded-lg bg-muted/50 border border-border">
-                  <div className="text-sm text-muted-foreground">
+                <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-5 hover:shadow-md transition-all duration-300">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                     Report Period
                   </div>
-                  <div className="text-sm font-semibold mt-1">
+                  <div className="text-xs font-bold text-slate-700 mt-2">
                     {startDate} to {endDate}
                   </div>
                 </div>
               </div>
 
-              {/* Status Breakdown */}
+              {/* Status Breakdown & Counselor Performance */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="font-semibold mb-4 flex items-center gap-2">
-                    <MdSchedule className="w-4 h-4" />
+                <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-6 hover:shadow-md transition-all duration-300">
+                  <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <PieChart className="w-4 h-4 text-blue-600" />
                     Leads by Status
                   </h3>
-                  <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
+                  <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
                     {Object.entries(reportData.stats.byStatus).map(
                       ([status, count]) => (
                         <div
                           key={status}
-                          className="flex justify-between items-center p-3 bg-muted/30 rounded"
+                          className="flex justify-between items-center p-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100/50 transition-colors"
                         >
-                          <span className="text-sm">{status}</span>
-                          <span className="font-semibold">{count}</span>
+                          <span className="text-xs font-semibold text-slate-600">{status}</span>
+                          <span className="text-xs font-bold text-slate-800">{count}</span>
                         </div>
                       ),
                     )}
                   </div>
                 </div>
 
-                {/* Counselor Performance */}
-                <div>
-                  <h3 className="font-semibold mb-4 flex items-center gap-2">
-                    <MdCheckCircle className="w-4 h-4" />
+                <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-6 hover:shadow-md transition-all duration-300">
+                  <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-blue-600" />
                     Leads by Counselor
                   </h3>
-                  <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
+                  <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
                     {Object.entries(reportData.stats.byCounselor).map(
                       ([counselorId, count]) => {
                         const counselor = reportData.counselors.find(
@@ -558,12 +551,12 @@ export default function AdminReports() {
                         return (
                           <div
                             key={counselorId}
-                            className="flex justify-between items-center p-3 bg-muted/30 rounded"
+                            className="flex justify-between items-center p-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100/50 transition-colors"
                           >
-                            <span className="text-sm">
+                            <span className="text-xs font-semibold text-slate-600">
                               {counselor?.name || counselor?.email || "Unknown"}
                             </span>
-                            <span className="font-semibold">{count}</span>
+                            <span className="text-xs font-bold text-slate-800">{count}</span>
                           </div>
                         );
                       },
@@ -573,48 +566,41 @@ export default function AdminReports() {
               </div>
 
               {/* Leads Table */}
-              <div>
-                <h3 className="font-semibold mb-4">Lead Details</h3>
-                <div className="overflow-x-auto border border-border rounded-lg">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/50 border-b border-border">
-                      <tr>
-                        <th className="px-4 py-3 text-left font-semibold">
-                          Student Name
-                        </th>
-                        <th className="px-4 py-3 text-left font-semibold">
-                          Mobile
-                        </th>
-                        <th className="px-4 py-3 text-left font-semibold">
-                          Course
-                        </th>
-                        <th className="px-4 py-3 text-left font-semibold">
-                          Status
-                        </th>
-                        <th className="px-4 py-3 text-left font-semibold">
-                          Assigned To
-                        </th>
+              <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-6 hover:shadow-md transition-all duration-300">
+                <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                  <Table className="w-4 h-4 text-blue-600" />
+                  Lead Details Log
+                </h3>
+                <div className="overflow-x-auto rounded-xl border border-slate-100 bg-white">
+                  <table className="w-full border-separate border-spacing-0 text-sm">
+                    <thead>
+                      <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100">
+                        <th className="px-4 py-3 font-semibold rounded-l-xl">Student Name</th>
+                        <th className="px-4 py-3 font-semibold">Mobile</th>
+                        <th className="px-4 py-3 font-semibold">Course</th>
+                        <th className="px-4 py-3 font-semibold">Status</th>
+                        <th className="px-4 py-3 font-semibold rounded-r-xl">Assigned To</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-border">
+                    <tbody className="divide-y divide-slate-100">
                       {reportData.leads
                         .slice(
                           (currentPage - 1) * itemsPerPage,
                           currentPage * itemsPerPage,
                         )
                         .map((lead) => (
-                          <tr key={lead.id} className="hover:bg-muted/20">
-                            <td className="px-4 py-3">{lead.studentName}</td>
-                            <td className="px-4 py-3 font-mono text-xs">
+                          <tr key={lead.id} className="hover:bg-slate-50/30 transition-colors">
+                            <td className="px-4 py-3 font-semibold text-slate-800">{lead.studentName}</td>
+                            <td className="px-4 py-3 font-mono text-xs text-slate-500">
                               {lead.mobileWithCountry}
                             </td>
-                            <td className="px-4 py-3">{lead.course}</td>
+                            <td className="px-4 py-3 text-slate-600">{lead.course}</td>
                             <td className="px-4 py-3">
-                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[lead.status] || "bg-gray-100 text-gray-800"}`}>
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_COLORS[lead.status] || "bg-slate-50 text-slate-700 border border-slate-200"}`}>
                                 {lead.status}
                               </span>
                             </td>
-                            <td className="px-4 py-3">{lead.assignedToName}</td>
+                            <td className="px-4 py-3 text-slate-600">{lead.assignedToName}</td>
                           </tr>
                         ))}
                     </tbody>
@@ -622,8 +608,8 @@ export default function AdminReports() {
                 </div>
 
                 {/* Pagination */}
-                <div className="flex items-center justify-between mt-4">
-                  <div className="text-sm text-muted-foreground">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mt-5 pt-4 border-t border-slate-50">
+                  <div className="text-xs font-semibold text-slate-400">
                     Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
                     {Math.min(
                       currentPage * itemsPerPage,
@@ -631,37 +617,34 @@ export default function AdminReports() {
                     )}{" "}
                     of {reportData.leads.length} leads
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
                       onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
+                      className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-600 shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       Previous
-                    </Button>
-                    <div className="flex items-center gap-2">
+                    </button>
+                    <div className="flex items-center gap-1">
                       {Array.from({
                         length: Math.ceil(
                           reportData.leads.length / itemsPerPage,
                         ),
                       }).map((_, i) => (
-                        <Button
+                        <button
                           key={i + 1}
-                          variant={
-                            currentPage === i + 1 ? "default" : "outline"
-                          }
-                          size="sm"
                           onClick={() => setCurrentPage(i + 1)}
-                          className="w-10 h-10 p-0"
+                          className={`w-9 h-9 rounded-xl text-xs font-bold shadow-sm transition-all ${
+                            currentPage === i + 1
+                              ? "bg-blue-600 text-white"
+                              : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                          }`}
                         >
                           {i + 1}
-                        </Button>
+                        </button>
                       ))}
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
+                    <button
                       onClick={() =>
                         setCurrentPage((p) =>
                           Math.min(
@@ -674,9 +657,10 @@ export default function AdminReports() {
                         currentPage ===
                         Math.ceil(reportData.leads.length / itemsPerPage)
                       }
+                      className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-600 shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       Next
-                    </Button>
+                    </button>
                   </div>
                 </div>
               </div>

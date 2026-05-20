@@ -2,22 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
-  MdDashboard,
-  MdPeople,
-  MdCloudUpload,
-  MdSettings,
-  MdExitToApp,
-  MdAssessment,
-} from "react-icons/md";
+  LayoutDashboard,
+  Users as UsersIcon,
+  UploadCloud,
+  BarChart3,
+  Settings as SettingsIcon,
+  LogOut,
+} from "lucide-react";
 import AdminDashboard from "@/components/admin/Dashboard";
 import AdminLeads from "@/components/admin/Leads";
 import BulkUpload from "@/components/admin/BulkUpload";
 import AdminSettings from "@/components/admin/Settings";
 import AdminReports from "@/components/admin/Reports";
-import AdminUsers from "@/components/admin/Users";
 import { createPocketBaseClient } from "@/lib/pocketbase";
-import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,16 +33,14 @@ type AdminTab =
   | "leads"
   | "bulk"
   | "reports"
-  | "settings"
-  | "users";
+  | "settings";
 
-const tabs: Array<{ id: AdminTab; label: string; icon: typeof MdDashboard }> = [
-  { id: "dashboard", label: "Dashboard", icon: MdDashboard },
-  { id: "leads", label: "All Leads", icon: MdPeople },
-  { id: "bulk", label: "Bulk Upload", icon: MdCloudUpload },
-  { id: "reports", label: "Reports", icon: MdAssessment },
-  { id: "users", label: "Users", icon: MdPeople },
-  { id: "settings", label: "Settings", icon: MdSettings },
+const tabs: Array<{ id: AdminTab; label: string; icon: any }> = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "leads", label: "All Leads", icon: UsersIcon },
+  { id: "bulk", label: "Bulk Upload", icon: UploadCloud },
+  { id: "reports", label: "Reports", icon: BarChart3 },
+  { id: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
 const isValidTab = (value: string | null): value is AdminTab =>
@@ -65,7 +62,10 @@ export default function AdminPage() {
     // read URL on mount to restore active tab
     try {
       const params = new URLSearchParams(window.location.search);
-      const tab = params.get("tab");
+      let tab = params.get("tab");
+      if (tab === "users") {
+        tab = "settings";
+      }
       // Setting state in effect is intentional for URL-driven initialization
       // eslint-disable-next-line react-hooks/set-state-in-effect
       if (isValidTab(tab)) setCurrentTab(tab);
@@ -134,66 +134,92 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="flex h-screen">
+    <div className="min-h-screen bg-[#fafbfc] text-[#1e293b] antialiased">
+      <div className="flex h-screen overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-64 border-r border-border bg-muted/30 flex flex-col">
-          <div className="px-6 py-8 border-b border-border">
-            <h1 className="text-xl font-bold tracking-tight">
-              Lead Management System
-            </h1>
-            <p className="text-sm text-muted-foreground mt-2">Amazon College</p>
+        <aside className="w-68 bg-white border-r border-slate-200/80 flex flex-col text-slate-700 shadow-[4px_0_24px_rgba(15,23,42,0.03)] relative z-20">
+          <div className="px-5 py-8 border-b border-slate-100/80 bg-white flex flex-col items-center text-center gap-4 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-50/80 via-transparent to-transparent pointer-events-none" />
+            
+            <div className="flex flex-col items-center gap-4 relative z-10">
+              <div className="relative h-24 w-24 rounded-[1.5rem] overflow-hidden shadow-sm shadow-slate-200/50 border border-slate-100 flex-shrink-0 bg-white">
+                <Image src="/images/amazon-logo.jpeg" alt="Amazon College Logo" fill className="object-cover p-1" />
+              </div>
+              <div className="flex flex-col gap-0.5 items-center">
+                <h1 className="text-xl font-black tracking-tight text-slate-900 leading-tight">
+                  Lead Management
+                </h1>
+                <span className="text-lg font-extrabold bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent w-fit">
+                  System
+                </span>
+              </div>
+            </div>
+            
+            <div className="relative z-10 mt-1">
+              <div className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200/60 rounded-xl shadow-sm">
+                <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                <p className="text-[11px] text-slate-600 font-bold uppercase tracking-widest">
+                  Amazon College
+                </p>
+              </div>
+            </div>
           </div>
 
-          <nav className="flex-1 px-3 py-6 space-y-2 overflow-y-auto">
+          <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
             {tabs.map((t) => {
               const Icon = t.icon;
+              const isActive = currentTab === t.id;
               return (
                 <button
                   key={t.id}
                   onClick={() => setTab(t.id)}
-                  className={`w-full flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all ${
-                    currentTab === t.id
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-foreground hover:bg-muted"
+                  className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${
+                    isActive
+                      ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/15"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                   }`}
                 >
-                  <Icon className="w-5 h-5" />
+                  <Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-slate-400 group-hover:text-slate-600"}`} />
                   <span>{t.label}</span>
                 </button>
               );
             })}
           </nav>
 
-          <div className="border-t border-border p-4">
-            <Button
+          <div className="border-t border-slate-100 p-4 bg-slate-50/30 flex flex-col gap-2">
+            <button
               onClick={() => setLogoutOpen(true)}
-              variant="ghost"
-              className="w-full justify-start gap-3 h-auto py-3 px-4"
-              size="lg"
+              className="w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200 text-slate-500 hover:bg-slate-50 hover:text-rose-600"
             >
-              <MdExitToApp className="w-6 h-6 flex-shrink-0" />
-              <div className="text-left">
-                <div className="text-sm font-medium">{adminName}</div>
-                <div className="text-xs text-muted-foreground capitalize">
+              <LogOut className="w-4.5 h-4.5 flex-shrink-0 text-slate-400" />
+              <div className="text-left flex-1 min-w-0">
+                <div className="text-xs font-bold text-slate-700 truncate">{adminName}</div>
+                <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
                   {adminRole}
                 </div>
               </div>
-            </Button>
+            </button>
           </div>
         </aside>
 
         {/* Main content */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-4 shadow-sm">
+          <header className="border-b border-slate-100 bg-white/70 backdrop-blur-md px-8 py-5 flex items-center justify-between shadow-sm relative z-10">
             <div>
-              <h2 className="text-2xl font-bold tracking-tight">
+              <h2 className="text-xl font-extrabold text-slate-800 tracking-tight">
                 {tabs.find((t) => t.id === currentTab)?.label}
               </h2>
+              <p className="text-xs text-slate-400 mt-0.5 font-medium">
+                {currentTab === "dashboard" && "Real-time key statistics & active trends"}
+                {currentTab === "leads" && "Search, browse, edit, and filter all leads"}
+                {currentTab === "bulk" && "Upload CSV file for batch imports"}
+                {currentTab === "reports" && "Query performance stats and visual charts"}
+                {currentTab === "settings" && "Manage administrators, credentials, and settings"}
+              </p>
             </div>
           </header>
 
-          <main className="flex-1 overflow-y-auto px-6 py-6">
+          <main className="flex-1 overflow-y-auto px-8 py-8 bg-[#fafbfc]">
             <div className={`mx-auto transition-all duration-300 ${
               currentTab === "leads" || currentTab === "reports" || currentTab === "dashboard"
                 ? "max-w-7xl"
@@ -205,7 +231,6 @@ export default function AdminPage() {
                 <BulkUpload operatorId={adminId} operatorLabel={adminLabel} />
               )}
               {currentTab === "reports" && <AdminReports />}
-              {currentTab === "users" && <AdminUsers />}
               {currentTab === "settings" && <AdminSettings />}
             </div>
           </main>
@@ -213,23 +238,23 @@ export default function AdminPage() {
       </div>
 
       <AlertDialog open={logoutOpen} onOpenChange={setLogoutOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-2xl border border-slate-100 bg-white shadow-xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Log Out</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className="text-slate-800 font-bold">Log Out</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-500 text-sm">
               Are you sure you want to log out? You&apos;ll need to sign in
               again to access the system.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition-all">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 const pb = createPocketBaseClient();
                 pb.authStore.clear();
                 router.replace("/");
               }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="rounded-xl bg-rose-600 hover:bg-rose-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all"
             >
               Log Out
             </AlertDialogAction>

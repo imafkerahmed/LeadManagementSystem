@@ -14,6 +14,7 @@ import {
   AlertDialogTitle,
   AlertDialogDescription,
 } from "@/components/ui/alert-dialog";
+import { Search, Users, UserPlus } from "lucide-react";
 
 type ManagedUser = {
   id: string;
@@ -333,33 +334,54 @@ export default function AdminUsers() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900">Users</h3>
-          <p className="text-sm text-gray-600 mt-1">Manage system users</p>
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-100">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-blue-50 rounded-xl text-blue-600">
+            <Users className="h-6 w-6" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-slate-800">System Users</h3>
+            <p className="text-sm text-slate-400">Manage administrator and counselor credentials</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={openCreateForm}>Add User</Button>
-          <Button variant="outline" onClick={() => void loadUsers()}>
+          <button
+            onClick={openCreateForm}
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 shadow-sm transition-all"
+          >
+            <UserPlus className="h-4 w-4" />
+            Add User
+          </button>
+          <button
+            onClick={() => void loadUsers()}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 shadow-sm transition-all"
+          >
             Refresh
-          </Button>
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-white p-4 md:grid-cols-4">
-        <label className="text-sm text-gray-700 md:col-span-2">
-          Search
-          <input
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
-            placeholder="Search by name or email"
-          />
-        </label>
+      <div className="grid grid-cols-1 gap-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm md:grid-cols-4 items-end">
+        <div className="md:col-span-2 space-y-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            Search Directory
+          </label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 py-2.5 text-sm text-slate-700 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+              placeholder="Search by name, email..."
+            />
+          </div>
+        </div>
 
-        <label className="text-sm text-gray-700">
-          Role
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            Role Filter
+          </label>
           <select
             value={roleFilter}
             onChange={(event) =>
@@ -367,16 +389,18 @@ export default function AdminUsers() {
                 event.target.value as "all" | "admin" | "student-counsellor",
               )
             }
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
           >
             <option value="all">All roles</option>
             <option value="admin">Admin</option>
             <option value="student-counsellor">Student Counsellor</option>
           </select>
-        </label>
+        </div>
 
-        <label className="text-sm text-gray-700">
-          Status
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            Account Status
+          </label>
           <select
             value={statusFilter}
             onChange={(event) =>
@@ -384,109 +408,126 @@ export default function AdminUsers() {
                 event.target.value as "all" | "enabled" | "disabled",
               )
             }
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
           >
             <option value="all">All status</option>
             <option value="enabled">Enabled</option>
             <option value="disabled">Disabled</option>
           </select>
-        </label>
+        </div>
       </div>
 
       {showForm && (
-        <div className="rounded-lg border border-gray-200 p-4 space-y-3">
-          <h4 className="font-medium text-gray-900">
-            {editingUserId ? "Edit User" : "Add User"}
+        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-4 relative overflow-hidden transition-all duration-300">
+          <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-blue-600" />
+          <h4 className="font-bold text-slate-800 flex items-center gap-2">
+            <UserPlus className="h-4 w-4 text-blue-600" />
+            {editingUserId ? "Edit User Account" : "Register New Account"}
           </h4>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <label className="text-sm text-gray-700">
-              Name
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Full Name
+              </label>
               <input
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
                 placeholder="Full name"
               />
-            </label>
+            </div>
 
-            <label className="text-sm text-gray-700">
-              Email
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Email Address
+              </label>
               <input
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 disabled={Boolean(editingUserId)}
-                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 disabled:bg-gray-100"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all disabled:bg-slate-50 disabled:text-slate-400"
                 placeholder="name@example.com"
               />
-            </label>
+            </div>
 
             {!editingUserId && (
-              <label className="text-sm text-gray-700">
-                Password
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Password
+                </label>
                 <input
                   type="password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
                   placeholder="At least 8 characters"
                 />
-              </label>
+              </div>
             )}
 
-            <label className="text-sm text-gray-700">
-              Role
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Access Level Role
+              </label>
               <select
                 value={role}
                 onChange={(event) =>
                   setRole(event.target.value as "admin" | "student-counsellor")
                 }
-                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
               >
                 <option value="student-counsellor">Student Counsellor</option>
                 <option value="admin">Admin</option>
               </select>
-            </label>
+            </div>
           </div>
 
-          <div className="flex gap-2">
-            <Button onClick={() => void saveUser()} disabled={isSubmitting}>
+          <div className="flex gap-2 pt-2">
+            <button 
+              onClick={() => void saveUser()} 
+              disabled={isSubmitting}
+              className="rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all disabled:opacity-50"
+            >
               {editingUserId ? "Save Changes" : "Create User"}
-            </Button>
-            <Button
-              variant="outline"
+            </button>
+            <button
               onClick={() => {
                 resetForm();
                 setShowForm(false);
               }}
+              className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition-all"
             >
               Cancel
-            </Button>
+            </button>
           </div>
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="text-left px-4 py-3">User</th>
-              <th className="text-left px-4 py-3">Role</th>
-              <th className="text-left px-4 py-3">Assigned Leads</th>
-              <th className="text-left px-4 py-3">Status</th>
-              <th className="text-right px-4 py-3">Actions</th>
+      <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white shadow-sm">
+        <table className="w-full text-sm border-separate border-spacing-0">
+          <thead>
+            <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100">
+              <th className="px-4 py-3 font-semibold rounded-l-2xl">User</th>
+              <th className="px-4 py-3 font-semibold">Role</th>
+              <th className="px-4 py-3 font-semibold">Assigned Leads</th>
+              <th className="px-4 py-3 font-semibold">Status</th>
+              <th className="px-4 py-3 font-semibold text-right rounded-r-2xl">Actions</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-slate-100">
             {isLoading ? (
               <tr>
-                <td className="px-4 py-4 text-gray-500" colSpan={5}>
-                  Loading users...
+                <td className="px-4 py-8 text-center text-slate-400 font-medium" colSpan={5}>
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-500 border-t-transparent" />
+                    Loading system directory...
+                  </div>
                 </td>
               </tr>
             ) : filteredUsers.length === 0 ? (
               <tr>
-                <td className="px-4 py-4 text-gray-500" colSpan={5}>
+                <td className="px-4 py-8 text-center text-slate-400" colSpan={5}>
                   No users match the selected filters
                 </td>
               </tr>
@@ -495,17 +536,27 @@ export default function AdminUsers() {
                 const isEnabled = user.accountStatus === "enabled";
 
                 return (
-                  <tr key={user.id} className="border-t border-gray-100">
+                  <tr key={user.id} className="hover:bg-slate-50/30 transition-colors duration-200">
                     <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900">
+                      <div className="font-semibold text-slate-800">
                         {user.name}
                       </div>
-                      <div className="text-xs text-gray-600">{user.email}</div>
+                      <div className="text-xs text-slate-400 mt-0.5">{user.email}</div>
                     </td>
-                    <td className="px-4 py-3">
-                      {user.role === "admin" ? "Admin" : "Student Counsellor"}
+                    <td className="px-4 py-3 font-medium text-slate-600">
+                      {user.role === "admin" ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                          Admin
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-200">
+                          Counselor
+                        </span>
+                      )}
                     </td>
-                    <td className="px-4 py-3">{user.assignedLeadCount}</td>
+                    <td className="px-4 py-3 text-slate-600">
+                      <span className="font-bold text-slate-700">{user.assignedLeadCount}</span> leads
+                    </td>
                     <td className="px-4 py-3">
                       <label className="inline-flex items-center gap-2 cursor-pointer">
                         <input
@@ -516,28 +567,25 @@ export default function AdminUsers() {
                             handleStatusToggle(user, event.target.checked)
                           }
                         />
-                        <span className="relative h-6 w-11 rounded-full bg-gray-300 transition peer-checked:bg-emerald-500 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all peer-checked:after:translate-x-5" />
-                        <span className="text-xs text-gray-700">
+                        <span className="relative h-6 w-11 rounded-full bg-slate-200 transition-all peer-checked:bg-emerald-500 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-all peer-checked:after:translate-x-5" />
+                        <span className="text-xs font-semibold text-slate-500 peer-checked:text-emerald-600">
                           {isEnabled ? "Enabled" : "Disabled"}
                         </span>
                       </label>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
+                      <button
                         onClick={() => openEditForm(user)}
+                        className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-all"
                       >
                         Edit
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
+                      </button>
+                      <button
                         onClick={() => setResetUser(user)}
-                        className="ml-2"
+                        className="ml-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-all"
                       >
                         Reset Password
-                      </Button>
+                      </button>
                     </td>
                   </tr>
                 );
@@ -606,41 +654,47 @@ export default function AdminUsers() {
       {resetUser ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div
-            className="absolute inset-0 bg-black/30"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
             onClick={closeResetDialog}
           />
-          <div className="relative z-10 w-full max-w-md rounded-lg bg-white p-5 shadow-lg">
-            <h3 className="text-lg font-medium">
-              Reset password for {resetUser.name}
-            </h3>
-            <p className="text-sm text-gray-600 mt-1">
-              Enter a new password for this user.
-            </p>
-
-            <div className="mt-4">
-              <label className="block text-sm">
-                New password
-                <input
-                  type="password"
-                  value={resetPassword}
-                  onChange={(e) => setResetPassword(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
-                  placeholder="At least 8 characters"
-                />
-              </label>
+          <div className="relative z-10 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-100 flex flex-col gap-4">
+            <div>
+              <h3 className="text-lg font-bold text-slate-800">
+                Reset password for {resetUser.name}
+              </h3>
+              <p className="text-sm text-slate-400 mt-1">
+                Enter a new password for this user account.
+              </p>
             </div>
 
-            <div className="mt-4 flex justify-end gap-2">
-              <Button
-                variant="outline"
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                New password
+              </label>
+              <input
+                type="password"
+                value={resetPassword}
+                onChange={(e) => setResetPassword(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                placeholder="At least 8 characters"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-50">
+              <button
                 onClick={closeResetDialog}
                 disabled={resetLoading}
+                className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition-all"
               >
                 Cancel
-              </Button>
-              <Button onClick={handleResetPassword} disabled={resetLoading}>
+              </button>
+              <button 
+                onClick={handleResetPassword} 
+                disabled={resetLoading}
+                className="rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all disabled:opacity-50"
+              >
                 {resetLoading ? "Resetting..." : "Reset Password"}
-              </Button>
+              </button>
             </div>
           </div>
         </div>

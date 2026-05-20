@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useSyncExternalStore, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   ChevronLeft,
   ChevronRight,
@@ -1146,16 +1147,21 @@ export default function CounselorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-slate-900">
+    <div className="min-h-screen bg-[#fafbfc] text-[#1e293b] antialiased">
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight sm:text-xl">
-              Amazon College
-            </h1>
-            <p className="text-sm text-slate-500" suppressHydrationWarning>
-              {counselorName}
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="relative h-12 w-12 rounded-xl overflow-hidden shadow-sm border border-slate-100 flex-shrink-0 bg-white">
+              <Image src="/images/amazon-logo.jpeg" alt="Amazon College Logo" fill className="object-cover" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold tracking-tight sm:text-xl text-slate-900 leading-tight">
+                Amazon College
+              </h1>
+              <p className="text-[13px] font-medium text-slate-500" suppressHydrationWarning>
+                {counselorName}
+              </p>
+            </div>
           </div>
           <button
             onClick={() => {
@@ -1228,7 +1234,7 @@ export default function CounselorPage() {
           </div>
 
           {filteredLeads.length === 0 ? (
-            <div className="rounded-lg border border-slate-200 bg-white p-10 shadow-sm">
+            <div className="rounded-2xl border border-slate-200 bg-white p-10 shadow-sm">
               <div className="mx-auto flex max-w-sm flex-col items-center justify-center gap-3 text-slate-500">
                 {showNoLeadsText ? (
                   <p className="text-sm font-medium text-slate-500">
@@ -1247,7 +1253,7 @@ export default function CounselorPage() {
               </div>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200 text-sm">
                   <thead className="bg-slate-50 text-left text-slate-600">
@@ -1377,7 +1383,7 @@ export default function CounselorPage() {
 
       {addLeadModalVisible && (
         <div
-          className={`fixed inset-0 z-30 flex items-end justify-center bg-black/50 px-0 transition-opacity duration-200 ease-out sm:items-center sm:px-4 ${
+          className={`fixed inset-0 z-30 flex items-end justify-center bg-slate-900/40 backdrop-blur-sm px-0 transition-opacity duration-200 ease-out sm:items-center sm:px-4 ${
             addLeadModalOpen ? "opacity-100" : "pointer-events-none opacity-0"
           }`}
           onClick={() => setAddLeadModalOpen(false)}
@@ -1742,7 +1748,7 @@ export default function CounselorPage() {
 
       {modalVisible && selectedLead && (
         <div
-          className={`fixed inset-0 z-20 flex items-end justify-center bg-black/50 px-0 transition-opacity duration-200 ease-out sm:items-center sm:px-4 ${
+          className={`fixed inset-0 z-20 flex items-end justify-center bg-slate-900/40 backdrop-blur-sm px-0 transition-opacity duration-200 ease-out sm:items-center sm:px-4 ${
             modalOpen ? "opacity-100" : "pointer-events-none opacity-0"
           }`}
           onClick={() => setModalOpen(false)}
@@ -2301,7 +2307,7 @@ export default function CounselorPage() {
 
       {duplicateWarningVisible && duplicateInfo && (
         <div
-          className={`fixed inset-0 z-40 flex items-end justify-center bg-black/50 px-0 transition-opacity duration-200 ease-out sm:items-center sm:px-4 ${
+          className={`fixed inset-0 z-40 flex items-end justify-center bg-slate-900/40 backdrop-blur-sm px-0 transition-opacity duration-200 ease-out sm:items-center sm:px-4 ${
             duplicateWarningOpen
               ? "opacity-100"
               : "pointer-events-none opacity-0"
