@@ -2,6 +2,19 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { createPocketBaseClient } from "@/lib/pocketbase";
+import {
+  Users,
+  UserPlus,
+  PhoneOff,
+  PhoneCall,
+  Clock,
+  CheckCircle,
+  XCircle,
+  TrendingUp,
+  BarChart3,
+  UserCheck,
+  Activity,
+} from "lucide-react";
 
 type LeadRecord = {
   id?: string;
@@ -591,32 +604,84 @@ export default function AdminDashboard() {
   }
 
   const statCards = [
-    { label: "Total Leads", value: stats.totalLeads, color: "blue" },
-    { label: "New", value: stats.newLeads, color: "blue" },
-    { label: "Ringing No Answer", value: stats.ringingNoAnswerLeads, color: "indigo" },
-    { label: "Contacted", value: stats.contactedLeads, color: "yellow" },
-    { label: "Follow-Up", value: stats.followUpLeads, color: "orange" },
-    { label: "Registered", value: stats.registeredLeads, color: "green" },
-    { label: "Lost", value: stats.lostLeads, color: "red" },
+    {
+      label: "Total Leads",
+      value: stats.totalLeads,
+      icon: Users,
+      color: "blue",
+      subtext: "Aggregated active records",
+      gradient: "from-blue-500/10 via-blue-500/5 to-transparent",
+      accent: "bg-blue-500",
+      borderColor: "border-blue-100",
+      iconColor: "text-blue-600 bg-blue-50",
+    },
+    {
+      label: "New",
+      value: stats.newLeads,
+      icon: UserPlus,
+      color: "sky",
+      subtext: `${stats.totalLeads > 0 ? Math.round((stats.newLeads / stats.totalLeads) * 100) : 0}% of database`,
+      gradient: "from-sky-500/10 via-sky-500/5 to-transparent",
+      accent: "bg-sky-500",
+      borderColor: "border-sky-100",
+      iconColor: "text-sky-600 bg-sky-50",
+    },
+    {
+      label: "Ringing No Answer",
+      value: stats.ringingNoAnswerLeads,
+      icon: PhoneOff,
+      color: "indigo",
+      subtext: `${stats.totalLeads > 0 ? Math.round((stats.ringingNoAnswerLeads / stats.totalLeads) * 100) : 0}% of database`,
+      gradient: "from-indigo-500/10 via-indigo-500/5 to-transparent",
+      accent: "bg-indigo-500",
+      borderColor: "border-indigo-100",
+      iconColor: "text-indigo-600 bg-indigo-50",
+    },
+    {
+      label: "Contacted",
+      value: stats.contactedLeads,
+      icon: PhoneCall,
+      color: "yellow",
+      subtext: `${stats.totalLeads > 0 ? Math.round((stats.contactedLeads / stats.totalLeads) * 100) : 0}% of database`,
+      gradient: "from-yellow-500/10 via-yellow-500/5 to-transparent",
+      accent: "bg-yellow-500",
+      borderColor: "border-yellow-100",
+      iconColor: "text-yellow-600 bg-yellow-50",
+    },
+    {
+      label: "Follow-Up",
+      value: stats.followUpLeads,
+      icon: Clock,
+      color: "orange",
+      subtext: `${stats.totalLeads > 0 ? Math.round((stats.followUpLeads / stats.totalLeads) * 100) : 0}% of database`,
+      gradient: "from-orange-500/10 via-orange-500/5 to-transparent",
+      accent: "bg-orange-500",
+      borderColor: "border-orange-100",
+      iconColor: "text-orange-600 bg-orange-50",
+    },
+    {
+      label: "Registered",
+      value: stats.registeredLeads,
+      icon: CheckCircle,
+      color: "green",
+      subtext: `${stats.totalLeads > 0 ? Math.round((stats.registeredLeads / stats.totalLeads) * 100) : 0}% of database`,
+      gradient: "from-green-500/10 via-green-500/5 to-transparent",
+      accent: "bg-green-500",
+      borderColor: "border-green-100",
+      iconColor: "text-green-600 bg-green-50",
+    },
+    {
+      label: "Lost",
+      value: stats.lostLeads,
+      icon: XCircle,
+      color: "red",
+      subtext: `${stats.totalLeads > 0 ? Math.round((stats.lostLeads / stats.totalLeads) * 100) : 0}% of database`,
+      gradient: "from-red-500/10 via-red-500/5 to-transparent",
+      accent: "bg-red-500",
+      borderColor: "border-red-100",
+      iconColor: "text-red-600 bg-red-50",
+    },
   ];
-
-  const colorClasses: Record<string, string> = {
-    blue: "text-blue-700",
-    indigo: "text-indigo-700",
-    yellow: "text-yellow-700",
-    orange: "text-orange-700",
-    green: "text-green-700",
-    red: "text-red-700",
-  };
-
-  const bgClasses: Record<string, string> = {
-    blue: "bg-blue-50",
-    indigo: "bg-indigo-50",
-    yellow: "bg-yellow-50",
-    orange: "bg-orange-50",
-    green: "bg-green-50",
-    red: "bg-red-50",
-  };
 
   const counselorOptions = stats.counselorStats
     .map((counselor) => counselor.name)
@@ -652,39 +717,74 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-8">
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {statCards.map((card) => (
-          <div
-            key={card.label}
-            className={`${bgClasses[card.color]} rounded-lg p-6`}
-          >
-            <p className="text-sm font-medium text-gray-600">{card.label}</p>
-            <p
-              className={`text-3xl font-bold ${colorClasses[card.color]} mt-2`}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {statCards.map((card) => {
+          const Icon = card.icon;
+          const isTotal = card.label === "Total Leads";
+          return (
+            <div
+              key={card.label}
+              className={`relative overflow-hidden bg-white border ${card.borderColor} rounded-2xl p-6 shadow-sm transition-all duration-300 hover:shadow-md hover:scale-[1.01] flex flex-col justify-between group ${
+                isTotal ? "lg:col-span-2" : ""
+              }`}
             >
-              {card.value}
-            </p>
-          </div>
-        ))}
+              {/* Subtle background glow */}
+              <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${card.gradient} rounded-bl-full pointer-events-none opacity-50 transition-opacity group-hover:opacity-80 duration-500`} />
+              
+              {/* Left-edge color bar accent */}
+              <div className={`absolute left-0 top-0 bottom-0 w-[4px] ${card.accent}`} />
+              
+              <div className="flex items-start justify-between relative z-10">
+                <div className="space-y-1">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    {card.label}
+                  </span>
+                  <h4 className="text-3xl font-bold tracking-tight text-slate-800">
+                    {card.value}
+                  </h4>
+                </div>
+                <div className={`p-2.5 rounded-xl ${card.iconColor} transition-transform duration-300 group-hover:scale-110`}>
+                  <Icon className="h-5 w-5" />
+                </div>
+              </div>
+              
+              <div className="mt-4 pt-3 border-t border-slate-50 flex items-center justify-between text-xs text-slate-500 relative z-10">
+                <span>{card.subtext}</span>
+                {card.label === "Registered" && stats.totalLeads > 0 && (
+                  <span className="flex items-center gap-1 text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-md">
+                    <TrendingUp className="h-3.5 w-3.5" />
+                    Success
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between mb-5">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">
-              Monthly Lead Status
-            </h3>
-            <p className="text-sm text-gray-500">
-              Stacked monthly view of all lead statuses in the system.
-            </p>
+      {/* Monthly Status Bar Chart Widget */}
+      <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-6 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:scale-[1.005] group">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6 pb-4 border-b border-slate-50">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-50 rounded-xl text-blue-600">
+              <BarChart3 className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-slate-800">
+                Monthly Lead Status
+              </h3>
+              <p className="text-sm text-slate-400">
+                Stacked monthly view of all lead statuses in the system.
+              </p>
+            </div>
           </div>
-          <div className="text-sm text-gray-500">
-            Total months: {stats.monthlyStatusStats.length}
+          <div className="text-xs font-semibold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100">
+            Total Months: {stats.monthlyStatusStats.length}
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <div className="min-w-max flex items-end gap-4 pb-2">
+        <div className="overflow-x-auto pb-4">
+          <div className="min-w-max flex items-end gap-6 pt-6 px-2">
             {stats.monthlyStatusStats.length > 0 ? (
               stats.monthlyStatusStats.map((entry) => {
                 const newHeight = (entry.newCount / chartMax) * 100;
@@ -698,199 +798,204 @@ export default function AdminDashboard() {
                 return (
                   <div
                     key={entry.month}
-                    className="w-24 flex-shrink-0 text-center"
+                    className="w-28 flex-shrink-0 text-center group/bar"
                   >
-                    <div className="h-48 flex items-end rounded-xl bg-gray-50 border border-gray-200 overflow-hidden">
-                      <div className="flex h-full w-full flex-col justify-end">
-                        <div
-                          className="bg-blue-500"
-                          style={{ height: `${newHeight}%` }}
-                          title={`New: ${entry.newCount}`}
-                        />
-                        <div
-                          className="bg-indigo-500"
-                          style={{ height: `${ringingNoAnswerHeight}%` }}
-                          title={`Ringing No Answer: ${entry.ringingNoAnswerCount}`}
-                        />
-                        <div
-                          className="bg-yellow-500"
-                          style={{ height: `${contactedHeight}%` }}
-                          title={`Contacted: ${entry.contactedCount}`}
-                        />
-                        <div
-                          className="bg-orange-500"
-                          style={{ height: `${followUpHeight}%` }}
-                          title={`Follow-Up: ${entry.followUpCount}`}
-                        />
-                        <div
-                          className="bg-green-500"
-                          style={{ height: `${registeredHeight}%` }}
-                          title={`Registered: ${entry.registeredCount}`}
-                        />
-                        <div
-                          className="bg-red-500"
-                          style={{ height: `${lostHeight}%` }}
-                          title={`Lost: ${entry.lostCount}`}
-                        />
+                    <div className="h-52 flex items-end rounded-2xl bg-slate-50/50 border border-slate-100 overflow-hidden shadow-inner p-1">
+                      <div className="flex h-full w-full flex-col justify-end gap-[2px] rounded-xl overflow-hidden">
+                        {entry.newCount > 0 && (
+                          <div
+                            className="bg-gradient-to-t from-blue-500 to-blue-400 rounded-sm transition-all duration-300 hover:brightness-110 cursor-pointer"
+                            style={{ height: `${newHeight}%` }}
+                            title={`New: ${entry.newCount}`}
+                          />
+                        )}
+                        {entry.ringingNoAnswerCount > 0 && (
+                          <div
+                            className="bg-gradient-to-t from-indigo-500 to-indigo-400 rounded-sm transition-all duration-300 hover:brightness-110 cursor-pointer"
+                            style={{ height: `${ringingNoAnswerHeight}%` }}
+                            title={`Ringing No Answer: ${entry.ringingNoAnswerCount}`}
+                          />
+                        )}
+                        {entry.contactedCount > 0 && (
+                          <div
+                            className="bg-gradient-to-t from-amber-500 to-amber-400 rounded-sm transition-all duration-300 hover:brightness-110 cursor-pointer"
+                            style={{ height: `${contactedHeight}%` }}
+                            title={`Contacted: ${entry.contactedCount}`}
+                          />
+                        )}
+                        {entry.followUpCount > 0 && (
+                          <div
+                            className="bg-gradient-to-t from-orange-500 to-orange-400 rounded-sm transition-all duration-300 hover:brightness-110 cursor-pointer"
+                            style={{ height: `${followUpHeight}%` }}
+                            title={`Follow-Up: ${entry.followUpCount}`}
+                          />
+                        )}
+                        {entry.registeredCount > 0 && (
+                          <div
+                            className="bg-gradient-to-t from-emerald-500 to-emerald-400 rounded-sm transition-all duration-300 hover:brightness-110 cursor-pointer"
+                            style={{ height: `${registeredHeight}%` }}
+                            title={`Registered: ${entry.registeredCount}`}
+                          />
+                        )}
+                        {entry.lostCount > 0 && (
+                          <div
+                            className="bg-gradient-to-t from-rose-500 to-rose-400 rounded-sm transition-all duration-300 hover:brightness-110 cursor-pointer"
+                            style={{ height: `${lostHeight}%` }}
+                            title={`Lost: ${entry.lostCount}`}
+                          />
+                        )}
                       </div>
                     </div>
-                    <p className="mt-3 text-xs font-medium text-gray-700">
+                    <p className="mt-3 text-xs font-semibold text-slate-700">
                       {entry.label}
                     </p>
-                    <p className="text-xs text-gray-500">{entry.total} leads</p>
+                    <p className="text-[10px] font-medium text-slate-400 mt-0.5">{entry.total} leads</p>
                   </div>
                 );
               })
             ) : (
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-slate-400">
                 No monthly lead data available.
               </p>
             )}
           </div>
         </div>
 
-        <div className="mt-5 flex flex-wrap gap-3 text-xs text-gray-600">
-          <span className="inline-flex items-center gap-2">
-            <span className="h-3 w-3 rounded-sm bg-blue-500" /> New
+        <div className="mt-6 pt-4 border-t border-slate-50 flex flex-wrap gap-4 text-xs font-medium text-slate-500">
+          <span className="inline-flex items-center gap-1.5 bg-blue-50/50 px-2.5 py-1 rounded-full border border-blue-100/50">
+            <span className="h-2 w-2 rounded-full bg-blue-500" /> New
           </span>
-          <span className="inline-flex items-center gap-2">
-            <span className="h-3 w-3 rounded-sm bg-indigo-500" /> Ringing No Answer
+          <span className="inline-flex items-center gap-1.5 bg-indigo-50/50 px-2.5 py-1 rounded-full border border-indigo-100/50">
+            <span className="h-2 w-2 rounded-full bg-indigo-500" /> Ringing No Answer
           </span>
-          <span className="inline-flex items-center gap-2">
-            <span className="h-3 w-3 rounded-sm bg-yellow-500" /> Contacted
+          <span className="inline-flex items-center gap-1.5 bg-amber-50/50 px-2.5 py-1 rounded-full border border-amber-100/50">
+            <span className="h-2 w-2 rounded-full bg-amber-500" /> Contacted
           </span>
-          <span className="inline-flex items-center gap-2">
-            <span className="h-3 w-3 rounded-sm bg-orange-500" /> Follow-Up
+          <span className="inline-flex items-center gap-1.5 bg-orange-50/50 px-2.5 py-1 rounded-full border border-orange-100/50">
+            <span className="h-2 w-2 rounded-full bg-orange-500" /> Follow-Up
           </span>
-          <span className="inline-flex items-center gap-2">
-            <span className="h-3 w-3 rounded-sm bg-green-500" /> Registered
+          <span className="inline-flex items-center gap-1.5 bg-emerald-50/50 px-2.5 py-1 rounded-full border border-emerald-100/50">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" /> Registered
           </span>
-          <span className="inline-flex items-center gap-2">
-            <span className="h-3 w-3 rounded-sm bg-red-500" /> Lost
+          <span className="inline-flex items-center gap-1.5 bg-rose-50/50 px-2.5 py-1 rounded-full border border-rose-100/50">
+            <span className="h-2 w-2 rounded-full bg-rose-500" /> Lost
           </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-4">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">
-                Lead Stats
-              </h3>
-              <p className="text-sm text-gray-500">
-                Filter counsellors and review their lead status breakdown.
-              </p>
+      <div className="flex flex-col gap-8">
+        {/* Lead Stats Table Widget */}
+        <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-6 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:scale-[1.005] group">
+          <div className="flex flex-col gap-4 mb-6 pb-4 border-b border-slate-50">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-50 rounded-xl text-indigo-600">
+                <UserCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-slate-800">
+                  Counselor Lead Stats
+                </h3>
+                <p className="text-sm text-slate-400">
+                  Filter counselors and review their lead status breakdown.
+                </p>
+              </div>
             </div>
-            <div className="w-full md:w-64">
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Counsellor
-              </label>
-              <select
-                value={selectedCounselor}
-                onChange={(e) => setSelectedCounselor(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
-              >
-                <option value="">All Counsellors</option>
-                {counselorOptions.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+              <div>
+                <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                  Counselor
+                </label>
+                <select
+                  value={selectedCounselor}
+                  onChange={(e) => setSelectedCounselor(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                >
+                  <option value="">All Counselors</option>
+                  {counselorOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                  Month
+                </label>
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                >
+                  <option value="">All Months</option>
+                  {monthOptions.map((entry) => (
+                    <option key={entry.month} value={entry.month}>
+                      {entry.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
-          <div className="mb-4 w-full md:w-64">
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Month
-            </label>
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
-            >
-              <option value="">All Months</option>
-              {monthOptions.map((entry) => (
-                <option key={entry.month} value={entry.month}>
-                  {entry.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-            Showing counselor stats for{" "}
-            {selectedMonth ? getMonthLabel(selectedMonth) : "all months"}.
+          <div className="mb-4 rounded-xl border border-slate-100 bg-slate-50/50 px-4 py-3 text-xs font-medium text-slate-500 flex items-center justify-between">
+            <span>Showing counselor stats for <strong className="text-slate-700 font-semibold">{selectedMonth ? getMonthLabel(selectedMonth) : "all months"}</strong>.</span>
+            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 bg-white px-2 py-0.5 rounded border border-slate-100 shadow-sm">{filteredCounselorStats.length} active</span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="min-w-full border-separate border-spacing-0">
               <thead>
-                <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
-                  <th className="border-b border-gray-200 px-3 py-3 font-medium">
-                    Counsellor
-                  </th>
-                  <th className="border-b border-gray-200 px-3 py-3 font-medium text-right">
-                    Total
-                  </th>
-                  <th className="border-b border-gray-200 px-3 py-3 font-medium text-right">
-                    New
-                  </th>
-                  <th className="border-b border-gray-200 px-3 py-3 font-medium text-right">
-                    Ringing No Answer
-                  </th>
-                  <th className="border-b border-gray-200 px-3 py-3 font-medium text-right">
-                    Contacted
-                  </th>
-                  <th className="border-b border-gray-200 px-3 py-3 font-medium text-right">
-                    Follow-Up
-                  </th>
-                  <th className="border-b border-gray-200 px-3 py-3 font-medium text-right">
-                    Registered
-                  </th>
-                  <th className="border-b border-gray-200 px-3 py-3 font-medium text-right">
-                    Lost
-                  </th>
+                <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100">
+                  <th className="px-4 py-3 font-semibold rounded-l-xl">Counselor</th>
+                  <th className="px-4 py-3 font-semibold text-right">Total</th>
+                  <th className="px-4 py-3 font-semibold text-right">New</th>
+                  <th className="px-4 py-3 font-semibold text-right">Ringing</th>
+                  <th className="px-4 py-3 font-semibold text-right">Contacted</th>
+                  <th className="px-4 py-3 font-semibold text-right">Follow-Up</th>
+                  <th className="px-4 py-3 font-semibold text-right">Registered</th>
+                  <th className="px-4 py-3 font-semibold text-right rounded-r-xl">Lost</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100">
                 {filteredCounselorStats.length > 0 ? (
                   filteredCounselorStats.map((counselor) => (
                     <tr
                       key={counselor.name}
-                      className="border-b border-gray-100 last:border-0"
+                      className="hover:bg-slate-50/50 transition-colors duration-200"
                     >
-                      <td className="px-3 py-4 text-sm font-medium text-gray-900">
+                      <td className="px-4 py-3 text-sm font-semibold text-slate-800">
                         {counselor.name}
                       </td>
-                      <td className="px-3 py-4 text-right text-sm text-gray-700">
+                      <td className="px-4 py-3 text-right text-sm font-bold text-slate-800">
                         {counselor.leadCount}
                       </td>
-                      <td className="px-3 py-4 text-right text-sm text-gray-700">
+                      <td className="px-4 py-3 text-right text-sm text-slate-600 font-medium">
                         {counselor.newCount}
                       </td>
-                      <td className="px-3 py-4 text-right text-sm text-gray-700">
+                      <td className="px-4 py-3 text-right text-sm text-slate-600 font-medium">
                         {counselor.ringingNoAnswerCount}
                       </td>
-                      <td className="px-3 py-4 text-right text-sm text-gray-700">
+                      <td className="px-4 py-3 text-right text-sm text-slate-600 font-medium">
                         {counselor.contactedCount}
                       </td>
-                      <td className="px-3 py-4 text-right text-sm text-gray-700">
+                      <td className="px-4 py-3 text-right text-sm text-slate-600 font-medium">
                         {counselor.followUpCount}
                       </td>
-                      <td className="px-3 py-4 text-right text-sm text-gray-700">
+                      <td className="px-4 py-3 text-right text-sm text-emerald-600 font-semibold">
                         {counselor.registeredCount}
                       </td>
-                      <td className="px-3 py-4 text-right text-sm text-gray-700">
+                      <td className="px-4 py-3 text-right text-sm text-rose-500 font-medium">
                         {counselor.lostCount}
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td className="px-3 py-8 text-sm text-gray-500" colSpan={8}>
-                      No counsellor data available.
+                    <td className="px-4 py-8 text-center text-sm text-slate-400" colSpan={8}>
+                      No counselor data available.
                     </td>
                   </tr>
                 )}
@@ -899,17 +1004,23 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-4">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">
-                Recent Activity
-              </h3>
-              <p className="text-sm text-gray-500">
-                Paginated recent updates from lead history.
-              </p>
+        {/* Recent Activity Widget */}
+        <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-6 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:scale-[1.005] group">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-6 pb-4 border-b border-slate-50">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-50 rounded-xl text-blue-600">
+                <Activity className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-slate-800">
+                  Recent Activity Feed
+                </h3>
+                <p className="text-sm text-slate-400">
+                  Paginated recent updates from lead history logs.
+                </p>
+              </div>
             </div>
-            <div className="text-sm text-gray-500">
+            <div className="text-xs font-semibold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100">
               Page {activityPage} of {activityTotalPages}
             </div>
           </div>
@@ -917,45 +1028,45 @@ export default function AdminDashboard() {
           <div className="overflow-x-auto">
             <table className="min-w-full border-separate border-spacing-0">
               <thead>
-                <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
-                  <th className="border-b border-gray-200 px-3 py-3 font-medium">
-                    Date
-                  </th>
-                  <th className="border-b border-gray-200 px-3 py-3 font-medium">
-                    Student
-                  </th>
-                  <th className="border-b border-gray-200 px-3 py-3 font-medium">
-                    Event
-                  </th>
-                  <th className="border-b border-gray-200 px-3 py-3 font-medium">
-                    Changed By
-                  </th>
+                <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100">
+                  <th className="px-4 py-3 font-semibold rounded-l-xl">Date</th>
+                  <th className="px-4 py-3 font-semibold">Student</th>
+                  <th className="px-4 py-3 font-semibold">Event Description</th>
+                  <th className="px-4 py-3 font-semibold rounded-r-xl">Changed By</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100">
                 {paginatedActivity.length > 0 ? (
                   paginatedActivity.map((activity, idx) => (
                     <tr
                       key={`${activity.created}-${idx}`}
-                      className="border-b border-gray-100 last:border-0"
+                      className="hover:bg-slate-50/50 transition-colors duration-200"
                     >
-                      <td className="px-3 py-4 text-sm text-gray-700 whitespace-nowrap">
+                      <td className="px-4 py-3.5 text-sm text-slate-500 whitespace-nowrap font-mono text-xs">
                         {formatDate(activity.created)}
                       </td>
-                      <td className="px-3 py-4 text-sm font-medium text-gray-900">
+                      <td className="px-4 py-3.5 text-sm font-semibold text-slate-800">
                         {activity.studentName}
                       </td>
-                      <td className="px-3 py-4 text-sm text-gray-700">
-                        {activity.eventType}
+                      <td className="px-4 py-3.5 text-sm text-slate-600">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                          activity.eventType?.includes("status") || activity.eventType?.includes("comment")
+                            ? "bg-slate-100 text-slate-700"
+                            : activity.eventType?.includes("created")
+                              ? "bg-blue-50 text-blue-700"
+                              : "bg-indigo-50 text-indigo-700"
+                        }`}>
+                          {activity.eventType}
+                        </span>
                       </td>
-                      <td className="px-3 py-4 text-sm text-gray-700">
+                      <td className="px-4 py-3.5 text-sm text-slate-500 font-medium">
                         {activity.changedBy}
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td className="px-3 py-8 text-sm text-gray-500" colSpan={4}>
+                    <td className="px-4 py-8 text-center text-sm text-slate-400" colSpan={4}>
                       No recent activity available.
                     </td>
                   </tr>
@@ -964,24 +1075,22 @@ export default function AdminDashboard() {
             </table>
           </div>
 
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <p className="text-sm text-gray-500">
+          <div className="mt-5 pt-4 border-t border-slate-50 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between text-xs text-slate-500">
+            <p className="font-medium text-slate-400">
               Showing{" "}
-              {Math.min(activityStartIndex + 1, stats.recentActivity.length)}-
-              {Math.min(
-                activityStartIndex + ACTIVITY_PAGE_SIZE,
-                stats.recentActivity.length,
-              )}{" "}
-              of {stats.recentActivity.length}
+              <strong className="text-slate-600">{Math.min(activityStartIndex + 1, stats.recentActivity.length)}</strong>
+              -
+              <strong className="text-slate-600">{Math.min(activityStartIndex + ACTIVITY_PAGE_SIZE, stats.recentActivity.length)}</strong>{" "}
+              of <strong className="text-slate-600">{stats.recentActivity.length}</strong> entries
             </p>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setActivityPage((page) => Math.max(1, page - 1))}
                 disabled={activityPage === 1}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 shadow-sm transition-all animate-all"
               >
-                Prev
+                Previous
               </button>
               <button
                 type="button"
@@ -991,7 +1100,7 @@ export default function AdminDashboard() {
                   )
                 }
                 disabled={activityPage === activityTotalPages}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 shadow-sm transition-all animate-all"
               >
                 Next
               </button>
