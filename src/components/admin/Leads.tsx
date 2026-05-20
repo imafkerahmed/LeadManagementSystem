@@ -870,7 +870,7 @@ export default function AdminLeads() {
 
   // When filters change, reset to page 1 and reload the appropriate dataset.
   useEffect(() => {
-    setPage(1);
+    setTimeout(() => setPage(1), 0);
 
     if (dateFilterRange) {
       setTimeout(() => {

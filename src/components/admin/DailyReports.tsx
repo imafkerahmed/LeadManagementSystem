@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { MdRefresh } from "react-icons/md";
+import Image from "next/image";
 import { Download, Image as ImageIcon } from "lucide-react";
 import { toPng } from "html-to-image";
 import * as XLSX from "xlsx";
@@ -37,10 +38,12 @@ export default function DailyReports() {
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const exportRef = useRef<HTMLDivElement | null>(null);
 
+  // Hoisted fetch function so effects can call it
+
   // Initialize date to today on mount
   useEffect(() => {
     const today = new Date();
-    setSelectedDate(formatLocalDate(today));
+    setTimeout(() => setSelectedDate(formatLocalDate(today)), 0);
   }, []);
 
   // Auto-refresh logic - poll every 60 seconds
@@ -61,7 +64,7 @@ export default function DailyReports() {
     }
   }, [selectedDate]);
 
-  const fetchDailyReport = async (date: string) => {
+  async function fetchDailyReport(date: string) {
     setIsLoading(true);
     try {
       const res = await fetch(`/api/admin/daily-reports?date=${date}`);
@@ -79,7 +82,7 @@ export default function DailyReports() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
   const handleRefresh = async () => {
     if (selectedDate) {
@@ -444,7 +447,7 @@ export default function DailyReports() {
         </ul>
         <p className="mt-3 text-xs text-gray-600">
           Data is automatically refreshed every 60 seconds. Manually click
-          "Refresh" for immediate updates.
+          &quot;Refresh&quot; for immediate updates.
         </p>
       </div>
 
@@ -469,10 +472,13 @@ export default function DailyReports() {
               </button>
             </div>
             <div className="max-h-[75vh] overflow-auto bg-slate-100 p-4">
-              <img
-                src={imagePreviewUrl}
+              <Image
+                src={imagePreviewUrl as string}
                 alt="Daily report preview"
+                width={1200}
+                height={800}
                 className="mx-auto h-auto w-full rounded-lg bg-white shadow"
+                unoptimized
               />
             </div>
             <div className="flex items-center justify-end gap-3 border-t bg-white px-5 py-4">

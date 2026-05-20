@@ -10,6 +10,7 @@ import {
   MdCheckCircle,
   MdSchedule,
 } from "react-icons/md";
+import DailyReports from "@/components/admin/DailyReports";
 
 interface CounselorOption {
   id: string;
@@ -134,6 +135,7 @@ const PRESET_RANGES: PresetRange[] = [
 ];
 
 export default function AdminReports() {
+  const [reportView, setReportView] = useState<"summary" | "daily">("summary");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [selectedCounselor, setSelectedCounselor] = useState("all");
@@ -314,320 +316,362 @@ export default function AdminReports() {
 
   return (
     <div className="space-y-6">
-      {/* Preset Date Range Buttons */}
-      <div className="flex flex-wrap gap-2">
-        {PRESET_RANGES.map((range) => (
-          <Button
-            key={range.id}
-            variant={selectedPreset === range.id ? "default" : "outline"}
-            size="sm"
-            onClick={() => {
-              const dates = range.getDates();
-              setStartDate(dates.start);
-              setEndDate(dates.end);
-              setSelectedPreset(range.id);
-            }}
-          >
-            {range.label}
-          </Button>
-        ))}
-      </div>
-
-      {/* Filters Grid */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {/* Start Date */}
-        <div>
-          <label className="block text-sm font-medium mb-2">Start Date</label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => {
-              setStartDate(e.target.value);
-              setSelectedPreset(null);
-            }}
-            className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground"
-          />
-        </div>
-
-        {/* End Date */}
-        <div>
-          <label className="block text-sm font-medium mb-2">End Date</label>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => {
-              setEndDate(e.target.value);
-              setSelectedPreset(null);
-            }}
-            className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground"
-          />
-        </div>
-
-        {/* Counselor Filter */}
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            Filter by Counselor
-          </label>
-          <select
-            value={selectedCounselor}
-            onChange={(e) => setSelectedCounselor(e.target.value)}
-            className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground"
-          >
-            <option value="all">All Counselors</option>
-            {counselors.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name || c.email}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Status Filter */}
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            Filter by Status
-          </label>
-          <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground"
-          >
-            <option value="all">All Statuses</option>
-            {LEAD_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {status.replace(/_/g, " ")}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex gap-3">
-        <Button
-          onClick={handleGenerateReport}
-          disabled={isLoading}
-          className="flex items-center gap-2"
+      <div className="flex items-center gap-2 rounded-lg border bg-white p-1 w-fit">
+        <button
+          onClick={() => setReportView("summary")}
+          className={`rounded-md px-4 py-2 text-sm font-medium transition ${
+            reportView === "summary"
+              ? "bg-blue-600 text-white"
+              : "text-gray-600 hover:bg-gray-100"
+          }`}
         >
-          <MdRefresh className="w-4 h-4" />
-          {isLoading ? "Generating..." : "Generate Report"}
-        </Button>
-
-        {hasGenerated && reportData && (
-          <Button
-            onClick={handleExportToXLSX}
-            variant="outline"
-            className="flex items-center gap-2"
-          >
-            <MdDownload className="w-4 h-4" />
-            Export to XLSX
-          </Button>
-        )}
+          Summary Report
+        </button>
+        <button
+          onClick={() => setReportView("daily")}
+          className={`rounded-md px-4 py-2 text-sm font-medium transition ${
+            reportView === "daily"
+              ? "bg-blue-600 text-white"
+              : "text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          Daily Report
+        </button>
       </div>
 
-      {/* Report Summary */}
-      {reportData && (
-        <div className="space-y-6">
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
-            <div className="p-4 rounded-lg bg-muted/50 border border-border">
-              <div className="text-sm text-muted-foreground">Total Leads</div>
-              <div className="text-2xl font-bold mt-1">
-                {reportData.stats.totalLeads}
-              </div>
+      {reportView === "daily" ? (
+        <DailyReports />
+      ) : (
+        <>
+          {/* Preset Date Range Buttons */}
+          <div className="flex flex-wrap gap-2">
+            {PRESET_RANGES.map((range) => (
+              <Button
+                key={range.id}
+                variant={selectedPreset === range.id ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  const dates = range.getDates();
+                  setStartDate(dates.start);
+                  setEndDate(dates.end);
+                  setSelectedPreset(range.id);
+                }}
+              >
+                {range.label}
+              </Button>
+            ))}
+          </div>
+
+          {/* Filters Grid */}
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {/* Start Date */}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Start Date
+              </label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setSelectedPreset(null);
+                }}
+                className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground"
+              />
             </div>
 
-            <div className="p-4 rounded-lg bg-muted/50 border border-border">
-              <div className="text-sm text-muted-foreground">
-                Conversion Rate
-              </div>
-              <div className="text-2xl font-bold mt-1 text-green-600">
-                {reportData.stats.conversionRate}%
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                {reportData.stats.byStatus["Registered"] || 0} registered
-              </div>
+            {/* End Date */}
+            <div>
+              <label className="block text-sm font-medium mb-2">End Date</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setSelectedPreset(null);
+                }}
+                className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground"
+              />
             </div>
 
-            <div className="p-4 rounded-lg bg-muted/50 border border-border">
-              <div className="text-sm text-muted-foreground">
-                Counselors Involved
-              </div>
-              <div className="text-2xl font-bold mt-1">
-                {Object.keys(reportData.stats.byCounselor).length}
-              </div>
+            {/* Counselor Filter */}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Filter by Counselor
+              </label>
+              <select
+                value={selectedCounselor}
+                onChange={(e) => setSelectedCounselor(e.target.value)}
+                className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground"
+              >
+                <option value="all">All Counselors</option>
+                {counselors.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name || c.email}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <div className="p-4 rounded-lg bg-muted/50 border border-border">
-              <div className="text-sm text-muted-foreground">
-                Avg Leads/Counselor
-              </div>
-              <div className="text-2xl font-bold mt-1">
-                {reportData.stats.avgLeadsPerCounselor}
-              </div>
-            </div>
-
-            <div className="p-4 rounded-lg bg-muted/50 border border-border">
-              <div className="text-sm text-muted-foreground">Report Period</div>
-              <div className="text-sm font-semibold mt-1">
-                {startDate} to {endDate}
-              </div>
+            {/* Status Filter */}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Filter by Status
+              </label>
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground"
+              >
+                <option value="all">All Statuses</option>
+                {LEAD_STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {status.replace(/_/g, " ")}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
-          {/* Status Breakdown */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div>
-              <h3 className="font-semibold mb-4 flex items-center gap-2">
-                <MdSchedule className="w-4 h-4" />
-                Leads by Status
-              </h3>
-              <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
-                {Object.entries(reportData.stats.byStatus).map(
-                  ([status, count]) => (
-                    <div
-                      key={status}
-                      className="flex justify-between items-center p-3 bg-muted/30 rounded"
-                    >
-                      <span className="text-sm">{status}</span>
-                      <span className="font-semibold">{count}</span>
-                    </div>
-                  ),
-                )}
-              </div>
-            </div>
+          {/* Action Buttons */}
+          <div className="flex gap-3">
+            <Button
+              onClick={handleGenerateReport}
+              disabled={isLoading}
+              className="flex items-center gap-2"
+            >
+              <MdRefresh className="w-4 h-4" />
+              {isLoading ? "Generating..." : "Generate Report"}
+            </Button>
 
-            {/* Counselor Performance */}
-            <div>
-              <h3 className="font-semibold mb-4 flex items-center gap-2">
-                <MdCheckCircle className="w-4 h-4" />
-                Leads by Counselor
-              </h3>
-              <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
-                {Object.entries(reportData.stats.byCounselor).map(
-                  ([counselorId, count]) => {
-                    const counselor = reportData.counselors.find(
-                      (c) => c.id === counselorId,
-                    );
-                    return (
-                      <div
-                        key={counselorId}
-                        className="flex justify-between items-center p-3 bg-muted/30 rounded"
-                      >
-                        <span className="text-sm">
-                          {counselor?.name || counselor?.email || "Unknown"}
-                        </span>
-                        <span className="font-semibold">{count}</span>
-                      </div>
-                    );
-                  },
-                )}
-              </div>
-            </div>
+            {hasGenerated && reportData && (
+              <Button
+                onClick={handleExportToXLSX}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <MdDownload className="w-4 h-4" />
+                Export to XLSX
+              </Button>
+            )}
           </div>
 
-          {/* Leads Table */}
-          <div>
-            <h3 className="font-semibold mb-4">Lead Details</h3>
-            <div className="overflow-x-auto border border-border rounded-lg">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50 border-b border-border">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-semibold">
-                      Student Name
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold">
-                      Mobile
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold">
-                      Course
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold">
-                      Status
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold">
-                      Assigned To
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {reportData.leads
-                    .slice(
-                      (currentPage - 1) * itemsPerPage,
-                      currentPage * itemsPerPage,
-                    )
-                    .map((lead) => (
-                      <tr key={lead.id} className="hover:bg-muted/20">
-                        <td className="px-4 py-3">{lead.studentName}</td>
-                        <td className="px-4 py-3 font-mono text-xs">
-                          {lead.mobileWithCountry}
-                        </td>
-                        <td className="px-4 py-3">{lead.course}</td>
-                        <td className="px-4 py-3">
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                            {lead.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">{lead.assignedToName}</td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            <div className="flex items-center justify-between mt-4">
-              <div className="text-sm text-muted-foreground">
-                Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-                {Math.min(currentPage * itemsPerPage, reportData.leads.length)}{" "}
-                of {reportData.leads.length} leads
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                >
-                  Previous
-                </Button>
-                <div className="flex items-center gap-2">
-                  {Array.from({
-                    length: Math.ceil(reportData.leads.length / itemsPerPage),
-                  }).map((_, i) => (
-                    <Button
-                      key={i + 1}
-                      variant={currentPage === i + 1 ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setCurrentPage(i + 1)}
-                      className="w-10 h-10 p-0"
-                    >
-                      {i + 1}
-                    </Button>
-                  ))}
+          {/* Report Summary */}
+          {reportData && (
+            <div className="space-y-6">
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
+                <div className="p-4 rounded-lg bg-muted/50 border border-border">
+                  <div className="text-sm text-muted-foreground">
+                    Total Leads
+                  </div>
+                  <div className="text-2xl font-bold mt-1">
+                    {reportData.stats.totalLeads}
+                  </div>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setCurrentPage((p) =>
-                      Math.min(
-                        Math.ceil(reportData.leads.length / itemsPerPage),
-                        p + 1,
+
+                <div className="p-4 rounded-lg bg-muted/50 border border-border">
+                  <div className="text-sm text-muted-foreground">
+                    Conversion Rate
+                  </div>
+                  <div className="text-2xl font-bold mt-1 text-green-600">
+                    {reportData.stats.conversionRate}%
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {reportData.stats.byStatus["Registered"] || 0} registered
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-lg bg-muted/50 border border-border">
+                  <div className="text-sm text-muted-foreground">
+                    Counselors Involved
+                  </div>
+                  <div className="text-2xl font-bold mt-1">
+                    {Object.keys(reportData.stats.byCounselor).length}
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-lg bg-muted/50 border border-border">
+                  <div className="text-sm text-muted-foreground">
+                    Avg Leads/Counselor
+                  </div>
+                  <div className="text-2xl font-bold mt-1">
+                    {reportData.stats.avgLeadsPerCounselor}
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-lg bg-muted/50 border border-border">
+                  <div className="text-sm text-muted-foreground">
+                    Report Period
+                  </div>
+                  <div className="text-sm font-semibold mt-1">
+                    {startDate} to {endDate}
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Breakdown */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="font-semibold mb-4 flex items-center gap-2">
+                    <MdSchedule className="w-4 h-4" />
+                    Leads by Status
+                  </h3>
+                  <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
+                    {Object.entries(reportData.stats.byStatus).map(
+                      ([status, count]) => (
+                        <div
+                          key={status}
+                          className="flex justify-between items-center p-3 bg-muted/30 rounded"
+                        >
+                          <span className="text-sm">{status}</span>
+                          <span className="font-semibold">{count}</span>
+                        </div>
                       ),
-                    )
-                  }
-                  disabled={
-                    currentPage ===
-                    Math.ceil(reportData.leads.length / itemsPerPage)
-                  }
-                >
-                  Next
-                </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Counselor Performance */}
+                <div>
+                  <h3 className="font-semibold mb-4 flex items-center gap-2">
+                    <MdCheckCircle className="w-4 h-4" />
+                    Leads by Counselor
+                  </h3>
+                  <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
+                    {Object.entries(reportData.stats.byCounselor).map(
+                      ([counselorId, count]) => {
+                        const counselor = reportData.counselors.find(
+                          (c) => c.id === counselorId,
+                        );
+                        return (
+                          <div
+                            key={counselorId}
+                            className="flex justify-between items-center p-3 bg-muted/30 rounded"
+                          >
+                            <span className="text-sm">
+                              {counselor?.name || counselor?.email || "Unknown"}
+                            </span>
+                            <span className="font-semibold">{count}</span>
+                          </div>
+                        );
+                      },
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Leads Table */}
+              <div>
+                <h3 className="font-semibold mb-4">Lead Details</h3>
+                <div className="overflow-x-auto border border-border rounded-lg">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50 border-b border-border">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-semibold">
+                          Student Name
+                        </th>
+                        <th className="px-4 py-3 text-left font-semibold">
+                          Mobile
+                        </th>
+                        <th className="px-4 py-3 text-left font-semibold">
+                          Course
+                        </th>
+                        <th className="px-4 py-3 text-left font-semibold">
+                          Status
+                        </th>
+                        <th className="px-4 py-3 text-left font-semibold">
+                          Assigned To
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {reportData.leads
+                        .slice(
+                          (currentPage - 1) * itemsPerPage,
+                          currentPage * itemsPerPage,
+                        )
+                        .map((lead) => (
+                          <tr key={lead.id} className="hover:bg-muted/20">
+                            <td className="px-4 py-3">{lead.studentName}</td>
+                            <td className="px-4 py-3 font-mono text-xs">
+                              {lead.mobileWithCountry}
+                            </td>
+                            <td className="px-4 py-3">{lead.course}</td>
+                            <td className="px-4 py-3">
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                                {lead.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">{lead.assignedToName}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                <div className="flex items-center justify-between mt-4">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
+                    {Math.min(
+                      currentPage * itemsPerPage,
+                      reportData.leads.length,
+                    )}{" "}
+                    of {reportData.leads.length} leads
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <div className="flex items-center gap-2">
+                      {Array.from({
+                        length: Math.ceil(
+                          reportData.leads.length / itemsPerPage,
+                        ),
+                      }).map((_, i) => (
+                        <Button
+                          key={i + 1}
+                          variant={
+                            currentPage === i + 1 ? "default" : "outline"
+                          }
+                          size="sm"
+                          onClick={() => setCurrentPage(i + 1)}
+                          className="w-10 h-10 p-0"
+                        >
+                          {i + 1}
+                        </Button>
+                      ))}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCurrentPage((p) =>
+                          Math.min(
+                            Math.ceil(reportData.leads.length / itemsPerPage),
+                            p + 1,
+                          ),
+                        )
+                      }
+                      disabled={
+                        currentPage ===
+                        Math.ceil(reportData.leads.length / itemsPerPage)
+                      }
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
+          )}
+        </>
       )}
     </div>
   );

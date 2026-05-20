@@ -98,7 +98,7 @@ export function aggregateDailyMetrics(
         statusCountsByCounselor.set(lead.assignedTo, {
           New: 0,
           Contacted: 0,
-          "Follow-up": 0,
+          "Follow-Up": 0,
           Registered: 0,
           Lost: 0,
         });
@@ -187,7 +187,7 @@ export function aggregateDailyMetrics(
     const statusCounts = statusCountsByCounselor.get(counselorId) || {
       New: 0,
       Contacted: 0,
-      "Follow-up": 0,
+      "Follow-Up": 0,
       Registered: 0,
       Lost: 0,
     };
@@ -202,7 +202,7 @@ export function aggregateDailyMetrics(
       newLeads,
       statusNew,
       statusContacted: statusCounts.Contacted,
-      statusFollowUp: statusCounts["Follow-up"],
+      statusFollowUp: statusCounts["Follow-Up"],
       statusRegistered: statusCounts.Registered,
       statusLost: statusCounts.Lost,
       overdueFollowups: followups,
