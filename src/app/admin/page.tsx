@@ -9,6 +9,7 @@ import {
   MdSettings,
   MdExitToApp,
   MdAssessment,
+  MdCalendarToday,
 } from "react-icons/md";
 import AdminDashboard from "@/components/admin/Dashboard";
 import AdminLeads from "@/components/admin/Leads";
@@ -16,6 +17,7 @@ import BulkUpload from "@/components/admin/BulkUpload";
 import AdminSettings from "@/components/admin/Settings";
 import AdminReports from "@/components/admin/Reports";
 import AdminUsers from "@/components/admin/Users";
+import DailyReports from "@/components/admin/DailyReports";
 import { createPocketBaseClient } from "@/lib/pocketbase";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +36,7 @@ type AdminTab =
   | "leads"
   | "bulk"
   | "reports"
+  | "daily-reports"
   | "settings"
   | "users";
 
@@ -42,6 +45,7 @@ const tabs: Array<{ id: AdminTab; label: string; icon: typeof MdDashboard }> = [
   { id: "leads", label: "All Leads", icon: MdPeople },
   { id: "bulk", label: "Bulk Upload", icon: MdCloudUpload },
   { id: "reports", label: "Reports", icon: MdAssessment },
+  { id: "daily-reports", label: "Daily Reports", icon: MdCalendarToday },
   { id: "users", label: "Users", icon: MdPeople },
   { id: "settings", label: "Settings", icon: MdSettings },
 ];
@@ -201,6 +205,7 @@ export default function AdminPage() {
                 <BulkUpload operatorId={adminId} operatorLabel={adminLabel} />
               )}
               {currentTab === "reports" && <AdminReports />}
+              {currentTab === "daily-reports" && <DailyReports />}
               {currentTab === "users" && <AdminUsers />}
               {currentTab === "settings" && <AdminSettings />}
             </div>

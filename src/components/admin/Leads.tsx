@@ -868,18 +868,13 @@ export default function AdminLeads() {
     }
   }, [statusFilter, counselorFilter, searchTerm, mapLead]);
 
-  // When any filter/search changes, reload the appropriate dataset.
+  // When filters change, reset to page 1 and reload the appropriate dataset.
   useEffect(() => {
+    setPage(1);
+
     if (dateFilterRange) {
       setTimeout(() => {
         void fetchAllLeads();
-      }, 0);
-      return;
-    }
-
-    if (page !== 1) {
-      setTimeout(() => {
-        setPage(1);
       }, 0);
       return;
     }
@@ -892,7 +887,6 @@ export default function AdminLeads() {
     counselorFilter,
     searchTerm,
     dateFilterRange,
-    page,
     fetchLeads,
     fetchAllLeads,
   ]);

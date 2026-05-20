@@ -112,3 +112,24 @@ export interface BulkUploadResult {
   message: string;
   errors?: Array<{ row: number; message: string }>;
 }
+
+// Daily report metrics per counselor
+export interface DailyReportMetrics {
+  counselorId: string;
+  counselorName: string;
+  newLeads: number;
+  statusNew: number;
+  statusContacted: number;
+  statusFollowUp: number;
+  statusRegistered: number;
+  statusLost: number;
+  overdueFollowups: number;
+  conversionRate: number;
+  hoursTracked: number;
+}
+
+// Daily report response
+export interface DailyReportResponse {
+  date: string;
+  reports: DailyReportMetrics[];
+}
