@@ -65,10 +65,28 @@ export default function DailyReports() {
     }
   }, [selectedDate]);
 
-  async function fetchDailyReport(date: string) {
+  async function fetchDailyReport(dateStr: string) {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/admin/daily-reports?date=${date}`);
+      const parts = dateStr.split("-");
+      let startParam = "";
+      let endParam = "";
+      if (parts.length === 3) {
+        const year = parseInt(parts[0]);
+        const month = parseInt(parts[1]) - 1;
+        const day = parseInt(parts[2]);
+        
+        const localStart = new Date(year, month, day, 0, 0, 0, 0);
+        const localEnd = new Date(year, month, day, 23, 59, 59, 999);
+        startParam = localStart.toISOString();
+        endParam = localEnd.toISOString();
+      }
+
+      const queryUrl = startParam && endParam
+        ? `/api/admin/daily-reports?date=${dateStr}&startOfDay=${encodeURIComponent(startParam)}&endOfDay=${encodeURIComponent(endParam)}`
+        : `/api/admin/daily-reports?date=${dateStr}`;
+
+      const res = await fetch(queryUrl);
       if (!res.ok) {
         throw new Error(`Failed to fetch daily report: HTTP ${res.status}`);
       }

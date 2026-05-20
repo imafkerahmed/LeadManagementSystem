@@ -61,8 +61,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const startOfDay = getStartOfDay(targetDate);
-    const endOfDay = getEndOfDay(targetDate);
+    // Accept startOfDay and endOfDay from client to handle local timezone shifts perfectly
+    const clientStartOfDay = request.nextUrl.searchParams.get("startOfDay");
+    const clientEndOfDay = request.nextUrl.searchParams.get("endOfDay");
+
+    const startOfDay = clientStartOfDay || getStartOfDay(targetDate);
+    const endOfDay = clientEndOfDay || getEndOfDay(targetDate);
 
     const pb = await getPocketBaseAdminClient();
 
