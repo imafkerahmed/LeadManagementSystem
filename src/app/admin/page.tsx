@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
@@ -28,14 +28,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-type AdminTab =
-  | "dashboard"
-  | "leads"
-  | "bulk"
-  | "reports"
-  | "settings";
+type AdminTab = "dashboard" | "leads" | "bulk" | "reports" | "settings";
 
-const tabs: Array<{ id: AdminTab; label: string; icon: any }> = [
+const tabs: Array<{
+  id: AdminTab;
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+}> = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "leads", label: "All Leads", icon: UsersIcon },
   { id: "bulk", label: "Bulk Upload", icon: UploadCloud },
@@ -140,10 +139,15 @@ export default function AdminPage() {
         <aside className="w-68 bg-white border-r border-slate-200/80 flex flex-col text-slate-700 shadow-[4px_0_24px_rgba(15,23,42,0.03)] relative z-20">
           <div className="px-5 py-8 border-b border-slate-100/80 bg-white flex flex-col items-center text-center gap-4 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-blue-50/80 via-transparent to-transparent pointer-events-none" />
-            
+
             <div className="flex flex-col items-center gap-4 relative z-10">
               <div className="relative h-24 w-24 rounded-[1.5rem] overflow-hidden shadow-sm shadow-slate-200/50 border border-slate-100 flex-shrink-0 bg-white">
-                <Image src="/images/amazon-logo.jpeg" alt="Amazon College Logo" fill className="object-cover p-1" />
+                <Image
+                  src="/images/amazon-logo.jpeg"
+                  alt="Amazon College Logo"
+                  fill
+                  className="object-cover p-1"
+                />
               </div>
               <div className="flex flex-col gap-0.5 items-center">
                 <h1 className="text-xl font-black tracking-tight text-slate-900 leading-tight">
@@ -154,7 +158,7 @@ export default function AdminPage() {
                 </span>
               </div>
             </div>
-            
+
             <div className="relative z-10 mt-1">
               <div className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200/60 rounded-xl shadow-sm">
                 <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
@@ -179,7 +183,9 @@ export default function AdminPage() {
                       : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-slate-400 group-hover:text-slate-600"}`} />
+                  <Icon
+                    className={`w-4 h-4 ${isActive ? "text-white" : "text-slate-400 group-hover:text-slate-600"}`}
+                  />
                   <span>{t.label}</span>
                 </button>
               );
@@ -193,7 +199,9 @@ export default function AdminPage() {
             >
               <LogOut className="w-4.5 h-4.5 flex-shrink-0 text-slate-400" />
               <div className="text-left flex-1 min-w-0">
-                <div className="text-xs font-bold text-slate-700 truncate">{adminName}</div>
+                <div className="text-xs font-bold text-slate-700 truncate">
+                  {adminName}
+                </div>
                 <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
                   {adminRole}
                 </div>
@@ -210,21 +218,29 @@ export default function AdminPage() {
                 {tabs.find((t) => t.id === currentTab)?.label}
               </h2>
               <p className="text-xs text-slate-400 mt-0.5 font-medium">
-                {currentTab === "dashboard" && "Real-time key statistics & active trends"}
-                {currentTab === "leads" && "Search, browse, edit, and filter all leads"}
+                {currentTab === "dashboard" &&
+                  "Real-time key statistics & active trends"}
+                {currentTab === "leads" &&
+                  "Search, browse, edit, and filter all leads"}
                 {currentTab === "bulk" && "Upload CSV file for batch imports"}
-                {currentTab === "reports" && "Query performance stats and visual charts"}
-                {currentTab === "settings" && "Manage administrators, credentials, and settings"}
+                {currentTab === "reports" &&
+                  "Query performance stats and visual charts"}
+                {currentTab === "settings" &&
+                  "Manage administrators, credentials, and settings"}
               </p>
             </div>
           </header>
 
           <main className="flex-1 overflow-y-auto px-8 py-8 bg-[#fafbfc]">
-            <div className={`mx-auto transition-all duration-300 ${
-              currentTab === "leads" || currentTab === "reports" || currentTab === "dashboard"
-                ? "max-w-7xl"
-                : "max-w-5xl"
-            }`}>
+            <div
+              className={`mx-auto transition-all duration-300 ${
+                currentTab === "leads" ||
+                currentTab === "reports" ||
+                currentTab === "dashboard"
+                  ? "max-w-7xl"
+                  : "max-w-5xl"
+              }`}
+            >
               {currentTab === "dashboard" && <AdminDashboard />}
               {currentTab === "leads" && <AdminLeads />}
               {currentTab === "bulk" && (
@@ -240,14 +256,18 @@ export default function AdminPage() {
       <AlertDialog open={logoutOpen} onOpenChange={setLogoutOpen}>
         <AlertDialogContent className="rounded-2xl border border-slate-100 bg-white shadow-xl">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-slate-800 font-bold">Log Out</AlertDialogTitle>
+            <AlertDialogTitle className="text-slate-800 font-bold">
+              Log Out
+            </AlertDialogTitle>
             <AlertDialogDescription className="text-slate-500 text-sm">
               Are you sure you want to log out? You&apos;ll need to sign in
               again to access the system.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition-all">Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition-all">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 const pb = createPocketBaseClient();

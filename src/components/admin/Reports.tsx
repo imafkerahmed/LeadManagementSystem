@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import DailyReports from "@/components/admin/DailyReports";
-import { Download, RefreshCw, PieChart, Users, Table, Calendar } from "lucide-react";
+import { Download, RefreshCw, PieChart, Users, Table } from "lucide-react";
 
 interface CounselorOption {
   id: string;
@@ -52,7 +52,14 @@ interface PresetRange {
   getDates: () => { start: string; end: string };
 }
 
-const LEAD_STATUSES = ["New", "Ringing-No-Answer", "Contacted", "Follow-Up", "Registered", "Lost"];
+const LEAD_STATUSES = [
+  "New",
+  "Ringing-No-Answer",
+  "Contacted",
+  "Follow-Up",
+  "Registered",
+  "Lost",
+];
 
 const STATUS_COLORS: Record<string, string> = {
   New: "bg-blue-100 text-blue-800",
@@ -446,7 +453,9 @@ export default function AdminReports() {
               disabled={isLoading}
               className="inline-flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all disabled:opacity-50"
             >
-              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+              <RefreshCw
+                className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+              />
               {isLoading ? "Generating..." : "Generate Report"}
             </button>
 
@@ -483,7 +492,8 @@ export default function AdminReports() {
                     {reportData.stats.enrollmentRate}%
                   </div>
                   <div className="text-[10px] text-slate-400 font-medium mt-1">
-                    {reportData.stats.byStatus["Registered"] || 0} registered leads
+                    {reportData.stats.byStatus["Registered"] || 0} registered
+                    leads
                   </div>
                 </div>
 
@@ -529,8 +539,12 @@ export default function AdminReports() {
                           key={status}
                           className="flex justify-between items-center p-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100/50 transition-colors"
                         >
-                          <span className="text-xs font-semibold text-slate-600">{status}</span>
-                          <span className="text-xs font-bold text-slate-800">{count}</span>
+                          <span className="text-xs font-semibold text-slate-600">
+                            {status}
+                          </span>
+                          <span className="text-xs font-bold text-slate-800">
+                            {count}
+                          </span>
                         </div>
                       ),
                     )}
@@ -556,7 +570,9 @@ export default function AdminReports() {
                             <span className="text-xs font-semibold text-slate-600">
                               {counselor?.name || counselor?.email || "Unknown"}
                             </span>
-                            <span className="text-xs font-bold text-slate-800">{count}</span>
+                            <span className="text-xs font-bold text-slate-800">
+                              {count}
+                            </span>
                           </div>
                         );
                       },
@@ -575,11 +591,15 @@ export default function AdminReports() {
                   <table className="w-full border-separate border-spacing-0 text-sm">
                     <thead>
                       <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100">
-                        <th className="px-4 py-3 font-semibold rounded-l-xl">Student Name</th>
+                        <th className="px-4 py-3 font-semibold rounded-l-xl">
+                          Student Name
+                        </th>
                         <th className="px-4 py-3 font-semibold">Mobile</th>
                         <th className="px-4 py-3 font-semibold">Course</th>
                         <th className="px-4 py-3 font-semibold">Status</th>
-                        <th className="px-4 py-3 font-semibold rounded-r-xl">Assigned To</th>
+                        <th className="px-4 py-3 font-semibold rounded-r-xl">
+                          Assigned To
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -589,18 +609,29 @@ export default function AdminReports() {
                           currentPage * itemsPerPage,
                         )
                         .map((lead) => (
-                          <tr key={lead.id} className="hover:bg-slate-50/30 transition-colors">
-                            <td className="px-4 py-3 font-semibold text-slate-800">{lead.studentName}</td>
+                          <tr
+                            key={lead.id}
+                            className="hover:bg-slate-50/30 transition-colors"
+                          >
+                            <td className="px-4 py-3 font-semibold text-slate-800">
+                              {lead.studentName}
+                            </td>
                             <td className="px-4 py-3 font-mono text-xs text-slate-500">
                               {lead.mobileWithCountry}
                             </td>
-                            <td className="px-4 py-3 text-slate-600">{lead.course}</td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {lead.course}
+                            </td>
                             <td className="px-4 py-3">
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_COLORS[lead.status] || "bg-slate-50 text-slate-700 border border-slate-200"}`}>
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_COLORS[lead.status] || "bg-slate-50 text-slate-700 border border-slate-200"}`}
+                              >
                                 {lead.status}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-slate-600">{lead.assignedToName}</td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {lead.assignedToName}
+                            </td>
                           </tr>
                         ))}
                     </tbody>

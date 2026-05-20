@@ -31,71 +31,52 @@ type HistoryRecord = {
   created?: string;
 };
 
-/**
- * Format a date to start of day (matches Reports endpoint pattern)
- */
 export function getStartOfDay(date: Date): string {
-  const startDay = new Date(Date.UTC(
-    date.getUTCFullYear(),
-    date.getUTCMonth(),
-    date.getUTCDate(),
-    0, 0, 0, 0
-  ));
+  const startDay = new Date(
+    Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate(),
+      0,
+      0,
+      0,
+      0,
+    ),
+  );
   return startDay.toISOString();
 }
 
-/**
- * Format a date to end of day (matches Reports endpoint pattern)
- */
 export function getEndOfDay(date: Date): string {
-  const endDay = new Date(Date.UTC(
-    date.getUTCFullYear(),
-    date.getUTCMonth(),
-    date.getUTCDate(),
-    23, 59, 59, 999
-  ));
+  const endDay = new Date(
+    Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate(),
+      23,
+      59,
+      59,
+      999,
+    ),
+  );
   return endDay.toISOString();
 }
 
-/**
- * Aggregate daily report metrics for all counselors
- * @param leads - Leads created on the selected date (for daily metrics)
- * @param history - History records for the selected date
- * @param counselors - All counselors
- * @param allLeadsForOverdue - All leads in system (for global New status and overdue calculations). If provided, those counts reflect all leads, not just today's
- */
 export function aggregateDailyMetrics(
   leads: LeadRecord[],
   history: HistoryRecord[],
   counselors: UserRecord[],
   allLeadsForOverdue?: LeadRecord[],
 ): DailyReportMetrics[] {
-  // Map to store metrics by counselor ID
   const metricsMap = new Map<string, DailyReportMetrics>();
 
-  // Initialize metrics for all counselors (only those who have activity today)
-  const activeCounselorIds = new Set<string>();
-
-  // Count new leads per counselor
-  const newLeadsByCounselor = new Map<string, number>();
-
-  // Count leads by status per counselor across the dataset (for current status distribution)
-  const statusCountsByCounselor = new Map<
-    string,
-    {
-      New: number;
-      "Ringing-No-Answer": number;
-      Contacted: number;
-      "Follow-Up": number;
-      Registered: number;
-      Lost: number;
-    }
-  >();
-
-  // Helper to normalize various status strings into the canonical keys used across the app
+  // Helpers
   const normalizeStatus = (value?: string) => {
     const v = (value || "").trim().toLowerCase();
-    if (v === "ringing-no-answer" || v === "ringing no answer" || v === "ringing_no_answer")
+    if (
+      v === "ringing-no-answer" ||
+      v === "ringing no answer" ||
+      v === "ringing_no_answer"
+    )
       return "Ringing-No-Answer";
     if (v === "followup" || v === "follow-up" || v === "follow\-up")
       return "Follow-Up";
@@ -106,156 +87,163 @@ export function aggregateDailyMetrics(
     return (value || "").trim();
   };
 
-  leads.forEach((lead) => {
-    if (lead.assignedTo) {
-      activeCounselorIds.add(lead.assignedTo);
-
-      // Count as new lead
-      newLeadsByCounselor.set(
-        lead.assignedTo,
-        (newLeadsByCounselor.get(lead.assignedTo) || 0) + 1,
-      );
-
-      // (old logic counted statuses only for today's leads) --- keep newLeads count above
-    }
-  });
-
-  // Find target date's end of day.
-  let endOfTargetDay = new Date().toISOString();
-  if (leads.length > 0 && leads[0].created) {
-    endOfTargetDay = getEndOfDay(new Date(leads[0].created));
-  } else if (history.length > 0 && history[0].created) {
-    endOfTargetDay = getEndOfDay(new Date(history[0].created));
-  }
-
-  // Count current New leads across the full dataset so the New column shows all
-  // leads that are still in New status, regardless of when they were created,
-  // but only if they were present on (created on or before) the target day.
-  // If they were subsequently converted to a different status, they are deducted (not counted in New).
-  const globalNewStatusByCounselor = new Map<string, number>();
+  // Build lookup of leads
   const leadLookup = new Map<string, LeadRecord>();
-  const leadsToIndex = allLeadsForOverdue || leads;
-  leadsToIndex.forEach((l) => {
+  const lookupSource = allLeadsForOverdue || leads;
+  lookupSource.forEach((l) => {
     if (l.id) leadLookup.set(l.id, l);
-    if (
-      l.assignedTo &&
-      normalizeStatus(l.status || "New") === "New" &&
-      l.created &&
-      l.created <= endOfTargetDay
-    ) {
-      globalNewStatusByCounselor.set(
-        l.assignedTo,
-        (globalNewStatusByCounselor.get(l.assignedTo) || 0) + 1,
-      );
-      activeCounselorIds.add(l.assignedTo);
+  });
+
+  // Active counselors and counts
+  const activeCounselorIds = new Set<string>();
+  const newLeadsByCounselor = new Map<string, number>();
+
+  // Status sets to ensure unique lead counting per status per counselor
+  const statusSetsByCounselor = new Map<string, Map<string, Set<string>>>();
+
+  // New-present and converted-away sets per counselor
+  const newPresentByCounselor = new Map<string, Set<string>>();
+  const convertedAwayByCounselor = new Map<string, Set<string>>();
+
+  // Count leads created today per counselor (newLeads)
+  leads.forEach((lead) => {
+    if (!lead.assignedTo) return;
+    activeCounselorIds.add(lead.assignedTo);
+    newLeadsByCounselor.set(
+      lead.assignedTo,
+      (newLeadsByCounselor.get(lead.assignedTo) || 0) + 1,
+    );
+
+    // If created today and status is New, include in newPresent
+    if (lead.id && normalizeStatus(lead.status || "") === "New") {
+      if (!newPresentByCounselor.has(lead.assignedTo))
+        newPresentByCounselor.set(lead.assignedTo, new Set());
+      newPresentByCounselor.get(lead.assignedTo)!.add(lead.id);
     }
   });
 
-  // Initialize counters for any counselor we encounter via history
+  // Process history entries for the day
   history.forEach((h) => {
     if (!h || h.eventType !== "Status Change") return;
-    const newStatus = normalizeStatus(h.newValue || "");
-    if (
-      !["New", "Ringing-No-Answer", "Contacted", "Follow-Up", "Registered", "Lost"].includes(
-        newStatus,
-      )
-    ) {
-      return;
-    }
+    const leadId = h.leadId;
+    if (!leadId) return;
 
-    // Determine counselor: prefer the lead's assignedTo, fallback to changedBy
+    const newStatus = normalizeStatus(h.newValue || "");
+    const oldStatus = normalizeStatus(h.oldValue || "");
+
+    // counselor resolution: prefer assignedTo from lead, fallback to changedBy
     let counselorId: string | undefined;
-    if (h.leadId) {
-      const lead = leadLookup.get(h.leadId);
-      if (lead && lead.assignedTo) counselorId = lead.assignedTo;
-    }
+    const lead = leadLookup.get(leadId);
+    if (lead && lead.assignedTo) counselorId = lead.assignedTo;
     if (!counselorId && h.changedBy) counselorId = h.changedBy;
     if (!counselorId) return;
 
-    if (!statusCountsByCounselor.has(counselorId)) {
-      statusCountsByCounselor.set(counselorId, {
-        New: 0,
-        "Ringing-No-Answer": 0,
-        Contacted: 0,
-        "Follow-Up": 0,
-        Registered: 0,
-        Lost: 0,
-      });
+    activeCounselorIds.add(counselorId);
+
+    if (!statusSetsByCounselor.has(counselorId))
+      statusSetsByCounselor.set(counselorId, new Map());
+    const cMap = statusSetsByCounselor.get(counselorId)!;
+
+    const tracked = [
+      "New",
+      "Ringing-No-Answer",
+      "Contacted",
+      "Follow-Up",
+      "Registered",
+      "Lost",
+    ];
+    if (tracked.includes(newStatus)) {
+      if (!cMap.has(newStatus)) cMap.set(newStatus, new Set());
+      cMap.get(newStatus)!.add(leadId);
     }
 
-    const counts = statusCountsByCounselor.get(counselorId)!;
-    if (newStatus in counts) counts[newStatus as keyof typeof counts]++;
+    // Track conversions away from New
+    if (oldStatus === "New" && newStatus !== "New") {
+      if (!convertedAwayByCounselor.has(counselorId))
+        convertedAwayByCounselor.set(counselorId, new Set());
+      convertedAwayByCounselor.get(counselorId)!.add(leadId);
+    }
 
-    // Mark counselor as active for report inclusion
-    activeCounselorIds.add(counselorId);
+    // Track leads moved to New during the day
+    if (newStatus === "New") {
+      if (!newPresentByCounselor.has(counselorId))
+        newPresentByCounselor.set(counselorId, new Set());
+      newPresentByCounselor.get(counselorId)!.add(leadId);
+    }
   });
 
-  // Count overdue follow-ups (dates in past and not completed)
-  // Use allLeadsForOverdue if provided, otherwise use today's leads
+  // Overdue follow-ups
   const overdueFollowupsByCounselor = new Map<string, number>();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-
-  const leadsForOverdueCalculation = allLeadsForOverdue || leads;
-
-  leadsForOverdueCalculation.forEach((lead) => {
-    if (lead.assignedTo) {
-      let overdueCount = 0;
-      const followups = [
-        { date: lead.followup1Date, completed: lead.followup1Completed },
-        { date: lead.followup2Date, completed: lead.followup2Completed },
-        { date: lead.followup3Date, completed: lead.followup3Completed },
-      ];
-      followups.forEach((fu) => {
-        if (fu.date && !fu.completed) {
-          try {
-            const fuDate = new Date(fu.date);
-            fuDate.setHours(0, 0, 0, 0);
-            if (fuDate < today) overdueCount++;
-          } catch {
-            // ignore invalid dates
-          }
+  const leadsForOverdueCalc = allLeadsForOverdue || leads;
+  leadsForOverdueCalc.forEach((lead) => {
+    if (!lead.assignedTo) return;
+    let overdueCount = 0;
+    const followups = [
+      {
+        date: (lead as LeadRecord).followup1Date,
+        completed: (lead as LeadRecord).followup1Completed,
+      },
+      {
+        date: (lead as LeadRecord).followup2Date,
+        completed: (lead as LeadRecord).followup2Completed,
+      },
+      {
+        date: (lead as LeadRecord).followup3Date,
+        completed: (lead as LeadRecord).followup3Completed,
+      },
+    ];
+    followups.forEach((fu) => {
+      if (fu.date && !fu.completed) {
+        try {
+          const fuDate = new Date(fu.date);
+          fuDate.setHours(0, 0, 0, 0);
+          if (fuDate < today) overdueCount++;
+        } catch {
+          // ignore
         }
-      });
-      if (overdueCount > 0) {
-        // Only add to activeCounselorIds if this is from today's leads
-        // (not inflating active counselors with ones who only have overdue follow-ups)
-        if (!allLeadsForOverdue) {
-          activeCounselorIds.add(lead.assignedTo);
-        }
-        overdueFollowupsByCounselor.set(
-          lead.assignedTo,
-          (overdueFollowupsByCounselor.get(lead.assignedTo) || 0) +
-            overdueCount,
-        );
       }
+    });
+    if (overdueCount > 0) {
+      if (!allLeadsForOverdue) activeCounselorIds.add(lead.assignedTo!);
+      overdueFollowupsByCounselor.set(
+        lead.assignedTo,
+        (overdueFollowupsByCounselor.get(lead.assignedTo) || 0) + overdueCount,
+      );
     }
   });
 
-  // Build metrics for each counselor with activity today or overdue follow-ups
-  // Start with active counselors from today's activity
-  const allRelevantCounselors = new Set(activeCounselorIds);
-  // Add counselors who have a New-status lead anywhere in the dataset
-  globalNewStatusByCounselor.forEach((_, counselorId) => {
-    allRelevantCounselors.add(counselorId);
-  });
-  // Add counselors who have overdue follow-ups
-  overdueFollowupsByCounselor.forEach((_, counselorId) => {
-    allRelevantCounselors.add(counselorId);
-  });
+  // Build list of counselors to report on
+  const allRelevantCounselors = new Set<string>(activeCounselorIds);
+  statusSetsByCounselor.forEach((_, cid) => allRelevantCounselors.add(cid));
+  newPresentByCounselor.forEach((_, cid) => allRelevantCounselors.add(cid));
+  convertedAwayByCounselor.forEach((_, cid) => allRelevantCounselors.add(cid));
+  overdueFollowupsByCounselor.forEach((_, cid) =>
+    allRelevantCounselors.add(cid),
+  );
 
   allRelevantCounselors.forEach((counselorId) => {
     const counselor = counselors.find((c) => c.id === counselorId);
     const newLeads = newLeadsByCounselor.get(counselorId) || 0;
-    const statusNew = globalNewStatusByCounselor.get(counselorId) || 0;
-    const statusCounts = statusCountsByCounselor.get(counselorId) || {
-      New: 0,
-      "Ringing-No-Answer": 0,
-      Contacted: 0,
-      "Follow-Up": 0,
-      Registered: 0,
-      Lost: 0,
-    };
+
+    const newPresentSet =
+      newPresentByCounselor.get(counselorId) || new Set<string>();
+    const convertedSet =
+      convertedAwayByCounselor.get(counselorId) || new Set<string>();
+    const statusNew = Math.max(
+      0,
+      newPresentSet.size -
+        Array.from(newPresentSet).filter((id) => convertedSet.has(id)).length,
+    );
+
+    const cMap = statusSetsByCounselor.get(counselorId) || new Map();
+    const statusRingingNoAnswer = cMap.get("Ringing-No-Answer")?.size || 0;
+    const statusContacted = cMap.get("Contacted")?.size || 0;
+    const statusFollowUp = cMap.get("Follow-Up")?.size || 0;
+    const statusRegistered = cMap.get("Registered")?.size || 0;
+    const statusLost = cMap.get("Lost")?.size || 0;
+
     const followups = overdueFollowupsByCounselor.get(counselorId) || 0;
 
     metricsMap.set(counselorId, {
@@ -263,17 +251,16 @@ export function aggregateDailyMetrics(
       counselorName: counselor?.name || counselor?.email || "Unknown",
       newLeads,
       statusNew,
-      statusRingingNoAnswer: statusCounts["Ringing-No-Answer"],
-      statusContacted: statusCounts.Contacted,
-      statusFollowUp: statusCounts["Follow-Up"],
-      statusRegistered: statusCounts.Registered,
-      statusLost: statusCounts.Lost,
+      statusRingingNoAnswer,
+      statusContacted,
+      statusFollowUp,
+      statusRegistered,
+      statusLost,
       overdueFollowups: followups,
-      hoursTracked: 0, // Placeholder for future enhancement
+      hoursTracked: 0,
     });
   });
 
-  // Return sorted by counselor name
   return Array.from(metricsMap.values()).sort((a, b) =>
     a.counselorName.localeCompare(b.counselorName),
   );

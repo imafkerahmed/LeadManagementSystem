@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { createPocketBaseClient } from "@/lib/pocketbase";
-import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -342,7 +341,9 @@ export default function AdminUsers() {
           </div>
           <div>
             <h3 className="text-xl font-bold text-slate-800">System Users</h3>
-            <p className="text-sm text-slate-400">Manage administrator and counselor credentials</p>
+            <p className="text-sm text-slate-400">
+              Manage administrator and counselor credentials
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -484,8 +485,8 @@ export default function AdminUsers() {
           </div>
 
           <div className="flex gap-2 pt-2">
-            <button 
-              onClick={() => void saveUser()} 
+            <button
+              onClick={() => void saveUser()}
               disabled={isSubmitting}
               className="rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all disabled:opacity-50"
             >
@@ -512,13 +513,18 @@ export default function AdminUsers() {
               <th className="px-4 py-3 font-semibold">Role</th>
               <th className="px-4 py-3 font-semibold">Assigned Leads</th>
               <th className="px-4 py-3 font-semibold">Status</th>
-              <th className="px-4 py-3 font-semibold text-right rounded-r-2xl">Actions</th>
+              <th className="px-4 py-3 font-semibold text-right rounded-r-2xl">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (
               <tr>
-                <td className="px-4 py-8 text-center text-slate-400 font-medium" colSpan={5}>
+                <td
+                  className="px-4 py-8 text-center text-slate-400 font-medium"
+                  colSpan={5}
+                >
                   <div className="flex items-center justify-center gap-2">
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-500 border-t-transparent" />
                     Loading system directory...
@@ -527,7 +533,10 @@ export default function AdminUsers() {
               </tr>
             ) : filteredUsers.length === 0 ? (
               <tr>
-                <td className="px-4 py-8 text-center text-slate-400" colSpan={5}>
+                <td
+                  className="px-4 py-8 text-center text-slate-400"
+                  colSpan={5}
+                >
                   No users match the selected filters
                 </td>
               </tr>
@@ -536,12 +545,17 @@ export default function AdminUsers() {
                 const isEnabled = user.accountStatus === "enabled";
 
                 return (
-                  <tr key={user.id} className="hover:bg-slate-50/30 transition-colors duration-200">
+                  <tr
+                    key={user.id}
+                    className="hover:bg-slate-50/30 transition-colors duration-200"
+                  >
                     <td className="px-4 py-3">
                       <div className="font-semibold text-slate-800">
                         {user.name}
                       </div>
-                      <div className="text-xs text-slate-400 mt-0.5">{user.email}</div>
+                      <div className="text-xs text-slate-400 mt-0.5">
+                        {user.email}
+                      </div>
                     </td>
                     <td className="px-4 py-3 font-medium text-slate-600">
                       {user.role === "admin" ? (
@@ -555,7 +569,10 @@ export default function AdminUsers() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-slate-600">
-                      <span className="font-bold text-slate-700">{user.assignedLeadCount}</span> leads
+                      <span className="font-bold text-slate-700">
+                        {user.assignedLeadCount}
+                      </span>{" "}
+                      leads
                     </td>
                     <td className="px-4 py-3">
                       <label className="inline-flex items-center gap-2 cursor-pointer">
@@ -688,8 +705,8 @@ export default function AdminUsers() {
               >
                 Cancel
               </button>
-              <button 
-                onClick={handleResetPassword} 
+              <button
+                onClick={handleResetPassword}
                 disabled={resetLoading}
                 className="rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all disabled:opacity-50"
               >
