@@ -73,6 +73,21 @@ export default function BulkUpload({
   const [isBatchUploaded, setIsBatchUploaded] = useState(false);
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [lookupError, setLookupError] = useState<string | null>(null);
+  const [duplicateScanResult, setDuplicateScanResult] = useState<{
+    scanning: boolean;
+    scanned: boolean;
+    duplicates: Array<{
+      row: number;
+      studentName: string;
+      mobileWithCountry: string;
+      assignedTo?: string;
+      course?: string;
+    }>;
+  }>({
+    scanning: false,
+    scanned: false,
+    duplicates: [],
+  });
 
   const csvFieldLabels: Record<CsvField, string> = {
     studentName: "Student Name",
@@ -212,8 +227,16 @@ export default function BulkUpload({
     selectedCounselorIds.includes(counselor.id),
   );
 
+  const getUniqueLeads = () => {
+    const duplicateMobiles = new Set(
+      duplicateScanResult.duplicates.map((d) => d.mobileWithCountry)
+    );
+    return leads.filter((lead) => !duplicateMobiles.has(lead.mobileWithCountry));
+  };
+
   const getAssignmentBreakdown = () => {
-    if (leads.length === 0 || selectedCounselors.length === 0) {
+    const uniqueLeads = getUniqueLeads();
+    if (uniqueLeads.length === 0 || selectedCounselors.length === 0) {
       return [] as Array<{ id: string; name: string; count: number }>;
     }
 
@@ -221,13 +244,13 @@ export default function BulkUpload({
     selectedCounselors.forEach((counselor) => counts.set(counselor.id, 0));
 
     if (assignmentMethod === "roundRobin") {
-      leads.forEach((_, index) => {
+      uniqueLeads.forEach((_, index) => {
         const counselor = selectedCounselors[index % selectedCounselors.length];
         counts.set(counselor.id, (counts.get(counselor.id) || 0) + 1);
       });
     } else {
-      const baseCount = Math.floor(leads.length / selectedCounselors.length);
-      const remainder = leads.length % selectedCounselors.length;
+      const baseCount = Math.floor(uniqueLeads.length / selectedCounselors.length);
+      const remainder = uniqueLeads.length % selectedCounselors.length;
 
       selectedCounselors.forEach((counselor, index) => {
         counts.set(counselor.id, baseCount + (index < remainder ? 1 : 0));
@@ -244,6 +267,7 @@ export default function BulkUpload({
   const handleFileUpload = (file: File) => {
     setUploadResult(null);
     setIsBatchUploaded(false);
+    setDuplicateScanResult({ scanning: false, scanned: false, duplicates: [] });
 
     Papa.parse<Record<string, string>>(file, {
       header: true,
@@ -271,6 +295,46 @@ export default function BulkUpload({
         alert(`Error reading file: ${error.message}`);
       },
     });
+  };
+
+  const scanForDuplicates = async (mappedLeads: Lead[]) => {
+    if (mappedLeads.length === 0) return;
+
+    setDuplicateScanResult({
+      scanning: true,
+      scanned: false,
+      duplicates: [],
+    });
+
+    try {
+      const response = await fetch("/api/admin/bulk-upload/check-duplicates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leads: mappedLeads }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setDuplicateScanResult({
+          scanning: false,
+          scanned: true,
+          duplicates: data.duplicates || [],
+        });
+      } else {
+        toast.error("Failed to pre-scan for duplicates");
+        setDuplicateScanResult((current) => ({
+          ...current,
+          scanning: false,
+        }));
+      }
+    } catch (err) {
+      console.error("Scanning failed:", err);
+      toast.error("An error occurred during duplicate scan");
+      setDuplicateScanResult((current) => ({
+        ...current,
+        scanning: false,
+      }));
+    }
   };
 
   const applyMapping = () => {
@@ -307,6 +371,7 @@ export default function BulkUpload({
     setLeads(mappedLeads);
     setIsBatchUploaded(false);
     setMappingOpen(false);
+    scanForDuplicates(mappedLeads);
   };
 
   const cancelMapping = () => {
@@ -340,7 +405,7 @@ export default function BulkUpload({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          leads,
+          leads: getUniqueLeads(),
           assignmentMethod,
           selectedCounselorIds,
           performedBy: operatorId,
@@ -614,7 +679,7 @@ export default function BulkUpload({
                   </p>
                 </div>
                 <p className="text-sm font-medium text-blue-900">
-                  {leads.length} total leads
+                  {getUniqueLeads().length} unique leads to assign
                 </p>
               </div>
 
@@ -707,12 +772,101 @@ export default function BulkUpload({
         </div>
       )}
 
-      {/* Preview */}
+      {/* Duplicate Scan Status */}
       {leads.length > 0 && (
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            {leads.length} Leads Ready to Upload
+            Duplicate Verification
           </h3>
+          {duplicateScanResult.scanning ? (
+            <div className="flex items-center gap-3 text-sm text-slate-600 animate-pulse">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-500 border-t-transparent" />
+              Scanning for duplicate leads in database...
+            </div>
+          ) : duplicateScanResult.scanned ? (
+            duplicateScanResult.duplicates.length === 0 ? (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-emerald-800 flex flex-col gap-1">
+                <span className="font-semibold flex items-center gap-2">
+                  ✓ Clean Upload Verified
+                </span>
+                <span className="text-sm">
+                  Great! No duplicate phone numbers found in the database. All {leads.length} leads are completely unique and ready for assignment.
+                </span>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900 flex flex-col gap-1">
+                  <span className="font-semibold flex items-center gap-2">
+                    ⚠ Existing Duplicate Leads Detected
+                  </span>
+                  <span className="text-sm">
+                    Found <strong>{duplicateScanResult.duplicates.length}</strong> duplicate leads that already exist in the system. 
+                    They will be <strong>automatically skipped</strong> to prevent data duplication.
+                    Only <strong>{getUniqueLeads().length} new leads</strong> will be uploaded and assigned.
+                  </span>
+                </div>
+
+                <div className="border border-amber-200 rounded-lg overflow-hidden">
+                  <div className="bg-amber-100/50 px-4 py-2 text-xs font-semibold text-amber-900 uppercase tracking-wide border-b border-amber-200">
+                    Duplicate Leads List (Will be skipped)
+                  </div>
+                  <div className="max-h-60 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-amber-50/50 border-b border-amber-200 text-slate-700">
+                          <th className="px-4 py-2 text-left text-xs font-medium">Row</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium">Name</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium">Mobile</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium">Assigned To</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {duplicateScanResult.duplicates.map((dup, idx) => (
+                          <tr key={idx} className="border-b border-amber-100 hover:bg-amber-50/30 text-slate-700">
+                            <td className="px-4 py-2 font-mono text-xs">{dup.row}</td>
+                            <td className="px-4 py-2 font-medium">{dup.studentName}</td>
+                            <td className="px-4 py-2">{dup.mobileWithCountry}</td>
+                            <td className="px-4 py-2 text-xs">
+                              {dup.assignedTo ? (
+                                <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded font-medium">
+                                  {dup.assignedTo}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400">Unassigned</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )
+          ) : (
+            <button
+              onClick={() => scanForDuplicates(leads)}
+              className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 text-sm font-medium"
+            >
+              Verify Duplicates
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Preview */}
+      {leads.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">
+              {getUniqueLeads().length} Leads Ready to Upload
+            </h3>
+            {duplicateScanResult.duplicates.length > 0 && (
+              <span className="text-xs text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200 font-medium">
+                {duplicateScanResult.duplicates.length} duplicate leads excluded
+              </span>
+            )}
+          </div>
           <div className="max-h-96 overflow-y-auto">
             <table className="w-full text-sm">
               <thead>
@@ -724,7 +878,7 @@ export default function BulkUpload({
                 </tr>
               </thead>
               <tbody>
-                {leads.map((lead, idx) => (
+                {getUniqueLeads().map((lead, idx) => (
                   <tr key={idx} className="border-b hover:bg-gray-50">
                     <td className="px-4 py-2">{lead.studentName}</td>
                     <td className="px-4 py-2">{lead.mobileWithCountry}</td>
@@ -734,19 +888,28 @@ export default function BulkUpload({
                     </td>
                   </tr>
                 ))}
+                {getUniqueLeads().length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-8 text-center text-slate-500">
+                      No new leads to upload. All uploaded leads exist in database.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
           <button
             onClick={handleUpload}
-            disabled={isUploading || isBatchUploaded}
+            disabled={isUploading || isBatchUploaded || getUniqueLeads().length === 0 || duplicateScanResult.scanning}
             className="mt-4 w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 transition font-medium"
           >
             {isUploading
               ? "Uploading..."
               : isBatchUploaded
                 ? "Bulk Upload Completed"
-                : "Upload Leads"}
+                : getUniqueLeads().length === 0
+                  ? "No New Leads to Upload"
+                  : "Upload Leads"}
           </button>
         </div>
       )}
