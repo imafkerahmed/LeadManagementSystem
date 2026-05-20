@@ -14,8 +14,10 @@ export interface User {
 // Lead status types
 export type LeadStatus =
   | "New"
+  | "Ringing-No-Answer"
   | "Contacted"
   | "Follow-Up"
+  | "Follow-up"
   | "Registered"
   | "Lost";
 
@@ -119,6 +121,7 @@ export interface DailyReportMetrics {
   counselorName: string;
   newLeads: number;
   statusNew: number;
+  statusRingingNoAnswer: number;
   statusContacted: number;
   statusFollowUp: number;
   statusRegistered: number;

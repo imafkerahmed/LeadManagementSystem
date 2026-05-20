@@ -58,10 +58,12 @@ interface PresetRange {
   getDates: () => { start: string; end: string };
 }
 
-const LEAD_STATUSES = ["New", "Contacted", "Follow-Up", "Registered", "Lost"];
+const LEAD_STATUSES = ["New", "Ringing-No-Answer", "Contacted", "Follow-Up", "Registered", "Lost"];
 
 const STATUS_COLORS: Record<string, string> = {
   New: "bg-blue-100 text-blue-800",
+  "Ringing-No-Answer": "bg-indigo-100 text-indigo-800",
+  "Ringing No Answer": "bg-indigo-100 text-indigo-800",
   Contacted: "bg-yellow-100 text-yellow-800",
   "Follow-Up": "bg-orange-100 text-orange-800",
   "Follow-up": "bg-orange-100 text-orange-800",

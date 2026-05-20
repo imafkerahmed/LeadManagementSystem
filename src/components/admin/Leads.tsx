@@ -191,6 +191,9 @@ function splitPhoneParts(
 
 function normalizeLeadStatus(value: string | undefined): string {
   const normalized = (value || "").trim().toLowerCase();
+  if (normalized === "ringing-no-answer" || normalized === "ringing no answer") {
+    return "Ringing-No-Answer";
+  }
   if (normalized === "followup" || normalized === "follow-up") {
     return "Follow-up";
   }
@@ -1338,6 +1341,42 @@ export default function AdminLeads() {
         });
       }
 
+      if (selectedLead.followup1Completed !== followup1Completed) {
+        await pb.collection("leadHistory").create({
+          timeStamp: now,
+          leadId: selectedLead.id,
+          eventType: "Follow-up Completed Toggle",
+          changedBy: pb.authStore.model?.id || "",
+          oldValue: selectedLead.followup1Completed ? "Completed" : "Pending",
+          newValue: followup1Completed ? "Completed" : "Pending",
+          field: "followup1Completed",
+        });
+      }
+
+      if (selectedLead.followup2Completed !== followup2Completed) {
+        await pb.collection("leadHistory").create({
+          timeStamp: now,
+          leadId: selectedLead.id,
+          eventType: "Follow-up Completed Toggle",
+          changedBy: pb.authStore.model?.id || "",
+          oldValue: selectedLead.followup2Completed ? "Completed" : "Pending",
+          newValue: followup2Completed ? "Completed" : "Pending",
+          field: "followup2Completed",
+        });
+      }
+
+      if (selectedLead.followup3Completed !== followup3Completed) {
+        await pb.collection("leadHistory").create({
+          timeStamp: now,
+          leadId: selectedLead.id,
+          eventType: "Follow-up Completed Toggle",
+          changedBy: pb.authStore.model?.id || "",
+          oldValue: selectedLead.followup3Completed ? "Completed" : "Pending",
+          newValue: followup3Completed ? "Completed" : "Pending",
+          field: "followup3Completed",
+        });
+      }
+
       await fetchLeads(page);
       const updated = await pb.collection("leads").getOne(selectedLead.id, {
         expand: "assignedTo",
@@ -1518,11 +1557,14 @@ export default function AdminLeads() {
     }
   };
 
-  const statuses = ["New", "Contacted", "Follow-up", "Registered", "Lost"];
+  const statuses = ["New", "Ringing-No-Answer", "Contacted", "Follow-up", "Registered", "Lost"];
   const statusColors: Record<string, string> = {
     New: "bg-blue-100 text-blue-800",
+    "Ringing-No-Answer": "bg-indigo-100 text-indigo-800",
+    "Ringing No Answer": "bg-indigo-100 text-indigo-800",
     Contacted: "bg-yellow-100 text-yellow-800",
     "Follow-up": "bg-orange-100 text-orange-800",
+    "Follow-Up": "bg-orange-100 text-orange-800",
     Registered: "bg-green-100 text-green-800",
     Lost: "bg-red-100 text-red-800",
   };
@@ -1652,7 +1694,7 @@ export default function AdminLeads() {
             </div>
           </div>
         ) : (
-          <table className="w-full">
+          <table className="w-full min-w-[1100px]">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
@@ -2108,8 +2150,7 @@ export default function AdminLeads() {
                                       }
                                       disabled={
                                         !followup1Date ||
-                                        isSaving ||
-                                        followup1Completed
+                                        isSaving
                                       }
                                       className="rounded"
                                     />
@@ -2196,8 +2237,7 @@ export default function AdminLeads() {
                                       }
                                       disabled={
                                         !followup2Date ||
-                                        isSaving ||
-                                        followup2Completed
+                                        isSaving
                                       }
                                       className="rounded"
                                     />
@@ -2284,8 +2324,7 @@ export default function AdminLeads() {
                                       }
                                       disabled={
                                         !followup3Date ||
-                                        isSaving ||
-                                        followup3Completed
+                                        isSaving
                                       }
                                       className="rounded"
                                     />

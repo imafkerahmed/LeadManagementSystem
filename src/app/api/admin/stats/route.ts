@@ -30,6 +30,7 @@ export async function GET() {
     const stats = {
       totalLeads: allLeads.length,
       newLeads: 0,
+      ringingNoAnswerLeads: 0,
       contactedLeads: 0,
       followUpLeads: 0,
       registeredLeads: 0,
@@ -38,6 +39,7 @@ export async function GET() {
         name: string;
         leadCount: number;
         newCount: number;
+        ringingNoAnswerCount: number;
         contactedCount: number;
       }>,
       recentActivity: [] as HistoryRecord[],
@@ -46,7 +48,7 @@ export async function GET() {
     // Count by status
     const counselorMap = new Map<
       string,
-      { total: number; new: number; contacted: number }
+      { total: number; new: number; ringingNoAnswer: number; contacted: number }
     >();
 
     allLeads.forEach((lead) => {
@@ -54,10 +56,15 @@ export async function GET() {
         case "New":
           stats.newLeads++;
           break;
+        case "Ringing-No-Answer":
+        case "Ringing No Answer":
+          stats.ringingNoAnswerLeads++;
+          break;
         case "Contacted":
           stats.contactedLeads++;
           break;
         case "Follow-up":
+        case "Follow-Up":
           stats.followUpLeads++;
           break;
         case "Registered":
@@ -71,13 +78,14 @@ export async function GET() {
       // Count by counselor
       const counselorKey = lead.assignedTo || "Unassigned";
       if (!counselorMap.has(counselorKey)) {
-        counselorMap.set(counselorKey, { total: 0, new: 0, contacted: 0 });
+        counselorMap.set(counselorKey, { total: 0, new: 0, ringingNoAnswer: 0, contacted: 0 });
       }
 
       const counselorData = counselorMap.get(counselorKey)!;
       counselorData.total++;
 
       if (lead.status === "New") counselorData.new++;
+      if (lead.status === "Ringing-No-Answer" || lead.status === "Ringing No Answer") counselorData.ringingNoAnswer++;
       if (lead.status === "Contacted") counselorData.contacted++;
     });
 
@@ -87,6 +95,7 @@ export async function GET() {
         name: key,
         leadCount: value.total,
         newCount: value.new,
+        ringingNoAnswerCount: value.ringingNoAnswer,
         contactedCount: value.contacted,
       });
     });

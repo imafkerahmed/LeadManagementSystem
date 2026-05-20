@@ -188,10 +188,13 @@ export default function CounselorPage() {
   } | null>(null);
 
   // Status flow: New -> Contacted -> Follow-up -> Registered
-  const statusFlow = ["New", "Contacted", "Follow-up", "Registered", "Lost"];
+  const statusFlow = ["New", "Ringing-No-Answer", "Contacted", "Follow-up", "Registered", "Lost"];
 
   const normalizeLeadStatus = (status: string | undefined) => {
     const normalized = (status || "").trim().toLowerCase();
+    if (normalized === "ringing-no-answer" || normalized === "ringing no answer") {
+      return "Ringing-No-Answer";
+    }
     if (normalized === "followup" || normalized === "follow-up") {
       return "Follow-up";
     }
@@ -207,6 +210,8 @@ export default function CounselorPage() {
     switch (status) {
       case "New":
         return "bg-blue-100 text-blue-700";
+      case "Ringing-No-Answer":
+        return "bg-indigo-100 text-indigo-700";
       case "Contacted":
         return "bg-purple-100 text-purple-700";
       case "Follow-up":
@@ -235,6 +240,10 @@ export default function CounselorPage() {
       normalizedCurrentStatus === "Lost"
     )
       return [normalizedCurrentStatus];
+    // If current status is New, it cannot be updated to New again.
+    if (normalizedCurrentStatus === "New") {
+      return statusFlow.slice(currentIndex + 1);
+    }
     // Include the current status so comment-only submissions are allowed,
     // then allow forward statuses (no going back).
     return [normalizedCurrentStatus, ...statusFlow.slice(currentIndex + 1)];
@@ -242,11 +251,9 @@ export default function CounselorPage() {
 
   const getDefaultModalStatus = useCallback((currentStatus: string) => {
     const normalizedCurrentStatus = normalizeLeadStatus(currentStatus);
-
     if (normalizedCurrentStatus === "New") {
-      return "Contacted";
+      return "Ringing-No-Answer";
     }
-
     return normalizedCurrentStatus;
   }, []);
 
@@ -568,7 +575,7 @@ export default function CounselorPage() {
     fetchLeads(counselorId);
   }, [counselorId, fetchLeads, isCounselor]);
 
-  const openLeadDetails = async (lead: Lead) => {
+  const openLeadDetails = async (lead: Lead, preserveStatusSelect: boolean = false) => {
     setModalOpen(true);
     setTimelineOpen(false);
     setHistoryLoading(true);
@@ -601,7 +608,9 @@ export default function CounselorPage() {
       };
 
       setSelectedLead(nextLead);
-      setStatusSelect(getDefaultModalStatus(nextLead.status));
+      if (!preserveStatusSelect) {
+        setStatusSelect(getDefaultModalStatus(nextLead.status));
+      }
       setEditedName(latestLead.studentName || "");
       setEditedCourse(latestLead.course || latestLead.courseName || "");
       setEditedEmail(latestLead.email || "");
@@ -666,13 +675,13 @@ export default function CounselorPage() {
       return;
     }
 
-    // Client-side enforcement: first change from New must be to Contacted
-    if (
-      selectedLead.status === "New" &&
-      statusSelect !== selectedLead.status &&
-      statusSelect !== "Contacted"
-    ) {
-      showToast("First status change from New must be to Contacted", "error");
+    if (statusSelect === "New") {
+      showToast("A lead in New status must be transitioned to a different status", "error");
+      return;
+    }
+
+    if (statusSelect !== selectedLead.status && !trimmedComment) {
+      showToast("A comment is required for every status change", "error");
       return;
     }
 
@@ -877,7 +886,7 @@ export default function CounselorPage() {
 
       toast.success("Lead details updated");
       setIsEditingLeadDetails(false);
-      await openLeadDetails(selectedLead);
+      await openLeadDetails(selectedLead, true);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to update lead",
@@ -945,7 +954,7 @@ export default function CounselorPage() {
       }
 
       // Refresh lead details
-      await openLeadDetails(selectedLead);
+      await openLeadDetails(selectedLead, true);
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -1007,7 +1016,7 @@ export default function CounselorPage() {
       );
 
       // Refresh lead details
-      await openLeadDetails(selectedLead);
+      await openLeadDetails(selectedLead, true);
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -1984,7 +1993,7 @@ export default function CounselorPage() {
                         {isUpdating ? "Updating..." : "Update Lead"}
                       </button>
                       <button
-                        onClick={() => openLeadDetails(selectedLead)}
+                        onClick={() => openLeadDetails(selectedLead, true)}
                         disabled={historyLoading}
                         className="inline-flex flex-1 items-center justify-center rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                       >

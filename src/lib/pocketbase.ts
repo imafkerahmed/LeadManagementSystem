@@ -160,7 +160,7 @@ export async function setupPocketBaseCollections(): Promise<void> {
             type: "select",
             required: true,
             options: {
-              values: ["New", "Contacted", "Follow-Up", "Registered", "Lost"],
+              values: ["New", "Ringing-No-Answer", "Contacted", "Follow-up", "Registered", "Lost"],
             },
           },
           { name: "assignedTo", type: "text", required: true },

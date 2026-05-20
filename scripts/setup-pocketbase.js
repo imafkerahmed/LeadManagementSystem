@@ -73,7 +73,7 @@ async function setupCollections() {
           type: "select",
           required: true,
           options: {
-            values: ["New", "Contacted", "Follow-up", "Registered", "Lost"],
+            values: ["New", "Ringing-No-Answer", "Contacted", "Follow-up", "Registered", "Lost"],
             maxSelect: 1,
           },
         },

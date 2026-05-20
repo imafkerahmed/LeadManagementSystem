@@ -53,7 +53,7 @@ export async function POST() {
             type: "select",
             required: true,
             options: {
-              values: ["New", "Contacted", "Follow-Up", "Registered", "Lost"],
+              values: ["New", "Ringing-No-Answer", "Contacted", "Follow-up", "Registered", "Lost"],
               maxSelect: 1,
             },
           },

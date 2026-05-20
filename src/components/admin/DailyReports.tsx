@@ -132,6 +132,7 @@ export default function DailyReports() {
       Counselor: report.counselorName,
       "Leads Created Today": report.newLeads,
       New: report.statusNew,
+      "Ringing No Answer": report.statusRingingNoAnswer,
       Contacted: report.statusContacted,
       "Follow-Up": report.statusFollowUp,
       Registered: report.statusRegistered,
@@ -352,6 +353,9 @@ export default function DailyReports() {
                     New
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider text-center">
+                    Ringing No Answer
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider text-center">
                     Contacted
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider text-center">
@@ -385,6 +389,11 @@ export default function DailyReports() {
                     <td className="px-6 py-4 text-sm text-center text-gray-700">
                       <span className="inline-flex items-center justify-center w-8 h-8 bg-gray-200 text-gray-800 rounded-full">
                         {report.statusNew}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-center text-gray-700">
+                      <span className="inline-flex items-center justify-center w-8 h-8 bg-indigo-100 text-indigo-800 rounded-full">
+                        {report.statusRingingNoAnswer}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-center text-gray-700">
@@ -451,7 +460,7 @@ export default function DailyReports() {
           </li>
           <li>
             <strong>
-              Status Columns (Contacted, Follow-Up, Registered, Lost):
+              Status Columns (Ringing No Answer, Contacted, Follow-Up, Registered, Lost):
             </strong>{" "}
             Leads transitioned to these statuses on this date
           </li>

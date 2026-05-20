@@ -3,6 +3,9 @@ import { getPocketBaseAdminClient } from "@/lib/pocketbase";
 
 function normalizeLeadStatus(value: string | undefined): string {
   const normalized = (value || "").trim().toLowerCase();
+  if (normalized === "ringing-no-answer" || normalized === "ringing no answer") {
+    return "Ringing-No-Answer";
+  }
   if (normalized === "followup" || normalized === "follow-up") {
     return "Follow-up";
   }
@@ -51,7 +54,7 @@ export async function POST(request: NextRequest) {
     const normalizedNewStatus = normalizeLeadStatus(newStatus);
     const now = new Date().toISOString();
 
-    const statusFlow = ["New", "Contacted", "Follow-up", "Registered", "Lost"];
+    const statusFlow = ["New", "Ringing-No-Answer", "Contacted", "Follow-up", "Registered", "Lost"];
     const oldIndex = statusFlow.indexOf(oldStatus);
     const newIndex = statusFlow.indexOf(normalizedNewStatus);
 
@@ -90,16 +93,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Require that the first status change from "New" must be to "Contacted"
-    if (
-      oldStatus === "New" &&
-      normalizedNewStatus !== "New" &&
-      normalizedNewStatus !== "Contacted" &&
-      !isAdmin
-    ) {
+    // Checked transition constraints
+    if (normalizedNewStatus === "New") {
       return NextResponse.json(
-        { error: "First status change from New must be to Contacted" },
-        { status: 403 },
+        { error: "A lead in New status must be transitioned to a different status" },
+        { status: 400 },
+      );
+    }
+
+    if (normalizedNewStatus !== oldStatus && !trimmedComment) {
+      return NextResponse.json(
+        { error: "A comment is required for every status change" },
+        { status: 400 },
       );
     }
 

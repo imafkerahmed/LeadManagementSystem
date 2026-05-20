@@ -57,6 +57,7 @@ type CounselorStat = {
   name: string;
   leadCount: number;
   newCount: number;
+  ringingNoAnswerCount: number;
   contactedCount: number;
   followUpCount: number;
   registeredCount: number;
@@ -68,6 +69,7 @@ type MonthlyStatusStat = {
   label: string;
   total: number;
   newCount: number;
+  ringingNoAnswerCount: number;
   contactedCount: number;
   followUpCount: number;
   registeredCount: number;
@@ -79,6 +81,7 @@ type MonthlyCounselorStats = Record<string, CounselorStat[]>;
 interface DashboardStats {
   totalLeads: number;
   newLeads: number;
+  ringingNoAnswerLeads: number;
   contactedLeads: number;
   followUpLeads: number;
   registeredLeads: number;
@@ -96,8 +99,16 @@ const MONTH_LABEL_FORMAT: Intl.DateTimeFormatOptions = {
   year: "numeric",
 };
 
-const normalizeStatus = (status?: string) =>
-  (status || "").trim().toLowerCase();
+const normalizeStatus = (status?: string) => {
+  const normalized = (status || "").trim().toLowerCase();
+  if (normalized === "ringing-no-answer" || normalized === "ringing no answer" || normalized === "ringing_no_answer") {
+    return "ringing-no-answer";
+  }
+  if (normalized === "followup" || normalized === "follow-up") {
+    return "follow-up";
+  }
+  return normalized;
+};
 
 const matchesStatus = (status: string | undefined, target: string) =>
   normalizeStatus(status) === normalizeStatus(target);
@@ -132,6 +143,7 @@ const createEmptyCounselorStat = (name: string): CounselorStat => ({
   name,
   leadCount: 0,
   newCount: 0,
+  ringingNoAnswerCount: 0,
   contactedCount: 0,
   followUpCount: 0,
   registeredCount: 0,
@@ -143,6 +155,7 @@ const emptyMonthlyStat = (month: string): MonthlyStatusStat => ({
   label: getMonthLabel(month),
   total: 0,
   newCount: 0,
+  ringingNoAnswerCount: 0,
   contactedCount: 0,
   followUpCount: 0,
   registeredCount: 0,
@@ -276,6 +289,9 @@ export default function AdminDashboard() {
       const newLeads = leadRecords.filter((lead) =>
         matchesStatus(lead.leadStatus || lead.status, "New"),
       ).length;
+      const ringingNoAnswerLeads = leadRecords.filter((lead) =>
+        matchesStatus(lead.leadStatus || lead.status, "Ringing-No-Answer"),
+      ).length;
       const contactedLeads = leadRecords.filter((lead) =>
         matchesStatus(lead.leadStatus || lead.status, "Contacted"),
       ).length;
@@ -311,6 +327,9 @@ export default function AdminDashboard() {
         monthlyStat.total += 1;
         if (matchesStatus(lead.leadStatus || lead.status, "New"))
           monthlyStat.newCount += 1;
+        if (matchesStatus(lead.leadStatus || lead.status, "Ringing-No-Answer")) {
+          monthlyStat.ringingNoAnswerCount += 1;
+        }
         if (matchesStatus(lead.leadStatus || lead.status, "Contacted")) {
           monthlyStat.contactedCount += 1;
         }
@@ -338,10 +357,14 @@ export default function AdminDashboard() {
 
         grouped[counselorKey].leadCount += 1;
         monthlyCounselorGrouped[monthKey][counselorKey].leadCount += 1;
-        if (matchesStatus(lead.leadStatus || lead.status, "New"))
+        if (matchesStatus(lead.leadStatus || lead.status, "New")) {
           monthlyCounselorGrouped[monthKey][counselorKey].newCount += 1;
-        if (matchesStatus(lead.leadStatus || lead.status, "New"))
           grouped[counselorKey].newCount += 1;
+        }
+        if (matchesStatus(lead.leadStatus || lead.status, "Ringing-No-Answer")) {
+          monthlyCounselorGrouped[monthKey][counselorKey].ringingNoAnswerCount += 1;
+          grouped[counselorKey].ringingNoAnswerCount += 1;
+        }
         if (matchesStatus(lead.leadStatus || lead.status, "Contacted")) {
           monthlyCounselorGrouped[monthKey][counselorKey].contactedCount += 1;
           grouped[counselorKey].contactedCount += 1;
@@ -399,6 +422,7 @@ export default function AdminDashboard() {
       const data: DashboardStats = {
         totalLeads,
         newLeads,
+        ringingNoAnswerLeads,
         contactedLeads,
         followUpLeads,
         registeredLeads,
@@ -421,6 +445,7 @@ export default function AdminDashboard() {
         const defaultStats: DashboardStats = {
           totalLeads: 0,
           newLeads: 0,
+          ringingNoAnswerLeads: 0,
           contactedLeads: 0,
           followUpLeads: 0,
           registeredLeads: 0,
@@ -552,6 +577,7 @@ export default function AdminDashboard() {
   const statCards = [
     { label: "Total Leads", value: stats.totalLeads, color: "blue" },
     { label: "New", value: stats.newLeads, color: "blue" },
+    { label: "Ringing No Answer", value: stats.ringingNoAnswerLeads, color: "indigo" },
     { label: "Contacted", value: stats.contactedLeads, color: "yellow" },
     { label: "Follow-Up", value: stats.followUpLeads, color: "orange" },
     { label: "Registered", value: stats.registeredLeads, color: "green" },
@@ -560,6 +586,7 @@ export default function AdminDashboard() {
 
   const colorClasses: Record<string, string> = {
     blue: "text-blue-700",
+    indigo: "text-indigo-700",
     yellow: "text-yellow-700",
     orange: "text-orange-700",
     green: "text-green-700",
@@ -568,6 +595,7 @@ export default function AdminDashboard() {
 
   const bgClasses: Record<string, string> = {
     blue: "bg-blue-50",
+    indigo: "bg-indigo-50",
     yellow: "bg-yellow-50",
     orange: "bg-orange-50",
     green: "bg-green-50",
@@ -644,6 +672,7 @@ export default function AdminDashboard() {
             {stats.monthlyStatusStats.length > 0 ? (
               stats.monthlyStatusStats.map((entry) => {
                 const newHeight = (entry.newCount / chartMax) * 100;
+                const ringingNoAnswerHeight = (entry.ringingNoAnswerCount / chartMax) * 100;
                 const contactedHeight = (entry.contactedCount / chartMax) * 100;
                 const followUpHeight = (entry.followUpCount / chartMax) * 100;
                 const registeredHeight =
@@ -661,6 +690,11 @@ export default function AdminDashboard() {
                           className="bg-blue-500"
                           style={{ height: `${newHeight}%` }}
                           title={`New: ${entry.newCount}`}
+                        />
+                        <div
+                          className="bg-indigo-500"
+                          style={{ height: `${ringingNoAnswerHeight}%` }}
+                          title={`Ringing No Answer: ${entry.ringingNoAnswerCount}`}
                         />
                         <div
                           className="bg-yellow-500"
@@ -702,6 +736,9 @@ export default function AdminDashboard() {
         <div className="mt-5 flex flex-wrap gap-3 text-xs text-gray-600">
           <span className="inline-flex items-center gap-2">
             <span className="h-3 w-3 rounded-sm bg-blue-500" /> New
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <span className="h-3 w-3 rounded-sm bg-indigo-500" /> Ringing No Answer
           </span>
           <span className="inline-flex items-center gap-2">
             <span className="h-3 w-3 rounded-sm bg-yellow-500" /> Contacted
@@ -785,6 +822,9 @@ export default function AdminDashboard() {
                     New
                   </th>
                   <th className="border-b border-gray-200 px-3 py-3 font-medium text-right">
+                    Ringing No Answer
+                  </th>
+                  <th className="border-b border-gray-200 px-3 py-3 font-medium text-right">
                     Contacted
                   </th>
                   <th className="border-b border-gray-200 px-3 py-3 font-medium text-right">
@@ -815,6 +855,9 @@ export default function AdminDashboard() {
                         {counselor.newCount}
                       </td>
                       <td className="px-3 py-4 text-right text-sm text-gray-700">
+                        {counselor.ringingNoAnswerCount}
+                      </td>
+                      <td className="px-3 py-4 text-right text-sm text-gray-700">
                         {counselor.contactedCount}
                       </td>
                       <td className="px-3 py-4 text-right text-sm text-gray-700">
@@ -830,7 +873,7 @@ export default function AdminDashboard() {
                   ))
                 ) : (
                   <tr>
-                    <td className="px-3 py-8 text-sm text-gray-500" colSpan={7}>
+                    <td className="px-3 py-8 text-sm text-gray-500" colSpan={8}>
                       No counsellor data available.
                     </td>
                   </tr>

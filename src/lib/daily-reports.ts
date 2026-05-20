@@ -84,6 +84,7 @@ export function aggregateDailyMetrics(
     string,
     {
       New: number;
+      "Ringing-No-Answer": number;
       Contacted: number;
       "Follow-Up": number;
       Registered: number;
@@ -94,6 +95,8 @@ export function aggregateDailyMetrics(
   // Helper to normalize various status strings into the canonical keys used across the app
   const normalizeStatus = (value?: string) => {
     const v = (value || "").trim().toLowerCase();
+    if (v === "ringing-no-answer" || v === "ringing no answer" || v === "ringing_no_answer")
+      return "Ringing-No-Answer";
     if (v === "followup" || v === "follow-up" || v === "follow\-up")
       return "Follow-Up";
     if (v === "new") return "New";
@@ -153,7 +156,7 @@ export function aggregateDailyMetrics(
     if (!h || h.eventType !== "Status Change") return;
     const newStatus = normalizeStatus(h.newValue || "");
     if (
-      !["New", "Contacted", "Follow-Up", "Registered", "Lost"].includes(
+      !["New", "Ringing-No-Answer", "Contacted", "Follow-Up", "Registered", "Lost"].includes(
         newStatus,
       )
     ) {
@@ -172,6 +175,7 @@ export function aggregateDailyMetrics(
     if (!statusCountsByCounselor.has(counselorId)) {
       statusCountsByCounselor.set(counselorId, {
         New: 0,
+        "Ringing-No-Answer": 0,
         Contacted: 0,
         "Follow-Up": 0,
         Registered: 0,
@@ -246,6 +250,7 @@ export function aggregateDailyMetrics(
     const statusNew = globalNewStatusByCounselor.get(counselorId) || 0;
     const statusCounts = statusCountsByCounselor.get(counselorId) || {
       New: 0,
+      "Ringing-No-Answer": 0,
       Contacted: 0,
       "Follow-Up": 0,
       Registered: 0,
@@ -258,6 +263,7 @@ export function aggregateDailyMetrics(
       counselorName: counselor?.name || counselor?.email || "Unknown",
       newLeads,
       statusNew,
+      statusRingingNoAnswer: statusCounts["Ringing-No-Answer"],
       statusContacted: statusCounts.Contacted,
       statusFollowUp: statusCounts["Follow-Up"],
       statusRegistered: statusCounts.Registered,

@@ -30,6 +30,9 @@ type LeadRecord = {
 
 function normalizeLeadStatus(value: string | undefined): string {
   const normalized = (value || "").trim().toLowerCase();
+  if (normalized === "ringing-no-answer" || normalized === "ringing no answer") {
+    return "Ringing-No-Answer";
+  }
   if (normalized === "followup" || normalized === "follow-up") {
     return "Follow-up";
   }
@@ -118,7 +121,7 @@ export async function GET(request: NextRequest) {
     const leads = (await pb.collection("leads").getFullList({
       filter:
         `(${assignedValues.join(" || ")}) && ` +
-        `(status = "New" || status = "Contacted" || status = "Follow-Up" || status = "Follow-up" || status = "Followup" || status = "Registered" || status = "Lost")`,
+        `(status = "New" || status = "Ringing-No-Answer" || status = "Contacted" || status = "Follow-Up" || status = "Follow-up" || status = "Followup" || status = "Registered" || status = "Lost")`,
       sort: "-created",
     })) as LeadRecord[];
 

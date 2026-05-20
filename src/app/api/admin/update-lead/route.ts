@@ -3,6 +3,9 @@ import { getPocketBaseAdminClient } from "@/lib/pocketbase";
 
 function normalizeLeadStatus(value: string | undefined): string {
   const normalized = (value || "").trim().toLowerCase();
+  if (normalized === "ringing-no-answer" || normalized === "ringing no answer") {
+    return "Ringing-No-Answer";
+  }
   if (normalized === "followup" || normalized === "follow-up") {
     return "Follow-up";
   }

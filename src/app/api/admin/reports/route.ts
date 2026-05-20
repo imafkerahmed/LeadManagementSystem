@@ -100,6 +100,7 @@ export async function GET(request: NextRequest) {
       totalLeads: leads.length,
       byStatus: {
         New: 0,
+        "Ringing-No-Answer": 0,
         Contacted: 0,
         "Follow-Up": 0,
         Registered: 0,
@@ -117,7 +118,14 @@ export async function GET(request: NextRequest) {
     leads.forEach((lead: LeadRecord) => {
       // Count by status
       if (lead.status) {
-        stats.byStatus[lead.status] = (stats.byStatus[lead.status] || 0) + 1;
+        let normalizedStatus = lead.status;
+        const lower = lead.status.toLowerCase();
+        if (lower === "followup" || lower === "follow-up") {
+          normalizedStatus = "Follow-Up";
+        } else if (lower === "ringing-no-answer" || lower === "ringing no answer") {
+          normalizedStatus = "Ringing-No-Answer";
+        }
+        stats.byStatus[normalizedStatus] = (stats.byStatus[normalizedStatus] || 0) + 1;
       }
 
       // Count registered
