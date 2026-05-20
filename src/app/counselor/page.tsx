@@ -587,7 +587,7 @@ export default function CounselorPage() {
     }
 
     const pb = createPocketBaseClient();
-    pb.collection("leads").subscribe("*", (e) => {
+    pb.collection("leads").subscribe("*", () => {
       void fetchLeads(counselorId);
     });
 

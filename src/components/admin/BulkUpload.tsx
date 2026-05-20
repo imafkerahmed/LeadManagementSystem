@@ -467,9 +467,9 @@ export default function BulkUpload({
       </div>
 
       {mappingOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-gray-200 p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 sm:p-6 overflow-y-auto">
+          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl flex flex-col my-auto max-h-[90vh] sm:max-h-[85vh] overflow-hidden">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-200 p-6 shrink-0">
               <div>
                 <h3 className="text-xl font-semibold text-gray-900">
                   Map CSV Columns
@@ -489,7 +489,7 @@ export default function BulkUpload({
               </button>
             </div>
 
-            <div className="grid gap-4 p-6">
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
               {(Object.keys(csvFieldLabels) as CsvField[]).map((field) => (
                 <label
                   key={field}
@@ -600,7 +600,7 @@ export default function BulkUpload({
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 border-t border-gray-200 p-6">
+            <div className="flex items-center justify-end gap-3 border-t border-gray-200 p-6 shrink-0">
               <button
                 type="button"
                 onClick={cancelMapping}
