@@ -172,6 +172,51 @@ export function aggregateDailyMetrics(
     }
   });
 
+  // Also include current statuses from the leads list (ensure unique counting per lead)
+  // This makes the daily report reflect the lead's status as of the end of the day
+  // Build set of lead IDs relevant to this day's report: leads created today + leads mentioned in history
+  const relevantLeadIds = new Set<string>();
+  leads.forEach((l) => {
+    if (l.id) relevantLeadIds.add(l.id);
+  });
+  history.forEach((h) => {
+    if (h && h.leadId) relevantLeadIds.add(h.leadId);
+  });
+
+  const trackedStatuses = [
+    "New",
+    "Ringing-No-Answer",
+    "Contacted",
+    "Follow-Up",
+    "Registered",
+    "Lost",
+  ];
+
+  // For each relevant lead, prefer its current status and assignedTo (from leadLookup/allLeads)
+  // Remove any previous history-based assignment for that lead and attribute it correctly.
+  relevantLeadIds.forEach((leadId) => {
+    const lead = leadLookup.get(leadId);
+    if (!lead || !lead.assignedTo) return;
+
+    const currentStatus = normalizeStatus(lead.status || "");
+    if (!trackedStatuses.includes(currentStatus)) return;
+
+    const counselorId = lead.assignedTo;
+
+    // Remove leadId from any existing status sets for other counselors
+    statusSetsByCounselor.forEach((map) => {
+      map.forEach((set) => {
+        if (set.has(leadId)) set.delete(leadId);
+      });
+    });
+
+    if (!statusSetsByCounselor.has(counselorId))
+      statusSetsByCounselor.set(counselorId, new Map());
+    const cMap = statusSetsByCounselor.get(counselorId)!;
+    if (!cMap.has(currentStatus)) cMap.set(currentStatus, new Set());
+    cMap.get(currentStatus)!.add(leadId);
+  });
+
   // Overdue follow-ups
   const overdueFollowupsByCounselor = new Map<string, number>();
   const today = new Date();

@@ -3,7 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import Image from "next/image";
-import { Download, Image as ImageIcon, Copy, CalendarRange, RefreshCw } from "lucide-react";
+import {
+  Download,
+  Image as ImageIcon,
+  Copy,
+  CalendarRange,
+  RefreshCw,
+} from "lucide-react";
 import { toPng } from "html-to-image";
 import * as XLSX from "xlsx";
 import { DailyReportMetrics } from "@/types";
@@ -67,7 +73,7 @@ export default function DailyReports() {
   useEffect(() => {
     if (!selectedDate) return;
     const pb = createPocketBaseClient();
-    
+
     pb.collection("leads").subscribe("*", () => {
       void fetchDailyReport(selectedDate);
     });
@@ -91,16 +97,17 @@ export default function DailyReports() {
         const year = parseInt(parts[0]);
         const month = parseInt(parts[1]) - 1;
         const day = parseInt(parts[2]);
-        
+
         const localStart = new Date(year, month, day, 0, 0, 0, 0);
         const localEnd = new Date(year, month, day, 23, 59, 59, 999);
         startParam = localStart.toISOString();
         endParam = localEnd.toISOString();
       }
 
-      const queryUrl = startParam && endParam
-        ? `/api/admin/daily-reports?date=${dateStr}&startOfDay=${encodeURIComponent(startParam)}&endOfDay=${encodeURIComponent(endParam)}`
-        : `/api/admin/daily-reports?date=${dateStr}`;
+      const queryUrl =
+        startParam && endParam
+          ? `/api/admin/daily-reports?date=${dateStr}&startOfDay=${encodeURIComponent(startParam)}&endOfDay=${encodeURIComponent(endParam)}`
+          : `/api/admin/daily-reports?date=${dateStr}`;
 
       const res = await fetch(queryUrl);
       if (!res.ok) {
@@ -230,10 +237,14 @@ export default function DailyReports() {
           [blob.type]: blob,
         }),
       ]);
-      toast.success("Image copied to clipboard! You can now paste it directly.");
+      toast.success(
+        "Image copied to clipboard! You can now paste it directly.",
+      );
     } catch (error) {
       console.error("Failed to copy image", error);
-      toast.error("Failed to copy image to clipboard. Try downloading it instead.");
+      toast.error(
+        "Failed to copy image to clipboard. Try downloading it instead.",
+      );
     } finally {
       setIsCopyingImage(false);
     }
@@ -248,7 +259,9 @@ export default function DailyReports() {
             <CalendarRange className="h-6 w-6" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-800">Daily Performance Reports</h2>
+            <h2 className="text-xl font-bold text-slate-800">
+              Daily Performance Reports
+            </h2>
             <p className="text-sm text-slate-400">
               Real-time daily status and conversion metrics for each counselor
             </p>
@@ -294,7 +307,9 @@ export default function DailyReports() {
             disabled={isLoading}
             className="inline-flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all disabled:opacity-50"
           >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+            />
             Refresh
           </button>
         </div>
@@ -324,7 +339,9 @@ export default function DailyReports() {
         </div>
 
         <div className="flex items-center gap-3">
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-400">Select Date:</label>
+          <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            Select Date:
+          </label>
           <input
             type="date"
             value={selectedDate}
@@ -340,7 +357,9 @@ export default function DailyReports() {
           <div className="p-3 bg-blue-50 rounded-full text-blue-500 animate-spin">
             <RefreshCw className="h-6 w-6" />
           </div>
-          <p className="mt-3 text-sm font-semibold text-slate-500">Querying Daily Database records...</p>
+          <p className="mt-3 text-sm font-semibold text-slate-500">
+            Querying Daily Database records...
+          </p>
         </div>
       )}
 
@@ -369,14 +388,28 @@ export default function DailyReports() {
               <thead>
                 <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100">
                   <th className="px-6 py-3.5 font-semibold">Counselor</th>
-                  <th className="px-6 py-3.5 font-semibold text-center">Leads Created</th>
+                  <th className="px-6 py-3.5 font-semibold text-center">
+                    Leads Created Today
+                  </th>
                   <th className="px-6 py-3.5 font-semibold text-center">New</th>
-                  <th className="px-6 py-3.5 font-semibold text-center">Ringing</th>
-                  <th className="px-6 py-3.5 font-semibold text-center">Contacted</th>
-                  <th className="px-6 py-3.5 font-semibold text-center">Follow-Up</th>
-                  <th className="px-6 py-3.5 font-semibold text-center font-bold text-emerald-600">Registered</th>
-                  <th className="px-6 py-3.5 font-semibold text-center text-rose-500">Lost</th>
-                  <th className="px-6 py-3.5 font-semibold text-center">Overdue</th>
+                  <th className="px-6 py-3.5 font-semibold text-center">
+                    Ringing No Answer
+                  </th>
+                  <th className="px-6 py-3.5 font-semibold text-center">
+                    Contacted
+                  </th>
+                  <th className="px-6 py-3.5 font-semibold text-center">
+                    Follow-Up
+                  </th>
+                  <th className="px-6 py-3.5 font-semibold text-center font-bold text-emerald-600">
+                    Registered
+                  </th>
+                  <th className="px-6 py-3.5 font-semibold text-center text-rose-500">
+                    Lost
+                  </th>
+                  <th className="px-6 py-3.5 font-semibold text-center">
+                    Follow-up Overdue
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -427,8 +460,8 @@ export default function DailyReports() {
                       <span
                         className={`inline-flex items-center justify-center px-2 py-0.5 rounded-md text-xs font-semibold ${
                           report.overdueFollowups > 0
-                             ? "bg-red-50 text-red-600 border border-red-100"
-                             : "bg-green-50 text-green-600 border border-green-100"
+                            ? "bg-red-50 text-red-600 border border-red-100"
+                            : "bg-green-50 text-green-600 border border-green-100"
                         }`}
                       >
                         {report.overdueFollowups}
@@ -460,32 +493,51 @@ export default function DailyReports() {
         <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
           Metrics Explained
         </h4>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 text-xs text-slate-600">
           <div className="space-y-3">
             <div>
-              <strong className="text-slate-800 font-semibold">Leads Created Today:</strong> 
-              <p className="text-slate-400 mt-0.5">Total brand new lead profiles registered in the system on this calendar day.</p>
+              <strong className="text-slate-800 font-semibold">
+                Leads Created Today:
+              </strong>
+              <p className="text-slate-400 mt-0.5">
+                Total brand new lead profiles registered in the system on this
+                calendar day.
+              </p>
             </div>
             <div>
-              <strong className="text-slate-800 font-semibold">New:</strong> 
-              <p className="text-slate-400 mt-0.5">Leads created today that are still untouched (deducted if they are modified to other status states).</p>
+              <strong className="text-slate-800 font-semibold">New:</strong>
+              <p className="text-slate-400 mt-0.5">
+                Leads created today that are still untouched (deducted if they
+                are modified to other status states).
+              </p>
             </div>
           </div>
           <div className="space-y-3">
             <div>
-              <strong className="text-slate-800 font-semibold">Status Columns:</strong> 
-              <p className="text-slate-400 mt-0.5">Total counts of leads successfully moved into these specific status conditions today.</p>
+              <strong className="text-slate-800 font-semibold">
+                Status Columns:
+              </strong>
+              <p className="text-slate-400 mt-0.5">
+                Total counts of leads successfully moved into these specific
+                status conditions today.
+              </p>
             </div>
             <div>
-              <strong className="text-slate-800 font-semibold">Overdue Follow-ups:</strong> 
-              <p className="text-slate-400 mt-0.5">Assigned scheduler tasks past their active dates that are still uncompleted.</p>
+              <strong className="text-slate-800 font-semibold">
+                Overdue Follow-ups:
+              </strong>
+              <p className="text-slate-400 mt-0.5">
+                Assigned scheduler tasks past their active dates that are still
+                uncompleted.
+              </p>
             </div>
           </div>
         </div>
-        
+
         <p className="mt-4 pt-3 border-t border-slate-50 text-[10px] font-semibold text-slate-400">
-          Data is synced in real-time using PocketBase triggers. Auto-polling refreshes the state every 60 seconds automatically.
+          Data is synced in real-time using PocketBase triggers. Auto-polling
+          refreshes the state every 60 seconds automatically.
         </p>
       </div>
 

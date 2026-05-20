@@ -29,6 +29,12 @@ type LeadRecord = {
         name?: string;
         email?: string;
       };
+  followup1Date?: string;
+  followup1Completed?: boolean;
+  followup2Date?: string;
+  followup2Completed?: boolean;
+  followup3Date?: string;
+  followup3Completed?: boolean;
 };
 
 type UserLookupRecord = {
@@ -73,6 +79,7 @@ type CounselorStat = {
   ringingNoAnswerCount: number;
   contactedCount: number;
   followUpCount: number;
+  overdueCount: number;
   registeredCount: number;
   lostCount: number;
 };
@@ -85,6 +92,7 @@ type MonthlyStatusStat = {
   ringingNoAnswerCount: number;
   contactedCount: number;
   followUpCount: number;
+  overdueCount: number;
   registeredCount: number;
   lostCount: number;
 };
@@ -97,6 +105,7 @@ interface DashboardStats {
   ringingNoAnswerLeads: number;
   contactedLeads: number;
   followUpLeads: number;
+  followUpOverdueLeads: number;
   registeredLeads: number;
   lostLeads: number;
   counselorStats: CounselorStat[];
@@ -114,7 +123,11 @@ const MONTH_LABEL_FORMAT: Intl.DateTimeFormatOptions = {
 
 const normalizeStatus = (status?: string) => {
   const normalized = (status || "").trim().toLowerCase();
-  if (normalized === "ringing-no-answer" || normalized === "ringing no answer" || normalized === "ringing_no_answer") {
+  if (
+    normalized === "ringing-no-answer" ||
+    normalized === "ringing no answer" ||
+    normalized === "ringing_no_answer"
+  ) {
     return "ringing-no-answer";
   }
   if (normalized === "followup" || normalized === "follow-up") {
@@ -159,6 +172,7 @@ const createEmptyCounselorStat = (name: string): CounselorStat => ({
   ringingNoAnswerCount: 0,
   contactedCount: 0,
   followUpCount: 0,
+  overdueCount: 0,
   registeredCount: 0,
   lostCount: 0,
 });
@@ -171,6 +185,7 @@ const emptyMonthlyStat = (month: string): MonthlyStatusStat => ({
   ringingNoAnswerCount: 0,
   contactedCount: 0,
   followUpCount: 0,
+  overdueCount: 0,
   registeredCount: 0,
   lostCount: 0,
 });
@@ -311,6 +326,10 @@ export default function AdminDashboard() {
       const followUpLeads = leadRecords.filter((lead) =>
         matchesStatus(lead.leadStatus || lead.status, "Follow-Up"),
       ).length;
+      // Compute overdue follow-ups across all leads
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      let totalOverdue = 0;
       const registeredLeads = leadRecords.filter((lead) =>
         matchesStatus(lead.leadStatus || lead.status, "Registered"),
       ).length;
@@ -326,6 +345,25 @@ export default function AdminDashboard() {
       > = {};
 
       leadRecords.forEach((lead) => {
+        // compute overdue followups for this lead
+        const followups = [
+          { date: lead.followup1Date, completed: lead.followup1Completed },
+          { date: lead.followup2Date, completed: lead.followup2Completed },
+          { date: lead.followup3Date, completed: lead.followup3Completed },
+        ];
+        let overdueForLead = 0;
+        followups.forEach((fu) => {
+          if (fu.date && !fu.completed) {
+            try {
+              const fuDate = new Date(fu.date);
+              fuDate.setHours(0, 0, 0, 0);
+              if (fuDate < today) overdueForLead += 1;
+            } catch {
+              // ignore parse errors
+            }
+          }
+        });
+        totalOverdue += overdueForLead;
         const monthKey = getMonthKey(lead.created);
 
         if (!monthlyGrouped[monthKey]) {
@@ -340,7 +378,9 @@ export default function AdminDashboard() {
         monthlyStat.total += 1;
         if (matchesStatus(lead.leadStatus || lead.status, "New"))
           monthlyStat.newCount += 1;
-        if (matchesStatus(lead.leadStatus || lead.status, "Ringing-No-Answer")) {
+        if (
+          matchesStatus(lead.leadStatus || lead.status, "Ringing-No-Answer")
+        ) {
           monthlyStat.ringingNoAnswerCount += 1;
         }
         if (matchesStatus(lead.leadStatus || lead.status, "Contacted")) {
@@ -354,6 +394,11 @@ export default function AdminDashboard() {
         }
         if (matchesStatus(lead.leadStatus || lead.status, "Lost")) {
           monthlyStat.lostCount += 1;
+        }
+
+        // add overdue counts to monthly and counselor buckets
+        if (overdueForLead > 0) {
+          monthlyStat.overdueCount += overdueForLead;
         }
 
         const counselorKey = resolveCounselorKey(lead);
@@ -374,8 +419,12 @@ export default function AdminDashboard() {
           monthlyCounselorGrouped[monthKey][counselorKey].newCount += 1;
           grouped[counselorKey].newCount += 1;
         }
-        if (matchesStatus(lead.leadStatus || lead.status, "Ringing-No-Answer")) {
-          monthlyCounselorGrouped[monthKey][counselorKey].ringingNoAnswerCount += 1;
+        if (
+          matchesStatus(lead.leadStatus || lead.status, "Ringing-No-Answer")
+        ) {
+          monthlyCounselorGrouped[monthKey][
+            counselorKey
+          ].ringingNoAnswerCount += 1;
           grouped[counselorKey].ringingNoAnswerCount += 1;
         }
         if (matchesStatus(lead.leadStatus || lead.status, "Contacted")) {
@@ -385,6 +434,11 @@ export default function AdminDashboard() {
         if (matchesStatus(lead.leadStatus || lead.status, "Follow-Up")) {
           monthlyCounselorGrouped[monthKey][counselorKey].followUpCount += 1;
           grouped[counselorKey].followUpCount += 1;
+        }
+        if (overdueForLead > 0) {
+          monthlyCounselorGrouped[monthKey][counselorKey].overdueCount +=
+            overdueForLead;
+          grouped[counselorKey].overdueCount += overdueForLead;
         }
         if (matchesStatus(lead.leadStatus || lead.status, "Registered")) {
           monthlyCounselorGrouped[monthKey][counselorKey].registeredCount += 1;
@@ -438,6 +492,7 @@ export default function AdminDashboard() {
         ringingNoAnswerLeads,
         contactedLeads,
         followUpLeads,
+        followUpOverdueLeads: totalOverdue,
         registeredLeads,
         lostLeads,
         counselorStats,
@@ -461,6 +516,7 @@ export default function AdminDashboard() {
           ringingNoAnswerLeads: 0,
           contactedLeads: 0,
           followUpLeads: 0,
+          followUpOverdueLeads: 0,
           registeredLeads: 0,
           lostLeads: 0,
           counselorStats: [],
@@ -482,7 +538,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const pb = createPocketBaseClient();
-    
+
     pb.collection("leads").subscribe("*", () => {
       void fetchStats();
     });
@@ -729,11 +785,15 @@ export default function AdminDashboard() {
               }`}
             >
               {/* Subtle background glow */}
-              <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${card.gradient} rounded-bl-full pointer-events-none opacity-50 transition-opacity group-hover:opacity-80 duration-500`} />
-              
+              <div
+                className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${card.gradient} rounded-bl-full pointer-events-none opacity-50 transition-opacity group-hover:opacity-80 duration-500`}
+              />
+
               {/* Left-edge color bar accent */}
-              <div className={`absolute left-0 top-0 bottom-0 w-[4px] ${card.accent}`} />
-              
+              <div
+                className={`absolute left-0 top-0 bottom-0 w-[4px] ${card.accent}`}
+              />
+
               <div className="flex items-start justify-between relative z-10">
                 <div className="space-y-1">
                   <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
@@ -743,11 +803,13 @@ export default function AdminDashboard() {
                     {card.value}
                   </h4>
                 </div>
-                <div className={`p-2.5 rounded-xl ${card.iconColor} transition-transform duration-300 group-hover:scale-110`}>
+                <div
+                  className={`p-2.5 rounded-xl ${card.iconColor} transition-transform duration-300 group-hover:scale-110`}
+                >
                   <Icon className="h-5 w-5" />
                 </div>
               </div>
-              
+
               <div className="mt-4 pt-3 border-t border-slate-50 flex items-center justify-between text-xs text-slate-500 relative z-10">
                 <span>{card.subtext}</span>
                 {card.label === "Registered" && stats.totalLeads > 0 && (
@@ -788,7 +850,8 @@ export default function AdminDashboard() {
             {stats.monthlyStatusStats.length > 0 ? (
               stats.monthlyStatusStats.map((entry) => {
                 const newHeight = (entry.newCount / chartMax) * 100;
-                const ringingNoAnswerHeight = (entry.ringingNoAnswerCount / chartMax) * 100;
+                const ringingNoAnswerHeight =
+                  (entry.ringingNoAnswerCount / chartMax) * 100;
                 const contactedHeight = (entry.contactedCount / chartMax) * 100;
                 const followUpHeight = (entry.followUpCount / chartMax) * 100;
                 const registeredHeight =
@@ -849,7 +912,9 @@ export default function AdminDashboard() {
                     <p className="mt-3 text-xs font-semibold text-slate-700">
                       {entry.label}
                     </p>
-                    <p className="text-[10px] font-medium text-slate-400 mt-0.5">{entry.total} leads</p>
+                    <p className="text-[10px] font-medium text-slate-400 mt-0.5">
+                      {entry.total} leads
+                    </p>
                   </div>
                 );
               })
@@ -866,7 +931,8 @@ export default function AdminDashboard() {
             <span className="h-2 w-2 rounded-full bg-blue-500" /> New
           </span>
           <span className="inline-flex items-center gap-1.5 bg-indigo-50/50 px-2.5 py-1 rounded-full border border-indigo-100/50">
-            <span className="h-2 w-2 rounded-full bg-indigo-500" /> Ringing No Answer
+            <span className="h-2 w-2 rounded-full bg-indigo-500" /> Ringing No
+            Answer
           </span>
           <span className="inline-flex items-center gap-1.5 bg-amber-50/50 px-2.5 py-1 rounded-full border border-amber-100/50">
             <span className="h-2 w-2 rounded-full bg-amber-500" /> Contacted
@@ -900,7 +966,7 @@ export default function AdminDashboard() {
                 </p>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
               <div>
                 <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
@@ -941,22 +1007,45 @@ export default function AdminDashboard() {
           </div>
 
           <div className="mb-4 rounded-xl border border-slate-100 bg-slate-50/50 px-4 py-3 text-xs font-medium text-slate-500 flex items-center justify-between">
-            <span>Showing counselor stats for <strong className="text-slate-700 font-semibold">{selectedMonth ? getMonthLabel(selectedMonth) : "all months"}</strong>.</span>
-            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 bg-white px-2 py-0.5 rounded border border-slate-100 shadow-sm">{filteredCounselorStats.length} active</span>
+            <span>
+              Showing counselor stats for{" "}
+              <strong className="text-slate-700 font-semibold">
+                {selectedMonth ? getMonthLabel(selectedMonth) : "all months"}
+              </strong>
+              .
+            </span>
+            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 bg-white px-2 py-0.5 rounded border border-slate-100 shadow-sm">
+              {filteredCounselorStats.length} active
+            </span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="min-w-full border-separate border-spacing-0">
               <thead>
                 <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100">
-                  <th className="px-4 py-3 font-semibold rounded-l-xl">Counselor</th>
+                  <th className="px-4 py-3 font-semibold rounded-l-xl">
+                    Counselor
+                  </th>
                   <th className="px-4 py-3 font-semibold text-right">Total</th>
                   <th className="px-4 py-3 font-semibold text-right">New</th>
-                  <th className="px-4 py-3 font-semibold text-right">Ringing</th>
-                  <th className="px-4 py-3 font-semibold text-right">Contacted</th>
-                  <th className="px-4 py-3 font-semibold text-right">Follow-Up</th>
-                  <th className="px-4 py-3 font-semibold text-right">Registered</th>
-                  <th className="px-4 py-3 font-semibold text-right rounded-r-xl">Lost</th>
+                  <th className="px-4 py-3 font-semibold text-right">
+                    Ringing No Answer
+                  </th>
+                  <th className="px-4 py-3 font-semibold text-right">
+                    Contacted
+                  </th>
+                  <th className="px-4 py-3 font-semibold text-right">
+                    Follow-up Overdue
+                  </th>
+                  <th className="px-4 py-3 font-semibold text-right">
+                    Follow-Up
+                  </th>
+                  <th className="px-4 py-3 font-semibold text-right">
+                    Registered
+                  </th>
+                  <th className="px-4 py-3 font-semibold text-right rounded-r-xl">
+                    Lost
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -982,6 +1071,9 @@ export default function AdminDashboard() {
                         {counselor.contactedCount}
                       </td>
                       <td className="px-4 py-3 text-right text-sm text-slate-600 font-medium">
+                        {counselor.overdueCount}
+                      </td>
+                      <td className="px-4 py-3 text-right text-sm text-slate-600 font-medium">
                         {counselor.followUpCount}
                       </td>
                       <td className="px-4 py-3 text-right text-sm text-emerald-600 font-semibold">
@@ -994,7 +1086,10 @@ export default function AdminDashboard() {
                   ))
                 ) : (
                   <tr>
-                    <td className="px-4 py-8 text-center text-sm text-slate-400" colSpan={8}>
+                    <td
+                      className="px-4 py-8 text-center text-sm text-slate-400"
+                      colSpan={8}
+                    >
                       No counselor data available.
                     </td>
                   </tr>
@@ -1032,7 +1127,9 @@ export default function AdminDashboard() {
                   <th className="px-4 py-3 font-semibold rounded-l-xl">Date</th>
                   <th className="px-4 py-3 font-semibold">Student</th>
                   <th className="px-4 py-3 font-semibold">Event Description</th>
-                  <th className="px-4 py-3 font-semibold rounded-r-xl">Changed By</th>
+                  <th className="px-4 py-3 font-semibold rounded-r-xl">
+                    Changed By
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -1049,13 +1146,16 @@ export default function AdminDashboard() {
                         {activity.studentName}
                       </td>
                       <td className="px-4 py-3.5 text-sm text-slate-600">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                          activity.eventType?.includes("status") || activity.eventType?.includes("comment")
-                            ? "bg-slate-100 text-slate-700"
-                            : activity.eventType?.includes("created")
-                              ? "bg-blue-50 text-blue-700"
-                              : "bg-indigo-50 text-indigo-700"
-                        }`}>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                            activity.eventType?.includes("status") ||
+                            activity.eventType?.includes("comment")
+                              ? "bg-slate-100 text-slate-700"
+                              : activity.eventType?.includes("created")
+                                ? "bg-blue-50 text-blue-700"
+                                : "bg-indigo-50 text-indigo-700"
+                          }`}
+                        >
                           {activity.eventType}
                         </span>
                       </td>
@@ -1066,7 +1166,10 @@ export default function AdminDashboard() {
                   ))
                 ) : (
                   <tr>
-                    <td className="px-4 py-8 text-center text-sm text-slate-400" colSpan={4}>
+                    <td
+                      className="px-4 py-8 text-center text-sm text-slate-400"
+                      colSpan={4}
+                    >
                       No recent activity available.
                     </td>
                   </tr>
@@ -1078,10 +1181,21 @@ export default function AdminDashboard() {
           <div className="mt-5 pt-4 border-t border-slate-50 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between text-xs text-slate-500">
             <p className="font-medium text-slate-400">
               Showing{" "}
-              <strong className="text-slate-600">{Math.min(activityStartIndex + 1, stats.recentActivity.length)}</strong>
+              <strong className="text-slate-600">
+                {Math.min(activityStartIndex + 1, stats.recentActivity.length)}
+              </strong>
               -
-              <strong className="text-slate-600">{Math.min(activityStartIndex + ACTIVITY_PAGE_SIZE, stats.recentActivity.length)}</strong>{" "}
-              of <strong className="text-slate-600">{stats.recentActivity.length}</strong> entries
+              <strong className="text-slate-600">
+                {Math.min(
+                  activityStartIndex + ACTIVITY_PAGE_SIZE,
+                  stats.recentActivity.length,
+                )}
+              </strong>{" "}
+              of{" "}
+              <strong className="text-slate-600">
+                {stats.recentActivity.length}
+              </strong>{" "}
+              entries
             </p>
             <div className="flex items-center gap-2">
               <button

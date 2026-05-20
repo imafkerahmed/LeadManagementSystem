@@ -5,7 +5,7 @@ import {
   getStartOfDay,
   getEndOfDay,
 } from "@/lib/daily-reports";
-import { DailyReportResponse } from "@/types";
+// DailyReportResponse not used here; response is built dynamically when debug is enabled
 
 type LeadRecord = {
   id: string;
@@ -100,11 +100,54 @@ export async function GET(request: NextRequest) {
       allLeads,
     );
 
-    // Format response
-    const response: DailyReportResponse = {
+    // If debug flag is present, also compute per-counselor lists of leadIds
+    const debug = request.nextUrl.searchParams.get("debug");
+    let reportsDebug: Record<string, { ringingLeadIds: string[] }> | undefined;
+    if (debug === "true") {
+      reportsDebug = {};
+      // Build a quick lookup of leads by id
+      const leadLookup = new Map<string, LeadRecord>();
+      allLeads.forEach((l) => {
+        if (l.id) leadLookup.set(l.id, l);
+      });
+
+      history.forEach((h) => {
+        if (!h || h.eventType !== "Status Change") return;
+        const leadId = h.leadId;
+        if (!leadId) return;
+
+        const newValue = (h.newValue || "").trim().toLowerCase();
+        const isRinging =
+          newValue === "ringing-no-answer" ||
+          newValue === "ringing no answer" ||
+          newValue === "ringing_no_answer";
+        if (!isRinging) return;
+
+        // Resolve counselor: prefer assignedTo on the lead record, fallback to changedBy
+        let counselorId: string | undefined;
+        const lead = leadLookup.get(leadId);
+        if (lead && lead.assignedTo) counselorId = lead.assignedTo;
+        if (!counselorId && h.changedBy) counselorId = h.changedBy;
+        if (!counselorId) return;
+
+        if (!reportsDebug![counselorId])
+          reportsDebug![counselorId] = { ringingLeadIds: [] };
+        if (!reportsDebug![counselorId].ringingLeadIds.includes(leadId)) {
+          reportsDebug![counselorId].ringingLeadIds.push(leadId);
+        }
+      });
+    }
+
+    // Format response (typed without `any`)
+    const response: {
+      date: string;
+      reports: typeof reports;
+      reportsDebug?: Record<string, { ringingLeadIds: string[] }>;
+    } = {
       date: targetDate.toISOString().split("T")[0], // YYYY-MM-DD format
       reports,
     };
+    if (reportsDebug) response.reportsDebug = reportsDebug;
 
     return NextResponse.json(response);
   } catch (error) {

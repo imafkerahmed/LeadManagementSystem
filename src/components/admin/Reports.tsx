@@ -596,7 +596,9 @@ export default function AdminReports() {
                         </th>
                         <th className="px-4 py-3 font-semibold">Mobile</th>
                         <th className="px-4 py-3 font-semibold">Course</th>
-                        <th className="px-4 py-3 font-semibold">Status</th>
+                        <th className="px-4 py-3 font-semibold text-center">
+                          Status
+                        </th>
                         <th className="px-4 py-3 font-semibold rounded-r-xl">
                           Assigned To
                         </th>
@@ -622,7 +624,7 @@ export default function AdminReports() {
                             <td className="px-4 py-3 text-slate-600">
                               {lead.course}
                             </td>
-                            <td className="px-4 py-3">
+                            <td className="px-4 py-3 text-center">
                               <span
                                 className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_COLORS[lead.status] || "bg-slate-50 text-slate-700 border border-slate-200"}`}
                               >
