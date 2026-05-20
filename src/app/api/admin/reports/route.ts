@@ -46,10 +46,25 @@ export async function GET(request: NextRequest) {
 
     const pb = await getPocketBaseAdminClient();
 
-    // Parse dates
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
+    // Parse dates timezone-safely
+    let start: Date;
+    let end: Date;
+
+    const startParts = startDate.split("-");
+    if (startParts.length === 3) {
+      start = new Date(Date.UTC(parseInt(startParts[0]), parseInt(startParts[1]) - 1, parseInt(startParts[2]), 0, 0, 0, 0));
+    } else {
+      start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+    }
+
+    const endParts = endDate.split("-");
+    if (endParts.length === 3) {
+      end = new Date(Date.UTC(parseInt(endParts[0]), parseInt(endParts[1]) - 1, parseInt(endParts[2]), 23, 59, 59, 999));
+    } else {
+      end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+    }
 
     const startIso = start.toISOString();
     const endIso = end.toISOString();

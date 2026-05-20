@@ -35,8 +35,12 @@ type HistoryRecord = {
  * Format a date to start of day (matches Reports endpoint pattern)
  */
 export function getStartOfDay(date: Date): string {
-  const startDay = new Date(date);
-  startDay.setHours(0, 0, 0, 0);
+  const startDay = new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    0, 0, 0, 0
+  ));
   return startDay.toISOString();
 }
 
@@ -44,8 +48,12 @@ export function getStartOfDay(date: Date): string {
  * Format a date to end of day (matches Reports endpoint pattern)
  */
 export function getEndOfDay(date: Date): string {
-  const endDay = new Date(date);
-  endDay.setHours(23, 59, 59, 999);
+  const endDay = new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    23, 59, 59, 999
+  ));
   return endDay.toISOString();
 }
 

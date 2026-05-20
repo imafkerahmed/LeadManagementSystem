@@ -37,9 +37,21 @@ type HistoryRecord = {
 
 export async function GET(request: NextRequest) {
   try {
-    // Get date parameter, default to today
     const dateParam = request.nextUrl.searchParams.get("date");
-    const targetDate = dateParam ? new Date(dateParam) : new Date();
+    let targetDate: Date;
+    if (dateParam) {
+      const parts = dateParam.split("-");
+      if (parts.length === 3) {
+        const year = parseInt(parts[0]);
+        const month = parseInt(parts[1]) - 1;
+        const day = parseInt(parts[2]);
+        targetDate = new Date(Date.UTC(year, month, day, 12, 0, 0));
+      } else {
+        targetDate = new Date(dateParam);
+      }
+    } else {
+      targetDate = new Date();
+    }
 
     // Validate date is valid
     if (isNaN(targetDate.getTime())) {
