@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { MdRefresh } from "react-icons/md";
 import Image from "next/image";
-import { Download, Image as ImageIcon } from "lucide-react";
+import { Download, Image as ImageIcon, Copy } from "lucide-react";
 import { toPng } from "html-to-image";
 import * as XLSX from "xlsx";
 import { DailyReportMetrics } from "@/types";
@@ -36,6 +36,7 @@ export default function DailyReports() {
   const [isExportingXlsx, setIsExportingXlsx] = useState(false);
   const [isExportingImage, setIsExportingImage] = useState(false);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [isCopyingImage, setIsCopyingImage] = useState(false);
   const exportRef = useRef<HTMLDivElement | null>(null);
 
   // Hoisted fetch function so effects can call it
@@ -180,6 +181,27 @@ export default function DailyReports() {
     link.href = imagePreviewUrl;
     link.click();
     toast.success("Image downloaded");
+  };
+
+  const handleCopyPreviewImage = async () => {
+    if (!imagePreviewUrl) return;
+
+    try {
+      setIsCopyingImage(true);
+      const response = await fetch(imagePreviewUrl);
+      const blob = await response.blob();
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          [blob.type]: blob,
+        }),
+      ]);
+      toast.success("Image copied to clipboard! You can now paste it directly.");
+    } catch (error) {
+      console.error("Failed to copy image", error);
+      toast.error("Failed to copy image to clipboard. Try downloading it instead.");
+    } finally {
+      setIsCopyingImage(false);
+    }
   };
 
   return (
@@ -463,6 +485,15 @@ export default function DailyReports() {
                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCopyPreviewImage}
+                disabled={isCopyingImage}
+                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                <Copy className="h-4 w-4" />
+                {isCopyingImage ? "Copying..." : "Copy Image"}
               </button>
               <button
                 type="button"
