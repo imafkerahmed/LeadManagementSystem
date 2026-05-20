@@ -376,6 +376,17 @@ export default function AdminLeads() {
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
+
+  const selectedLeadRef = useRef<Lead | null>(null);
+  const isEditingRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    selectedLeadRef.current = selectedLead;
+  }, [selectedLead]);
+
+  useEffect(() => {
+    isEditingRef.current = isEditing;
+  }, [isEditing]);
   const [deleteConfirmDialogOpen, setDeleteConfirmDialogOpen] = useState(false);
   const [deleteConfirmLeadId, setDeleteConfirmLeadId] = useState<string | null>(
     null,
@@ -812,6 +823,18 @@ export default function AdminLeads() {
         setFilteredLeads(dedupItems);
         setTotalPages(Math.max(1, list.totalPages || 1));
         setPage(list.page || pageToLoad);
+
+        // Update selectedLead from fresh data if it is open in sidebar
+        const currentSel = selectedLeadRef.current;
+        if (currentSel) {
+          const updatedSelectedLead = dedupItems.find((lead) => lead.id === currentSel.id);
+          if (updatedSelectedLead) {
+            setSelectedLead(updatedSelectedLead);
+            if (!isEditingRef.current) {
+              syncDraftFromLead(updatedSelectedLead);
+            }
+          }
+        }
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") {
           // Request was cancelled, don't show error
@@ -940,6 +963,17 @@ export default function AdminLeads() {
       void fetchLeads(page);
     }, 0);
   }, [page, dateFilterRange, fetchLeads]);
+
+  useEffect(() => {
+    const pb = createPocketBaseClient();
+    pb.collection("leads").subscribe("*", (e) => {
+      void fetchLeads(page);
+    });
+
+    return () => {
+      pb.collection("leads").unsubscribe("*");
+    };
+  }, [page, fetchLeads]);
 
   // Apply date filtering and sorting
   useEffect(() => {

@@ -9,6 +9,7 @@ import { Download, Image as ImageIcon, Copy } from "lucide-react";
 import { toPng } from "html-to-image";
 import * as XLSX from "xlsx";
 import { DailyReportMetrics } from "@/types";
+import { createPocketBaseClient } from "@/lib/pocketbase";
 
 interface DailyReportData {
   date: string;
@@ -63,6 +64,23 @@ export default function DailyReports() {
     if (selectedDate) {
       fetchDailyReport(selectedDate);
     }
+  }, [selectedDate]);
+
+  useEffect(() => {
+    if (!selectedDate) return;
+    const pb = createPocketBaseClient();
+    
+    pb.collection("leads").subscribe("*", () => {
+      void fetchDailyReport(selectedDate);
+    });
+    pb.collection("leadHistory").subscribe("*", () => {
+      void fetchDailyReport(selectedDate);
+    });
+
+    return () => {
+      pb.collection("leads").unsubscribe("*");
+      pb.collection("leadHistory").unsubscribe("*");
+    };
   }, [selectedDate]);
 
   async function fetchDailyReport(dateStr: string) {

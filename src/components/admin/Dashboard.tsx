@@ -468,6 +468,22 @@ export default function AdminDashboard() {
   }, [fetchStats]);
 
   useEffect(() => {
+    const pb = createPocketBaseClient();
+    
+    pb.collection("leads").subscribe("*", () => {
+      void fetchStats();
+    });
+    pb.collection("leadHistory").subscribe("*", () => {
+      void fetchStats();
+    });
+
+    return () => {
+      pb.collection("leads").unsubscribe("*");
+      pb.collection("leadHistory").unsubscribe("*");
+    };
+  }, [fetchStats]);
+
+  useEffect(() => {
     const totalPages = Math.max(
       1,
       Math.ceil((stats?.recentActivity.length || 0) / ACTIVITY_PAGE_SIZE),

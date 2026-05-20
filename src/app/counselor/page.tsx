@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
+import { useState, useEffect, useCallback, useSyncExternalStore, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   ChevronLeft,
@@ -162,6 +162,11 @@ export default function CounselorPage() {
   const [followup3Date, setFollowup3Date] = useState("");
   const [followup3Completed, setFollowup3Completed] = useState(false);
   const [savingFollowup, setSavingFollowup] = useState<1 | 2 | 3 | null>(null);
+
+  const selectedLeadIdRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    selectedLeadIdRef.current = selectedLead?.id;
+  }, [selectedLead]);
 
   // Form states
   const [statusSelect, setStatusSelect] = useState("");
@@ -535,8 +540,9 @@ export default function CounselorPage() {
         setLeads(nextLeads);
 
         if (nextLeads.length > 0) {
-          const nextIndex = selectedLeadId
-            ? nextLeads.findIndex((lead) => lead.id === selectedLeadId)
+          const targetId = selectedLeadId || selectedLeadIdRef.current;
+          const nextIndex = targetId
+            ? nextLeads.findIndex((lead) => lead.id === targetId)
             : 0;
           const safeIndex = nextIndex >= 0 ? nextIndex : 0;
           const nextLead = nextLeads[safeIndex];
@@ -573,6 +579,21 @@ export default function CounselorPage() {
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchLeads(counselorId);
+  }, [counselorId, fetchLeads, isCounselor]);
+
+  useEffect(() => {
+    if (!counselorId || counselorId.trim() === "" || !isCounselor) {
+      return;
+    }
+
+    const pb = createPocketBaseClient();
+    pb.collection("leads").subscribe("*", (e) => {
+      void fetchLeads(counselorId);
+    });
+
+    return () => {
+      pb.collection("leads").unsubscribe("*");
+    };
   }, [counselorId, fetchLeads, isCounselor]);
 
   const openLeadDetails = async (lead: Lead, preserveStatusSelect: boolean = false) => {
