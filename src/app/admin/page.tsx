@@ -2,7 +2,6 @@
 
 import { useEffect, useState, type ComponentType } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import {
   LayoutDashboard,
   Users as UsersIcon,
@@ -17,6 +16,8 @@ import BulkUpload from "@/components/admin/BulkUpload";
 import AdminSettings from "@/components/admin/Settings";
 import AdminReports from "@/components/admin/Reports";
 import { createPocketBaseClient } from "@/lib/pocketbase";
+import AppShell from "@/components/layout/AppShell";
+import AdminSidebarHeader from "@/components/layout/AdminSidebarHeader";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -65,9 +66,12 @@ export default function AdminPage() {
       if (tab === "users") {
         tab = "settings";
       }
-      // Setting state in effect is intentional for URL-driven initialization
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (isValidTab(tab)) setCurrentTab(tab);
+
+      // Defer state update to avoid synchronous setState in effect
+      if (isValidTab(tab)) {
+        const timer = window.setTimeout(() => setCurrentTab(tab), 0);
+        return () => window.clearTimeout(timer);
+      }
     } catch {
       // ignore
     }
@@ -75,29 +79,41 @@ export default function AdminPage() {
 
   useEffect(() => {
     const pb = createPocketBaseClient();
-    const authUser = pb.authStore.model as {
-      id?: string;
-      name?: string;
-      email?: string;
-      role?: string;
-    } | null;
+    const syncAuth = () => {
+      const authUser = pb.authStore.model as {
+        id?: string;
+        name?: string;
+        email?: string;
+        role?: string;
+      } | null;
 
-    const validAdmin = pb.authStore.isValid && authUser?.role === "admin";
-    // setting mount-time auth state is intentional to avoid hydration redirects
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setAuthChecked(true);
+      const validAdmin = pb.authStore.isValid && authUser?.role === "admin";
 
-    if (!validAdmin) {
-      setIsAdmin(false);
-      router.replace("/");
-      return;
-    }
+      // Defer the initial auth snapshot so PocketBase can finish restoring state.
+      setAuthChecked(true);
 
-    setIsAdmin(true);
-    setAdminId(authUser?.id || "");
-    setAdminLabel(authUser?.email || authUser?.name || "Admin");
-    setAdminName(authUser?.name || authUser?.email || "Admin");
-    setAdminRole(authUser?.role || "Admin");
+      if (!validAdmin) {
+        setIsAdmin(false);
+        router.replace("/");
+        return;
+      }
+
+      setIsAdmin(true);
+      setAdminId(authUser?.id || "");
+      setAdminLabel(authUser?.email || authUser?.name || "Admin");
+      setAdminName(authUser?.name || authUser?.email || "Admin");
+      setAdminRole(authUser?.role || "Admin");
+    };
+
+    const timer = window.setTimeout(syncAuth, 0);
+    const unsubscribe = pb.authStore.onChange(() => {
+      syncAuth();
+    });
+
+    return () => {
+      window.clearTimeout(timer);
+      unsubscribe();
+    };
   }, [router]);
 
   if (!authChecked) {
@@ -133,42 +149,13 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#fafbfc] text-[#1e293b] antialiased">
-      <div className="flex h-screen overflow-hidden">
-        {/* Sidebar */}
-        <aside className="w-68 bg-white border-r border-slate-200/80 flex flex-col text-slate-700 shadow-[4px_0_24px_rgba(15,23,42,0.03)] relative z-20">
-          <div className="px-5 py-8 border-b border-slate-100/80 bg-white flex flex-col items-center text-center gap-4 relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-50/80 via-transparent to-transparent pointer-events-none" />
-
-            <div className="flex flex-col items-center gap-4 relative z-10">
-              <div className="relative h-24 w-24 rounded-[1.5rem] overflow-hidden shadow-sm shadow-slate-200/50 border border-slate-100 flex-shrink-0 bg-white">
-                <Image
-                  src="/images/amazon-logo.jpeg"
-                  alt="Amazon College Logo"
-                  fill
-                  className="object-cover p-1"
-                />
-              </div>
-              <div className="flex flex-col gap-0.5 items-center">
-                <h1 className="text-xl font-black tracking-tight text-slate-900 leading-tight">
-                  Lead Management
-                </h1>
-                <span className="text-lg font-extrabold bg-gradient-to-r from-blue-600 to-indigo-500 bg-clip-text text-transparent w-fit">
-                  System
-                </span>
-              </div>
-            </div>
-
-            <div className="relative z-10 mt-1">
-              <div className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200/60 rounded-xl shadow-sm">
-                <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                <p className="text-[11px] text-slate-600 font-bold uppercase tracking-widest">
-                  Amazon College
-                </p>
-              </div>
-            </div>
-          </div>
-
+    <AppShell
+      title="Lead Management"
+      subtitle={adminLabel}
+      hideHeader
+      sidebar={
+        <>
+          <AdminSidebarHeader />
           <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
             {tabs.map((t) => {
               const Icon = t.icon;
@@ -208,49 +195,49 @@ export default function AdminPage() {
               </div>
             </button>
           </div>
-        </aside>
+        </>
+      }
+    >
+      {/* Main content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <header className="border-b border-slate-100 bg-white/70 backdrop-blur-md px-8 py-5 flex items-center justify-between shadow-sm relative z-10">
+          <div>
+            <h2 className="text-xl font-extrabold text-slate-800 tracking-tight">
+              {tabs.find((t) => t.id === currentTab)?.label}
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5 font-medium">
+              {currentTab === "dashboard" &&
+                "Real-time key statistics & active trends"}
+              {currentTab === "leads" &&
+                "Search, browse, edit, and filter all leads"}
+              {currentTab === "bulk" && "Upload CSV file for batch imports"}
+              {currentTab === "reports" &&
+                "Query performance stats and visual charts"}
+              {currentTab === "settings" &&
+                "Manage administrators, credentials, and settings"}
+            </p>
+          </div>
+        </header>
 
-        {/* Main content */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <header className="border-b border-slate-100 bg-white/70 backdrop-blur-md px-8 py-5 flex items-center justify-between shadow-sm relative z-10">
-            <div>
-              <h2 className="text-xl font-extrabold text-slate-800 tracking-tight">
-                {tabs.find((t) => t.id === currentTab)?.label}
-              </h2>
-              <p className="text-xs text-slate-400 mt-0.5 font-medium">
-                {currentTab === "dashboard" &&
-                  "Real-time key statistics & active trends"}
-                {currentTab === "leads" &&
-                  "Search, browse, edit, and filter all leads"}
-                {currentTab === "bulk" && "Upload CSV file for batch imports"}
-                {currentTab === "reports" &&
-                  "Query performance stats and visual charts"}
-                {currentTab === "settings" &&
-                  "Manage administrators, credentials, and settings"}
-              </p>
-            </div>
-          </header>
-
-          <main className="flex-1 overflow-y-auto px-8 py-8 bg-[#fafbfc]">
-            <div
-              className={`mx-auto transition-all duration-300 ${
-                currentTab === "leads" ||
-                currentTab === "reports" ||
-                currentTab === "dashboard"
-                  ? "max-w-7xl"
-                  : "max-w-5xl"
-              }`}
-            >
-              {currentTab === "dashboard" && <AdminDashboard />}
-              {currentTab === "leads" && <AdminLeads />}
-              {currentTab === "bulk" && (
-                <BulkUpload operatorId={adminId} operatorLabel={adminLabel} />
-              )}
-              {currentTab === "reports" && <AdminReports />}
-              {currentTab === "settings" && <AdminSettings />}
-            </div>
-          </main>
-        </div>
+        <main className="flex-1 overflow-y-auto px-8 py-8 bg-[#fafbfc]">
+          <div
+            className={`mx-auto transition-all duration-300 ${
+              currentTab === "leads" ||
+              currentTab === "reports" ||
+              currentTab === "dashboard"
+                ? "max-w-7xl"
+                : "max-w-5xl"
+            }`}
+          >
+            {currentTab === "dashboard" && <AdminDashboard />}
+            {currentTab === "leads" && <AdminLeads />}
+            {currentTab === "bulk" && (
+              <BulkUpload operatorId={adminId} operatorLabel={adminLabel} />
+            )}
+            {currentTab === "reports" && <AdminReports />}
+            {currentTab === "settings" && <AdminSettings />}
+          </div>
+        </main>
       </div>
 
       <AlertDialog open={logoutOpen} onOpenChange={setLogoutOpen}>
@@ -281,6 +268,6 @@ export default function AdminPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </AppShell>
   );
 }

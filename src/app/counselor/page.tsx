@@ -1,7 +1,13 @@
 "use client";
-import { useState, useEffect, useCallback, useSyncExternalStore, useRef } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useSyncExternalStore,
+  useRef,
+} from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
+import AppShell from "../../components/layout/AppShell";
 import {
   ChevronLeft,
   ChevronRight,
@@ -123,22 +129,52 @@ export default function CounselorPage() {
     () => false,
   );
   const pb = createPocketBaseClient();
-  const authUser = pb.authStore.model as {
+  const [authChecked, setAuthChecked] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const [authUser, setAuthUser] = useState<{
     id?: string;
     name?: string;
     email?: string;
     role?: string;
-  } | null;
+  } | null>(null);
+
+  useEffect(() => {
+    const syncAuth = () => {
+      const nextAuthUser = pb.authStore.model as {
+        id?: string;
+        name?: string;
+        email?: string;
+        role?: string;
+      } | null;
+
+      setAuthUser(nextAuthUser);
+      setAuthChecked(true);
+      setAuthReady(true);
+    };
+
+    const timer = window.setTimeout(syncAuth, 0);
+    const unsubscribe = pb.authStore.onChange(() => {
+      syncAuth();
+    });
+
+    return () => {
+      window.clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [pb]);
+
   const isCounselor =
-    pb.authStore.isValid && authUser?.role === "student-counsellor";
+    authChecked &&
+    pb.authStore.isValid &&
+    authUser?.role === "student-counsellor";
   const counselorId = authUser?.id || "";
   const counselorName = authUser?.name || "Student Counsellor";
 
   useEffect(() => {
-    if (!isCounselor) {
+    if (authChecked && !isCounselor) {
       router.replace("/");
     }
-  }, [isCounselor, router]);
+  }, [authChecked, isCounselor, router]);
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -194,11 +230,21 @@ export default function CounselorPage() {
   } | null>(null);
 
   // Status flow: New -> Contacted -> Follow-up -> Registered
-  const statusFlow = ["New", "Ringing-No-Answer", "Contacted", "Follow-up", "Registered", "Lost"];
+  const statusFlow = [
+    "New",
+    "Ringing-No-Answer",
+    "Contacted",
+    "Follow-up",
+    "Registered",
+    "Lost",
+  ];
 
   const normalizeLeadStatus = (status: string | undefined) => {
     const normalized = (status || "").trim().toLowerCase();
-    if (normalized === "ringing-no-answer" || normalized === "ringing no answer") {
+    if (
+      normalized === "ringing-no-answer" ||
+      normalized === "ringing no answer"
+    ) {
       return "Ringing-No-Answer";
     }
     if (normalized === "followup" || normalized === "follow-up") {
@@ -574,16 +620,28 @@ export default function CounselorPage() {
   );
 
   useEffect(() => {
-    if (!counselorId || counselorId.trim() === "" || !isCounselor) {
+    if (
+      !authReady ||
+      !authChecked ||
+      !counselorId ||
+      counselorId.trim() === "" ||
+      !isCounselor
+    ) {
       return;
     }
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchLeads(counselorId);
-  }, [counselorId, fetchLeads, isCounselor]);
+  }, [authChecked, authReady, counselorId, fetchLeads, isCounselor]);
 
   useEffect(() => {
-    if (!counselorId || counselorId.trim() === "" || !isCounselor) {
+    if (
+      !authReady ||
+      !authChecked ||
+      !counselorId ||
+      counselorId.trim() === "" ||
+      !isCounselor
+    ) {
       return;
     }
 
@@ -595,9 +653,12 @@ export default function CounselorPage() {
     return () => {
       pb.collection("leads").unsubscribe("*");
     };
-  }, [counselorId, fetchLeads, isCounselor]);
+  }, [authChecked, authReady, counselorId, fetchLeads, isCounselor]);
 
-  const openLeadDetails = async (lead: Lead, preserveStatusSelect: boolean = false) => {
+  const openLeadDetails = async (
+    lead: Lead,
+    preserveStatusSelect: boolean = false,
+  ) => {
     setModalOpen(true);
     setTimelineOpen(false);
     setHistoryLoading(true);
@@ -698,7 +759,10 @@ export default function CounselorPage() {
     }
 
     if (statusSelect === "New") {
-      showToast("A lead in New status must be transitioned to a different status", "error");
+      showToast(
+        "A lead in New status must be transitioned to a different status",
+        "error",
+      );
       return;
     }
 
@@ -1086,7 +1150,7 @@ export default function CounselorPage() {
     currentPage * PAGE_SIZE,
   );
 
-  const showAnimatedEmptyState = displayedLeads.length === 0;
+  const showAnimatedEmptyState = authReady && displayedLeads.length === 0;
 
   useEffect(() => {
     const timer = window.setTimeout(
@@ -1147,36 +1211,23 @@ export default function CounselorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#fafbfc] text-[#1e293b] antialiased">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
-          <div className="flex items-center gap-3">
-            <div className="relative h-12 w-12 rounded-xl overflow-hidden shadow-sm border border-slate-100 flex-shrink-0 bg-white">
-              <Image src="/images/amazon-logo.jpeg" alt="Amazon College Logo" fill className="object-cover" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold tracking-tight sm:text-xl text-slate-900 leading-tight">
-                Amazon College
-              </h1>
-              <p className="text-[13px] font-medium text-slate-500" suppressHydrationWarning>
-                {counselorName}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => {
-              const pb = createPocketBaseClient();
-              pb.authStore.clear();
-              router.replace("/");
-            }}
-            className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50"
-          >
-            <LogOut className="h-4 w-4" />
-            Logout
-          </button>
-        </div>
-      </header>
-
+    <AppShell
+      title="Amazon College"
+      subtitle={counselorName}
+      headerRight={
+        <button
+          onClick={() => {
+            const pb = createPocketBaseClient();
+            pb.authStore.clear();
+            router.replace("/");
+          }}
+          className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50"
+        >
+          <LogOut className="h-4 w-4" />
+          Logout
+        </button>
+      }
+    >
       <button
         onClick={() => setAddLeadModalOpen(true)}
         className="fixed bottom-5 right-5 z-20 inline-flex items-center gap-2 rounded-full bg-teal-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-teal-600/25 transition hover:bg-teal-700 md:hidden"
@@ -1184,87 +1235,112 @@ export default function CounselorPage() {
         + Add Lead
       </button>
 
-      <main className="mx-auto w-full max-w-5xl px-4 py-4 sm:px-6 sm:py-6">
-        <div className="space-y-4">
-          {/* Status Filter Tabs */}
-          <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
-            <button
-              onClick={() => setStatusFilter(null)}
-              className={`rounded-md px-3 py-2 text-sm font-medium transition ${
-                statusFilter === null
-                  ? "bg-slate-900 text-white"
-                  : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-              }`}
-            >
-              All ({leads.length})
-            </button>
-            {statusFlow.map((status) => {
-              const count = leads.filter((l) => l.status === status).length;
-              return (
-                <button
-                  key={status}
-                  onClick={() => setStatusFilter(status)}
-                  className={`rounded-md px-3 py-2 text-sm font-medium transition ${
-                    statusFilter === status
-                      ? "bg-slate-900 text-white"
-                      : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                  }`}
-                >
-                  {status} ({count})
-                </button>
-              );
-            })}
-          </div>
+      <div className="space-y-4">
+        {/* Status Filter Tabs */}
+        <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+          <button
+            onClick={() => setStatusFilter(null)}
+            className={`rounded-md px-3 py-2 text-sm font-medium transition ${
+              statusFilter === null
+                ? "bg-slate-900 text-white"
+                : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            All ({leads.length})
+          </button>
+          {statusFlow.map((status) => {
+            const count = leads.filter((l) => l.status === status).length;
+            return (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`rounded-md px-3 py-2 text-sm font-medium transition ${
+                  statusFilter === status
+                    ? "bg-slate-900 text-white"
+                    : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                {status} ({count})
+              </button>
+            );
+          })}
+        </div>
 
-          {/* Search box + desktop add button */}
-          <div className="mt-3 flex items-center gap-3">
-            <input
-              type="text"
-              placeholder="Search name, mobile, email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full max-w-md rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-            />
-            <button
-              onClick={() => setAddLeadModalOpen(true)}
-              className="hidden rounded-md bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-700 md:inline-flex"
-            >
-              + Add Lead
-            </button>
-          </div>
+        {/* Search box + desktop add button */}
+        <div className="mt-3 flex items-center gap-3">
+          <input
+            type="text"
+            placeholder="Search name, mobile, email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full max-w-md rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+          />
+          <button
+            onClick={() => setAddLeadModalOpen(true)}
+            className="hidden rounded-md bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-700 md:inline-flex"
+          >
+            + Add Lead
+          </button>
+        </div>
 
-          {filteredLeads.length === 0 ? (
-            <div className="rounded-2xl border border-slate-200 bg-white p-10 shadow-sm">
-              <div className="mx-auto flex max-w-sm flex-col items-center justify-center gap-3 text-slate-500">
-                {showNoLeadsText ? (
-                  <p className="text-sm font-medium text-slate-500">
-                    No leads found
-                  </p>
-                ) : (
-                  <>
-                    <Loader2 className="h-8 w-8 animate-spin text-teal-500" />
-                    <div className="flex items-center gap-1.5">
-                      <span className="h-2 w-2 animate-bounce rounded-full bg-teal-400 [animation-delay:-0.2s]" />
-                      <span className="h-2 w-2 animate-bounce rounded-full bg-teal-400 [animation-delay:-0.1s]" />
-                      <span className="h-2 w-2 animate-bounce rounded-full bg-teal-400" />
-                    </div>
-                  </>
-                )}
+        {!authReady ? (
+          <div className="rounded-2xl border border-slate-200 bg-white p-10 shadow-sm">
+            <div className="mx-auto flex max-w-sm flex-col items-center justify-center gap-3 text-slate-500">
+              <Loader2 className="h-8 w-8 animate-spin text-teal-500" />
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 animate-bounce rounded-full bg-teal-400 [animation-delay:-0.2s]" />
+                <span className="h-2 w-2 animate-bounce rounded-full bg-teal-400 [animation-delay:-0.1s]" />
+                <span className="h-2 w-2 animate-bounce rounded-full bg-teal-400" />
               </div>
             </div>
-          ) : (
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          </div>
+        ) : filteredLeads.length === 0 ? (
+          <div className="rounded-2xl border border-slate-200 bg-white p-10 shadow-sm">
+            <div className="mx-auto flex max-w-sm flex-col items-center justify-center gap-3 text-slate-500">
+              {showNoLeadsText ? (
+                <p className="text-sm font-medium text-slate-500">
+                  No leads found
+                </p>
+              ) : (
+                <>
+                  <Loader2 className="h-8 w-8 animate-spin text-teal-500" />
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-teal-400 [animation-delay:-0.2s]" />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-teal-400 [animation-delay:-0.1s]" />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-teal-400" />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-col">
+            <div className="max-h-[calc(100vh-300px)] overflow-y-auto">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200 text-sm">
-                  <thead className="bg-slate-50 text-left text-slate-600">
+                  <thead className="border-b border-slate-200 bg-white text-left text-slate-700 shadow-sm">
                     <tr>
-                      <th className="px-4 py-3 font-medium">Lead</th>
-                      <th className="px-4 py-3 font-medium">Mobile</th>
-                      <th className="px-4 py-3 font-medium">Course</th>
-                      <th className="px-4 py-3 font-medium">Next Follow-up</th>
-                      <th className="px-4 py-3 font-medium">Status</th>
-                      <th className="px-4 py-3 font-medium">Updated</th>
-                      <th className="px-4 py-3 font-medium">Action</th>
+                      <th className="sticky top-0 z-20 bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                        Lead
+                      </th>
+                      <th className="sticky top-0 z-20 bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                        Mobile
+                      </th>
+                      <th className="sticky top-0 z-20 bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                        Course
+                      </th>
+                      <th className="sticky top-0 z-20 bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                        Next Follow-up
+                      </th>
+                      <th className="sticky top-0 z-20 bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                        Status
+                      </th>
+                      <th className="sticky top-0 z-20 bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                        Updated
+                      </th>
+                      <th className="sticky top-0 z-20 bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                        Action
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1343,43 +1419,41 @@ export default function CounselorPage() {
                   </tbody>
                 </table>
               </div>
+            </div>
 
-              <div className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  Showing {(currentPage - 1) * PAGE_SIZE + 1} -{" "}
-                  {Math.min(currentPage * PAGE_SIZE, filteredLeads.length)} of{" "}
-                  {filteredLeads.length}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() =>
-                      setTablePage((page) => Math.max(1, page - 1))
-                    }
-                    disabled={currentPage === 1}
-                    className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-3 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    Prev
-                  </button>
-                  <span className="text-xs font-medium text-slate-500">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <button
-                    onClick={() =>
-                      setTablePage((page) => Math.min(totalPages, page + 1))
-                    }
-                    disabled={currentPage === totalPages}
-                    className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-3 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
+            <div className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                Showing {(currentPage - 1) * PAGE_SIZE + 1} -{" "}
+                {Math.min(currentPage * PAGE_SIZE, filteredLeads.length)} of{" "}
+                {filteredLeads.length}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setTablePage((page) => Math.max(1, page - 1))}
+                  disabled={currentPage === 1}
+                  className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-3 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Prev
+                </button>
+                <span className="text-xs font-medium text-slate-500">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() =>
+                    setTablePage((page) => Math.min(totalPages, page + 1))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-3 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </button>
               </div>
             </div>
-          )}
-        </div>
-      </main>
+          </div>
+        )}
+      </div>
 
       {addLeadModalVisible && (
         <div
@@ -2414,6 +2488,6 @@ export default function CounselorPage() {
           </div>
         </div>
       )}
-    </div>
+    </AppShell>
   );
 }

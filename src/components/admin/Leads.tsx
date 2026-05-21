@@ -191,7 +191,10 @@ function splitPhoneParts(
 
 function normalizeLeadStatus(value: string | undefined): string {
   const normalized = (value || "").trim().toLowerCase();
-  if (normalized === "ringing-no-answer" || normalized === "ringing no answer") {
+  if (
+    normalized === "ringing-no-answer" ||
+    normalized === "ringing no answer"
+  ) {
     return "Ringing-No-Answer";
   }
   if (normalized === "followup" || normalized === "follow-up") {
@@ -250,20 +253,24 @@ function isDateInRange(
   if (!date || !range.from) return false;
 
   if (date < range.from) return false;
+
   if (range.to) {
     const endOfTo = new Date(range.to);
     endOfTo.setDate(endOfTo.getDate() + 1);
     if (date >= endOfTo) return false;
   }
+
   return true;
 }
 
-function getNextFollowup(lead: Lead) {
+function getNextFollowup(
+  lead: Lead,
+): { date?: string; completed?: boolean } | null {
   const candidates: Array<{ date?: string; completed?: boolean }> = [
     { date: lead.followup1Date, completed: lead.followup1Completed },
     { date: lead.followup2Date, completed: lead.followup2Completed },
     { date: lead.followup3Date, completed: lead.followup3Completed },
-  ].filter((c) => c.date && c.date.trim());
+  ].filter((candidate) => candidate.date && candidate.date.trim());
 
   if (candidates.length === 0) return null;
 
@@ -273,7 +280,7 @@ function getNextFollowup(lead: Lead) {
     return da - db;
   });
 
-  const notCompleted = candidates.find((c) => !c.completed && c.date);
+  const notCompleted = candidates.find((candidate) => !candidate.completed);
   return notCompleted || candidates[0];
 }
 
@@ -332,6 +339,7 @@ export default function AdminLeads() {
   const currentUserName =
     authModel?.name || authModel?.email || "Amazon College Team";
   const isAdmin = authModel?.role === "admin";
+  const [authReady, setAuthReady] = useState(false);
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [filteredLeads, setFilteredLeads] = useState<Lead[]>([]);
@@ -376,6 +384,24 @@ export default function AdminLeads() {
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
+
+  useEffect(() => {
+    const pb = createPocketBaseClient();
+
+    const syncAuth = () => {
+      setAuthReady(true);
+    };
+
+    const timer = window.setTimeout(syncAuth, 0);
+    const unsubscribe = pb.authStore.onChange(() => {
+      syncAuth();
+    });
+
+    return () => {
+      window.clearTimeout(timer);
+      unsubscribe();
+    };
+  }, []);
 
   const selectedLeadRef = useRef<Lead | null>(null);
   const isEditingRef = useRef<boolean>(false);
@@ -665,6 +691,10 @@ export default function AdminLeads() {
   };
 
   useEffect(() => {
+    if (!authReady) {
+      return;
+    }
+
     const loadUsers = async () => {
       const isAssignableCounselor = (user: UserLookupRecord) => {
         const accountStatus = (user.accountStatus || "").toLowerCase();
@@ -764,7 +794,7 @@ export default function AdminLeads() {
     };
 
     loadUsers();
-  }, []);
+  }, [authReady]);
 
   const fetchLeads = useCallback(
     async (pageToLoad = 1) => {
@@ -827,7 +857,9 @@ export default function AdminLeads() {
         // Update selectedLead from fresh data if it is open in sidebar
         const currentSel = selectedLeadRef.current;
         if (currentSel) {
-          const updatedSelectedLead = dedupItems.find((lead) => lead.id === currentSel.id);
+          const updatedSelectedLead = dedupItems.find(
+            (lead) => lead.id === currentSel.id,
+          );
           if (updatedSelectedLead) {
             setSelectedLead(updatedSelectedLead);
             if (!isEditingRef.current) {
@@ -932,6 +964,10 @@ export default function AdminLeads() {
 
   // When filters change, reset to page 1 and reload the appropriate dataset.
   useEffect(() => {
+    if (!authReady) {
+      return;
+    }
+
     setTimeout(() => setPage(1), 0);
 
     if (dateFilterRange) {
@@ -945,6 +981,7 @@ export default function AdminLeads() {
       void fetchLeads(1);
     }, 0);
   }, [
+    authReady,
     statusFilter,
     counselorFilter,
     searchTerm,
@@ -955,6 +992,10 @@ export default function AdminLeads() {
   ]);
 
   useEffect(() => {
+    if (!authReady) {
+      return;
+    }
+
     if (dateFilterRange) {
       return;
     }
@@ -962,9 +1003,13 @@ export default function AdminLeads() {
     setTimeout(() => {
       void fetchLeads(page);
     }, 0);
-  }, [page, dateFilterRange, fetchLeads]);
+  }, [authReady, page, dateFilterRange, fetchLeads]);
 
   useEffect(() => {
+    if (!authReady) {
+      return;
+    }
+
     const pb = createPocketBaseClient();
     pb.collection("leads").subscribe("*", () => {
       void fetchLeads(page);
@@ -973,7 +1018,7 @@ export default function AdminLeads() {
     return () => {
       pb.collection("leads").unsubscribe("*");
     };
-  }, [page, fetchLeads]);
+  }, [authReady, page, fetchLeads]);
 
   // Apply date filtering and sorting
   useEffect(() => {
@@ -995,9 +1040,7 @@ export default function AdminLeads() {
       filtered = filtered.filter((lead) => {
         const nf = getNextFollowup(lead);
         const dateField =
-          dateFilterField === "created"
-            ? lead.created
-            : nf?.date;
+          dateFilterField === "created" ? lead.created : nf?.date;
 
         if (dateFilterField === "dueFollowup") {
           if (!nf || nf.completed) return false;
@@ -1040,7 +1083,8 @@ export default function AdminLeads() {
   const visibleLeads = dateFilterRange
     ? filteredLeads.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
     : filteredLeads;
-  const showAnimatedEmptyState = !isLoading && visibleLeads.length === 0;
+  const showAnimatedEmptyState =
+    authReady && !isLoading && visibleLeads.length === 0;
 
   useEffect(() => {
     const timer = window.setTimeout(
@@ -1591,7 +1635,14 @@ export default function AdminLeads() {
     }
   };
 
-  const statuses = ["New", "Ringing-No-Answer", "Contacted", "Follow-up", "Registered", "Lost"];
+  const statuses = [
+    "New",
+    "Ringing-No-Answer",
+    "Contacted",
+    "Follow-up",
+    "Registered",
+    "Lost",
+  ];
   const statusColors: Record<string, string> = {
     New: "bg-blue-100 text-blue-800",
     "Ringing-No-Answer": "bg-indigo-100 text-indigo-800",
@@ -1683,7 +1734,7 @@ export default function AdminLeads() {
       </div>
 
       {/* Leads Table */}
-      <div className="bg-white rounded-lg shadow overflow-x-auto">
+      <div className="bg-white rounded-lg shadow overflow-hidden flex flex-col">
         {isLoading ? (
           <div className="p-6">
             <div className="mb-4 flex items-center justify-center gap-2 text-sm text-gray-600">
@@ -1708,7 +1759,7 @@ export default function AdminLeads() {
               ))}
             </div>
           </div>
-        ) : visibleLeads.length === 0 ? (
+        ) : authReady && visibleLeads.length === 0 ? (
           <div className="p-10">
             <div className="mx-auto flex max-w-sm flex-col items-center justify-center gap-3 text-gray-500">
               {showNoLeadsText ? (
@@ -1727,97 +1778,125 @@ export default function AdminLeads() {
               )}
             </div>
           </div>
-        ) : (
-          <table className="w-full min-w-[1100px]">
-            <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                  ID
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                  Name
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                  Mobile
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                  Course
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                  Next Follow-up
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                  Assigned To
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleLeads.map((lead) => (
-                <tr
-                  key={lead.id}
-                  className="border-b border-gray-100 hover:bg-gray-50 transition"
+        ) : !authReady ? (
+          <div className="p-6">
+            <div className="mb-4 flex items-center justify-center gap-2 text-sm text-gray-600">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading leads...
+            </div>
+            <div className="space-y-3">
+              {[...Array(6)].map((_, index) => (
+                <div
+                  key={`lead-loader-auth-${index}`}
+                  className="grid grid-cols-8 gap-4 rounded-md border border-gray-100 px-4 py-3"
                 >
-                  <td className="px-6 py-3 text-sm font-mono text-gray-600">
-                    {lead.leadId}
-                  </td>
-                  <td className="px-6 py-3 text-sm font-medium text-gray-900">
-                    {lead.studentName}
-                  </td>
-                  <td className="px-6 py-3 text-sm text-gray-600">
-                    {lead.mobileWithCountry ||
-                      `${lead.countryCode || "+94"}${lead.mobile}`}
-                  </td>
-                  <td className="px-6 py-3 text-sm text-gray-600">
-                    {lead.course}
-                  </td>
-                  <td className="px-6 py-3 text-sm">
-                    {(() => {
-                      const nf = getNextFollowup(lead);
-                      if (!nf || !nf.date)
-                        return <span className="text-sm text-gray-400">-</span>;
-                      const status = getFollowupStatus(nf.date, nf.completed);
-                      return (
-                        <span
-                          className={`inline-block px-2 py-1 rounded text-xs font-medium ${getFollowupStatusColor(status)}`}
-                        >
-                          {formatFollowupDateOnly(nf.date)}
-                        </span>
-                      );
-                    })()}
-                  </td>
-                  <td className="px-6 py-3">
-                    <span
-                      className={`inline-block px-2 py-1 rounded text-xs font-medium ${statusColors[lead.status]}`}
-                    >
-                      {lead.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3 text-sm text-gray-600">
-                    {lead.assignedTo}
-                  </td>
-                  <td className="px-6 py-3 text-sm">
-                    <button
-                      onClick={() => openSidebarFor(lead, "view")}
-                      className="text-blue-600 hover:text-blue-800 font-medium"
-                    >
-                      View
-                    </button>
-                  </td>
-                </tr>
+                  <div className="h-4 animate-pulse rounded bg-gray-200" />
+                  <div className="h-4 animate-pulse rounded bg-gray-200" />
+                  <div className="h-4 animate-pulse rounded bg-gray-200" />
+                  <div className="h-4 animate-pulse rounded bg-gray-200" />
+                  <div className="h-4 animate-pulse rounded bg-gray-200" />
+                  <div className="h-4 animate-pulse rounded bg-gray-200" />
+                  <div className="h-4 animate-pulse rounded bg-gray-200" />
+                  <div className="h-4 animate-pulse rounded bg-gray-200" />
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </div>
+        ) : (
+          <div className="max-h-[calc(100vh-320px)] overflow-y-auto overflow-x-hidden">
+            <table className="w-full table-fixed">
+              <thead className="sticky top-0 z-10 bg-gray-50">
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                    ID
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                    Name
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                    Mobile
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                    Course
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                    Next Follow-up
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                    Assigned To
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleLeads.map((lead) => (
+                  <tr
+                    key={lead.id}
+                    className="border-b border-gray-100 hover:bg-gray-50 transition"
+                  >
+                    <td className="px-6 py-3 text-sm font-mono text-gray-600">
+                      {lead.leadId}
+                    </td>
+                    <td className="px-6 py-3 text-sm font-medium text-gray-900">
+                      {lead.studentName}
+                    </td>
+                    <td className="px-6 py-3 text-sm text-gray-600">
+                      {lead.mobileWithCountry ||
+                        `${lead.countryCode || "+94"}${lead.mobile}`}
+                    </td>
+                    <td className="px-6 py-3 text-sm text-gray-600">
+                      {lead.course}
+                    </td>
+                    <td className="px-6 py-3 text-sm">
+                      {(() => {
+                        const nf = getNextFollowup(lead);
+                        if (!nf || !nf.date)
+                          return (
+                            <span className="text-sm text-gray-400">-</span>
+                          );
+                        const status = getFollowupStatus(nf.date, nf.completed);
+                        return (
+                          <span
+                            className={`inline-block px-2 py-1 rounded text-xs font-medium ${getFollowupStatusColor(status)}`}
+                          >
+                            {formatFollowupDateOnly(nf.date)}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-6 py-3">
+                      <span
+                        className={`inline-block px-2 py-1 rounded text-xs font-medium ${statusColors[lead.status]}`}
+                      >
+                        {lead.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3 text-sm text-gray-600">
+                      {lead.assignedTo}
+                    </td>
+                    <td className="px-6 py-3 text-sm">
+                      <button
+                        onClick={() => openSidebarFor(lead, "view")}
+                        className="text-blue-600 hover:text-blue-800 font-medium"
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between border-t border-gray-100 pt-4">
         <div className="text-sm text-gray-600">
           Page {page} of {totalPages} (
           {dateFilterRange ? filteredLeads.length : leads.length} leads)
@@ -1879,7 +1958,10 @@ export default function AdminLeads() {
       {/* Sidebar Drawer */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-50 flex">
-          <div className="flex-1 bg-slate-900/40 backdrop-blur-sm transition-all duration-300" onClick={closeSidebar} />
+          <div
+            className="flex-1 bg-slate-900/40 backdrop-blur-sm transition-all duration-300"
+            onClick={closeSidebar}
+          />
           <div className="w-full max-w-md bg-white border-l border-slate-100 shadow-2xl overflow-y-auto flex flex-col h-full animate-in slide-in-from-right duration-300">
             <div className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-slate-100 p-5 flex items-center justify-between z-10">
               <h2 className="text-base font-extrabold text-slate-800 tracking-tight">
@@ -2174,7 +2256,9 @@ export default function AdminLeads() {
                                   disabled={savingFollowup === 1}
                                   className="w-full rounded-xl border border-slate-200 bg-white hover:bg-slate-50 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all"
                                 >
-                                  {savingFollowup === 1 ? "Setting..." : "Set Date"}
+                                  {savingFollowup === 1
+                                    ? "Setting..."
+                                    : "Set Date"}
                                 </button>
                               ) : (
                                 selectedLead?.followup1Date && (
@@ -2186,10 +2270,7 @@ export default function AdminLeads() {
                                       onChange={(e) =>
                                         setFollowup1Completed(e.target.checked)
                                       }
-                                      disabled={
-                                        !followup1Date ||
-                                        isSaving
-                                      }
+                                      disabled={!followup1Date || isSaving}
                                       className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                                     />
                                     <label
@@ -2261,7 +2342,9 @@ export default function AdminLeads() {
                                   disabled={savingFollowup === 2}
                                   className="w-full rounded-xl border border-slate-200 bg-white hover:bg-slate-50 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all"
                                 >
-                                  {savingFollowup === 2 ? "Setting..." : "Set Date"}
+                                  {savingFollowup === 2
+                                    ? "Setting..."
+                                    : "Set Date"}
                                 </button>
                               ) : (
                                 selectedLead?.followup2Date && (
@@ -2273,10 +2356,7 @@ export default function AdminLeads() {
                                       onChange={(e) =>
                                         setFollowup2Completed(e.target.checked)
                                       }
-                                      disabled={
-                                        !followup2Date ||
-                                        isSaving
-                                      }
+                                      disabled={!followup2Date || isSaving}
                                       className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                                     />
                                     <label
@@ -2348,7 +2428,9 @@ export default function AdminLeads() {
                                   disabled={savingFollowup === 3}
                                   className="w-full rounded-xl border border-slate-200 bg-white hover:bg-slate-50 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all"
                                 >
-                                  {savingFollowup === 3 ? "Setting..." : "Set Date"}
+                                  {savingFollowup === 3
+                                    ? "Setting..."
+                                    : "Set Date"}
                                 </button>
                               ) : (
                                 selectedLead?.followup3Date && (
@@ -2360,10 +2442,7 @@ export default function AdminLeads() {
                                       onChange={(e) =>
                                         setFollowup3Completed(e.target.checked)
                                       }
-                                      disabled={
-                                        !followup3Date ||
-                                        isSaving
-                                      }
+                                      disabled={!followup3Date || isSaving}
                                       className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                                     />
                                     <label
@@ -2432,7 +2511,10 @@ export default function AdminLeads() {
                             </p>
                           ) : (
                             groupedTimeline.map((group) => (
-                              <div key={group.id} className="relative pl-5 border-l border-slate-100 ml-2 py-0.5">
+                              <div
+                                key={group.id}
+                                className="relative pl-5 border-l border-slate-100 ml-2 py-0.5"
+                              >
                                 <span className="absolute -left-[5px] top-2 h-2.5 w-2.5 rounded-full bg-blue-500 ring-4 ring-white" />
                                 <div className="flex flex-col gap-2 rounded-xl border border-slate-100 bg-white p-3.5 shadow-sm">
                                   <div className="flex flex-col gap-1">

@@ -505,111 +505,113 @@ export default function AdminUsers() {
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white shadow-sm">
-        <table className="w-full text-sm border-separate border-spacing-0">
-          <thead>
-            <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100">
-              <th className="px-4 py-3 font-semibold rounded-l-2xl">User</th>
-              <th className="px-4 py-3 font-semibold">Role</th>
-              <th className="px-4 py-3 font-semibold">Assigned Leads</th>
-              <th className="px-4 py-3 font-semibold">Status</th>
-              <th className="px-4 py-3 font-semibold text-right rounded-r-2xl">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {isLoading ? (
-              <tr>
-                <td
-                  className="px-4 py-8 text-center text-slate-400 font-medium"
-                  colSpan={5}
-                >
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-500 border-t-transparent" />
-                    Loading system directory...
-                  </div>
-                </td>
+      <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm flex flex-col">
+        <div className="max-h-[calc(100vh-320px)] overflow-y-auto overflow-x-auto">
+          <table className="w-full text-sm border-separate border-spacing-0">
+            <thead className="sticky top-0 z-10 bg-slate-50">
+              <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100">
+                <th className="px-4 py-3 font-semibold rounded-l-2xl">User</th>
+                <th className="px-4 py-3 font-semibold">Role</th>
+                <th className="px-4 py-3 font-semibold">Assigned Leads</th>
+                <th className="px-4 py-3 font-semibold">Status</th>
+                <th className="px-4 py-3 font-semibold text-right rounded-r-2xl">
+                  Actions
+                </th>
               </tr>
-            ) : filteredUsers.length === 0 ? (
-              <tr>
-                <td
-                  className="px-4 py-8 text-center text-slate-400"
-                  colSpan={5}
-                >
-                  No users match the selected filters
-                </td>
-              </tr>
-            ) : (
-              filteredUsers.map((user) => {
-                const isEnabled = user.accountStatus === "enabled";
-
-                return (
-                  <tr
-                    key={user.id}
-                    className="hover:bg-slate-50/30 transition-colors duration-200"
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {isLoading ? (
+                <tr>
+                  <td
+                    className="px-4 py-8 text-center text-slate-400 font-medium"
+                    colSpan={5}
                   >
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-slate-800">
-                        {user.name}
-                      </div>
-                      <div className="text-xs text-slate-400 mt-0.5">
-                        {user.email}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 font-medium text-slate-600">
-                      {user.role === "admin" ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
-                          Admin
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-200">
-                          Counselor
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      <span className="font-bold text-slate-700">
-                        {user.assignedLeadCount}
-                      </span>{" "}
-                      leads
-                    </td>
-                    <td className="px-4 py-3">
-                      <label className="inline-flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          className="sr-only peer"
-                          checked={isEnabled}
-                          onChange={(event) =>
-                            handleStatusToggle(user, event.target.checked)
-                          }
-                        />
-                        <span className="relative h-6 w-11 rounded-full bg-slate-200 transition-all peer-checked:bg-emerald-500 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-all peer-checked:after:translate-x-5" />
-                        <span className="text-xs font-semibold text-slate-500 peer-checked:text-emerald-600">
-                          {isEnabled ? "Enabled" : "Disabled"}
-                        </span>
-                      </label>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => openEditForm(user)}
-                        className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-all"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => setResetUser(user)}
-                        className="ml-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-all"
-                      >
-                        Reset Password
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-500 border-t-transparent" />
+                      Loading system directory...
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredUsers.length === 0 ? (
+                <tr>
+                  <td
+                    className="px-4 py-8 text-center text-slate-400"
+                    colSpan={5}
+                  >
+                    No users match the selected filters
+                  </td>
+                </tr>
+              ) : (
+                filteredUsers.map((user) => {
+                  const isEnabled = user.accountStatus === "enabled";
+
+                  return (
+                    <tr
+                      key={user.id}
+                      className="hover:bg-slate-50/30 transition-colors duration-200"
+                    >
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-slate-800">
+                          {user.name}
+                        </div>
+                        <div className="text-xs text-slate-400 mt-0.5">
+                          {user.email}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-medium text-slate-600">
+                        {user.role === "admin" ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                            Admin
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-200">
+                            Counselor
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        <span className="font-bold text-slate-700">
+                          {user.assignedLeadCount}
+                        </span>{" "}
+                        leads
+                      </td>
+                      <td className="px-4 py-3">
+                        <label className="inline-flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="sr-only peer"
+                            checked={isEnabled}
+                            onChange={(event) =>
+                              handleStatusToggle(user, event.target.checked)
+                            }
+                          />
+                          <span className="relative h-6 w-11 rounded-full bg-slate-200 transition-all peer-checked:bg-emerald-500 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-all peer-checked:after:translate-x-5" />
+                          <span className="text-xs font-semibold text-slate-500 peer-checked:text-emerald-600">
+                            {isEnabled ? "Enabled" : "Disabled"}
+                          </span>
+                        </label>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => openEditForm(user)}
+                          className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-all"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => setResetUser(user)}
+                          className="ml-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-all"
+                        >
+                          Reset Password
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <AlertDialog open={disableDialogOpen} onOpenChange={setDisableDialogOpen}>
