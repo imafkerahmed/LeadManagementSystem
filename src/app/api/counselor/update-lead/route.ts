@@ -3,7 +3,10 @@ import { getPocketBaseAdminClient } from "@/lib/pocketbase";
 
 function normalizeLeadStatus(value: string | undefined): string {
   const normalized = (value || "").trim().toLowerCase();
-  if (normalized === "ringing-no-answer" || normalized === "ringing no answer") {
+  if (
+    normalized === "ringing-no-answer" ||
+    normalized === "ringing no answer"
+  ) {
     return "Ringing-No-Answer";
   }
   if (normalized === "followup" || normalized === "follow-up") {
@@ -54,7 +57,14 @@ export async function POST(request: NextRequest) {
     const normalizedNewStatus = normalizeLeadStatus(newStatus);
     const now = new Date().toISOString();
 
-    const statusFlow = ["New", "Ringing-No-Answer", "Contacted", "Follow-up", "Registered", "Lost"];
+    const statusFlow = [
+      "New",
+      "Ringing-No-Answer",
+      "Contacted",
+      "Follow-up",
+      "Registered",
+      "Lost",
+    ];
     const oldIndex = statusFlow.indexOf(oldStatus);
     const newIndex = statusFlow.indexOf(normalizedNewStatus);
 
@@ -96,7 +106,10 @@ export async function POST(request: NextRequest) {
     // Checked transition constraints
     if (normalizedNewStatus === "New") {
       return NextResponse.json(
-        { error: "A lead in New status must be transitioned to a different status" },
+        {
+          error:
+            "A lead in New status must be transitioned to a different status",
+        },
         { status: 400 },
       );
     }
@@ -143,6 +156,7 @@ export async function POST(request: NextRequest) {
     if (oldStatus !== normalizedNewStatus) {
       historyEntries.push({
         timeStamp: now,
+        created: now,
         leadId: lead.id,
         studentName: lead.id,
         eventType: "Status Change",
@@ -156,6 +170,7 @@ export async function POST(request: NextRequest) {
     if (trimmedComment) {
       historyEntries.push({
         timeStamp: now,
+        created: now,
         leadId: lead.id,
         studentName: lead.id,
         eventType: "Comment",

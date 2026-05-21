@@ -70,10 +70,16 @@ export async function GET(request: NextRequest) {
 
     const pb = await getPocketBaseAdminClient();
 
-    // Fetch leads created on the target date (for daily metrics)
-    const leadsToday = (await pb.collection("leads").getFullList({
+    // Fetch leads CREATED on the target date (for certain metrics)
+    const leadsCreatedToday = (await pb.collection("leads").getFullList({
       filter: `created >= "${startOfDay}" && created <= "${endOfDay}"`,
       sort: "-created",
+    })) as LeadRecord[];
+
+    // Fetch leads UPDATED on the target date (used for day-only status counts)
+    const leadsUpdatedToday = (await pb.collection("leads").getFullList({
+      filter: `updated >= "${startOfDay}" && updated <= "${endOfDay}"`,
+      sort: "-updated",
     })) as LeadRecord[];
 
     // Fetch ALL leads (for overdue follow-up calculation across entire system)
@@ -94,10 +100,11 @@ export async function GET(request: NextRequest) {
 
     // Aggregate metrics - pass allLeads for complete overdue calculation
     const reports = aggregateDailyMetrics(
-      leadsToday,
+      leadsCreatedToday,
       history,
       counselors,
       allLeads,
+      leadsUpdatedToday,
     );
 
     // If debug flag is present, also compute per-counselor lists of leadIds
@@ -123,11 +130,11 @@ export async function GET(request: NextRequest) {
           newValue === "ringing_no_answer";
         if (!isRinging) return;
 
-        // Resolve counselor: prefer assignedTo on the lead record, fallback to changedBy
+        // Resolve counselor by the account that made the update.
         let counselorId: string | undefined;
         const lead = leadLookup.get(leadId);
-        if (lead && lead.assignedTo) counselorId = lead.assignedTo;
-        if (!counselorId && h.changedBy) counselorId = h.changedBy;
+        if (h.changedBy) counselorId = h.changedBy;
+        if (!counselorId && lead?.assignedTo) counselorId = lead.assignedTo;
         if (!counselorId) return;
 
         if (!reportsDebug![counselorId])

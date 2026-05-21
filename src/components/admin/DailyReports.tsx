@@ -154,7 +154,7 @@ export default function DailyReports() {
     rows.map((report) => ({
       Counselor: report.counselorName,
       "Leads Created Today": report.newLeads,
-      New: report.statusNew,
+      "New Status": report.statusNew,
       "Ringing No Answer": report.statusRingingNoAnswer,
       Contacted: report.statusContacted,
       "Follow-Up": report.statusFollowUp,
@@ -391,7 +391,9 @@ export default function DailyReports() {
                   <th className="px-6 py-3.5 font-semibold text-center">
                     Leads Created Today
                   </th>
-                  <th className="px-6 py-3.5 font-semibold text-center">New</th>
+                  <th className="px-6 py-3.5 font-semibold text-center">
+                    New Status
+                  </th>
                   <th className="px-6 py-3.5 font-semibold text-center">
                     Ringing No Answer
                   </th>
@@ -506,10 +508,12 @@ export default function DailyReports() {
               </p>
             </div>
             <div>
-              <strong className="text-slate-800 font-semibold">New:</strong>
+              <strong className="text-slate-800 font-semibold">
+                New Status:
+              </strong>
               <p className="text-slate-400 mt-0.5">
-                Leads created today that are still untouched (deducted if they
-                are modified to other status states).
+                Leads whose current status is New, regardless of when they were
+                created.
               </p>
             </div>
           </div>
