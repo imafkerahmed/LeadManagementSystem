@@ -1,13 +1,59 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPocketBaseAdminClient } from "@/lib/pocketbase";
 
+function decodeJWT(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+
+    const payload = parts[1];
+    const decoded = Buffer.from(payload, "base64").toString("utf-8");
+    const json = JSON.parse(decoded);
+    return (json.data as Record<string, unknown>) || json;
+  } catch {
+    return null;
+  }
+}
+
+async function getAdminUserId(request: NextRequest, pb: any): Promise<string> {
+  const authHeader = request.headers.get("authorization") || "";
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+  const payload = token ? decodeJWT(token) : null;
+  if (payload?.id) {
+    return payload.id as string;
+  }
+
+  // Fallback: search for first admin user in PocketBase users collection
+  try {
+    const admins = await pb.collection("users").getFullList({
+      filter: 'role = "admin"',
+      limit: 1,
+    });
+    if (admins.length > 0) {
+      return admins[0].id;
+    }
+  } catch (err) {
+    console.error("Error finding fallback admin user:", err);
+  }
+
+  return "";
+}
+
 export async function GET() {
   try {
     const pb = await getPocketBaseAdminClient();
-    const records = await pb.collection("tasks").getFullList({
-      sort: "-created",
-      expand: "assignedTo",
-    });
+    let records = [];
+    try {
+      records = await pb.collection("tasks").getFullList({
+        sort: "-created",
+        expand: "assignedTo",
+      });
+    } catch (error: any) {
+      if (error.status === 404 || error.message?.includes("not found")) {
+        return NextResponse.json([]);
+      }
+      throw error;
+    }
 
     const tasks = records.map((record) => {
       const assignee = record.expand?.assignedTo as { name?: string; email?: string } | undefined;
@@ -76,10 +122,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Auto-generate task_id based on previous tasks (e.g. AMZ/TASK/0001)
-    const allTasks = await pb.collection("tasks").getFullList({
-      sort: "-created",
-      limit: 1,
-    });
+    let allTasks: any[] = [];
+    try {
+      allTasks = await pb.collection("tasks").getFullList({
+        sort: "-created",
+        limit: 1,
+      });
+    } catch (err: any) {
+      // If collection doesn't exist yet, it's fine, start with empty list
+      if (err.status !== 404 && !err.message?.includes("not found")) {
+        throw err;
+      }
+    }
 
     let nextTaskId = "AMZ/TASK/0001";
     if (allTasks.length > 0) {
@@ -103,6 +157,23 @@ export async function POST(request: NextRequest) {
       createdBy,
       notes: "",
     });
+
+    // Write to TaskHistory
+    const adminId = await getAdminUserId(request, pb);
+    if (adminId) {
+      try {
+        await pb.collection("taskHistory").create({
+          timeStamp: new Date().toISOString(),
+          taskId: record.id,
+          eventType: "Task Created",
+          changedBy: adminId,
+          newValue: "Pending",
+          comment: "Task created by Admin",
+        });
+      } catch (err) {
+        console.error("Failed to log task creation history:", err);
+      }
+    }
 
     return NextResponse.json(record, { status: 201 });
   } catch (error) {
@@ -137,6 +208,17 @@ export async function PATCH(request: NextRequest) {
 
     const pb = await getPocketBaseAdminClient();
 
+    // Fetch original record to identify changes
+    let originalRecord;
+    try {
+      originalRecord = await pb.collection("tasks").getOne(taskId);
+    } catch {
+      return NextResponse.json(
+        { error: "Task not found" },
+        { status: 404 },
+      );
+    }
+
     const updates: Record<string, unknown> = {};
     if (typeof body.title === "string") updates.title = body.title.trim();
     if (typeof body.description === "string") updates.description = body.description.trim();
@@ -154,6 +236,125 @@ export async function PATCH(request: NextRequest) {
     }
 
     const updatedRecord = await pb.collection("tasks").update(taskId, updates);
+
+    // Logging changes in TaskHistory
+    const adminId = await getAdminUserId(request, pb);
+    if (adminId) {
+      const now = new Date().toISOString();
+      const historyPromises = [];
+
+      if (updates.status && updates.status !== originalRecord.status) {
+        historyPromises.push(
+          pb.collection("taskHistory").create({
+            timeStamp: now,
+            taskId,
+            eventType: "Status Updated",
+            changedBy: adminId,
+            oldValue: originalRecord.status,
+            newValue: updates.status,
+          })
+        );
+      }
+
+      if (updates.assignedTo && updates.assignedTo !== originalRecord.assignedTo) {
+        let oldName = originalRecord.assignedTo;
+        let newName = updates.assignedTo as string;
+        try {
+          const [oldUser, newUser] = await Promise.all([
+            pb.collection("users").getOne(originalRecord.assignedTo).catch(() => null),
+            pb.collection("users").getOne(updates.assignedTo as string).catch(() => null),
+          ]);
+          if (oldUser) oldName = oldUser.name || oldUser.email || oldName;
+          if (newUser) newName = newUser.name || newUser.email || newName;
+        } catch {}
+
+        historyPromises.push(
+          pb.collection("taskHistory").create({
+            timeStamp: now,
+            taskId,
+            eventType: "Assignee Changed",
+            changedBy: adminId,
+            oldValue: oldName,
+            newValue: newName,
+          })
+        );
+      }
+
+      if (updates.priority && updates.priority !== originalRecord.priority) {
+        historyPromises.push(
+          pb.collection("taskHistory").create({
+            timeStamp: now,
+            taskId,
+            eventType: "Priority Updated",
+            changedBy: adminId,
+            oldValue: originalRecord.priority,
+            newValue: updates.priority,
+          })
+        );
+      }
+
+      if (updates.dueDate !== undefined) {
+        const origDueDate = originalRecord.dueDate ? originalRecord.dueDate.split("T")[0] : "";
+        const nextDueDate = updates.dueDate ? (updates.dueDate as string).split("T")[0] : "";
+        if (origDueDate !== nextDueDate) {
+          historyPromises.push(
+            pb.collection("taskHistory").create({
+              timeStamp: now,
+              taskId,
+              eventType: "Due Date Changed",
+              changedBy: adminId,
+              oldValue: origDueDate || "None",
+              newValue: nextDueDate || "Cleared",
+            })
+          );
+        }
+      }
+
+      if (updates.title && updates.title !== originalRecord.title) {
+        historyPromises.push(
+          pb.collection("taskHistory").create({
+            timeStamp: now,
+            taskId,
+            eventType: "Task Details Updated",
+            changedBy: adminId,
+            comment: `Title updated from "${originalRecord.title}" to "${updates.title}"`,
+          })
+        );
+      }
+
+      if (updates.description !== undefined && updates.description !== originalRecord.description) {
+        historyPromises.push(
+          pb.collection("taskHistory").create({
+            timeStamp: now,
+            taskId,
+            eventType: "Task Details Updated",
+            changedBy: adminId,
+            comment: "Task description updated",
+          })
+        );
+      }
+
+      if (updates.notes !== undefined && updates.notes !== originalRecord.notes) {
+        historyPromises.push(
+          pb.collection("taskHistory").create({
+            timeStamp: now,
+            taskId,
+            eventType: "Notes Added",
+            changedBy: adminId,
+            comment: updates.notes as string,
+          })
+        );
+      }
+
+      if (historyPromises.length > 0) {
+        try {
+          await Promise.all(historyPromises);
+        } catch (err) {
+          console.error("Failed to log task updates to history:", err);
+        }
+      }
+    }
+
     return NextResponse.json(updatedRecord);
   } catch (error) {
     console.error("Error updating task:", error);
@@ -177,6 +378,21 @@ export async function DELETE(request: NextRequest) {
     }
 
     const pb = await getPocketBaseAdminClient();
+
+    // Clean up taskHistory logs first
+    try {
+      const historyRecords = await pb.collection("taskHistory").getFullList({
+        filter: `taskId = "${id}"`,
+      });
+      await Promise.all(
+        historyRecords.map((r) => pb.collection("taskHistory").delete(r.id))
+      );
+    } catch (err: any) {
+      if (err.status !== 404 && !err.message?.includes("not found")) {
+        console.error("Failed to clean up task history records during deletion:", err);
+      }
+    }
+
     await pb.collection("tasks").delete(id);
 
     return NextResponse.json({ success: true, message: "Task deleted successfully" });
@@ -188,3 +404,4 @@ export async function DELETE(request: NextRequest) {
     );
   }
 }
+

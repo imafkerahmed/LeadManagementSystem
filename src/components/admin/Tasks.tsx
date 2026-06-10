@@ -15,6 +15,7 @@ import {
   ListTodo,
 } from "lucide-react";
 import { Task, TaskStatus, TaskPriority, User as SystemUser } from "@/types";
+import { createPocketBaseClient } from "@/lib/pocketbase";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,12 +55,34 @@ export default function AdminTasks() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [viewTask, setViewTask] = useState<Task | null>(null);
 
+  // History state
+  interface TaskHistoryEntry {
+    id: string;
+    timeStamp: string;
+    taskId: string;
+    eventType: string;
+    changedBy: string;
+    oldValue: string;
+    newValue: string;
+    comment: string;
+    created: string;
+  }
+  const [history, setHistory] = useState<TaskHistoryEntry[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
   const loadData = async () => {
     setIsLoading(true);
     try {
+      const pb = createPocketBaseClient();
+      const token = pb.authStore.token;
+      const fetchOptions: RequestInit = { cache: "no-store" };
+      if (token) {
+        fetchOptions.headers = { Authorization: `Bearer ${token}` };
+      }
+
       const [tasksRes, usersRes] = await Promise.all([
-        fetch("/api/admin/tasks", { cache: "no-store" }),
-        fetch("/api/admin/users", { cache: "no-store" }),
+        fetch("/api/admin/tasks", fetchOptions),
+        fetch("/api/admin/users", fetchOptions),
       ]);
 
       if (!tasksRes.ok) throw new Error("Failed to load tasks");
@@ -80,6 +103,30 @@ export default function AdminTasks() {
   useEffect(() => {
     void loadData();
   }, []);
+
+  const fetchTaskHistory = async (taskId: string) => {
+    setIsLoadingHistory(true);
+    setHistory([]);
+    try {
+      const response = await fetch(`/api/tasks/history?taskId=${taskId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setHistory(data);
+      }
+    } catch (error) {
+      console.error("Error fetching task history:", error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    if (viewTask) {
+      void fetchTaskHistory(viewTask.id);
+    } else {
+      setHistory([]);
+    }
+  }, [viewTask]);
 
   const resetForm = () => {
     setEditingTaskId(null);
@@ -132,9 +179,15 @@ export default function AdminTasks() {
         notes: editingTaskId ? notes : "",
       };
 
+      const pb = createPocketBaseClient();
+      const token = pb.authStore.token;
+
       const response = await fetch("/api/admin/tasks", {
         method: editingTaskId ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+        },
         body: JSON.stringify(payload),
       });
 
@@ -158,9 +211,15 @@ export default function AdminTasks() {
     if (!deleteTaskId) return;
 
     try {
-      const response = await fetch(`/api/admin/tasks?id=${deleteTaskId}`, {
-        method: "DELETE",
-      });
+      const pb = createPocketBaseClient();
+      const token = pb.authStore.token;
+
+      const options: RequestInit = { method: "DELETE" };
+      if (token) {
+        options.headers = { Authorization: `Bearer ${token}` };
+      }
+
+      const response = await fetch(`/api/admin/tasks?id=${deleteTaskId}`, options);
 
       if (!response.ok) {
         const err = await response.json();
@@ -264,6 +323,61 @@ export default function AdminTasks() {
         return "bg-amber-50 text-amber-700 border-amber-100";
       case "Low":
         return "bg-slate-50 text-slate-600 border-slate-200";
+    }
+  };
+
+  const formatTimelineDate = (dateStr?: string) => {
+    if (!dateStr) return "-";
+    try {
+      return new Intl.DateTimeFormat("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(new Date(dateStr));
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const getHistoryDescription = (entry: TaskHistoryEntry) => {
+    switch (entry.eventType) {
+      case "Task Created":
+        return "Task was created.";
+      case "Status Updated":
+        return (
+          <span>
+            Status changed from <span className="font-semibold text-slate-700">{entry.oldValue}</span> to <span className="font-semibold text-blue-600">{entry.newValue}</span>
+          </span>
+        );
+      case "Assignee Changed":
+        return (
+          <span>
+            Assignee changed from <span className="font-semibold text-slate-700">{entry.oldValue}</span> to <span className="font-semibold text-blue-600">{entry.newValue}</span>
+          </span>
+        );
+      case "Priority Updated":
+        return (
+          <span>
+            Priority updated from <span className="font-semibold text-slate-700">{entry.oldValue}</span> to <span className="font-semibold text-blue-600">{entry.newValue}</span>
+          </span>
+        );
+      case "Due Date Changed":
+        return (
+          <span>
+            Due date changed from <span className="font-semibold text-slate-700">{entry.oldValue}</span> to <span className="font-semibold text-blue-600">{entry.newValue}</span>
+          </span>
+        );
+      case "Notes Added":
+        return (
+          <div className="space-y-1">
+            <span className="text-slate-400 block text-[9px] uppercase font-bold tracking-wider">Note:</span>
+            <p className="italic bg-slate-50 p-2 rounded border border-slate-100 text-slate-600 text-[11px] whitespace-pre-wrap select-all">{entry.comment}</p>
+          </div>
+        );
+      default:
+        return entry.comment || entry.eventType;
     }
   };
 
@@ -653,6 +767,46 @@ export default function AdminTasks() {
                 <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-xl min-h-[60px] whitespace-pre-wrap italic">
                   {viewTask.notes || "No notes entered yet."}
                 </div>
+              </div>
+
+              {/* Task History Timeline */}
+              <div className="border-t border-slate-100 pt-4">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5" />
+                  Activity Timeline
+                </h4>
+                
+                {isLoadingHistory ? (
+                  <div className="flex items-center gap-2 py-4 justify-center text-xs text-slate-400">
+                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
+                    Fetching task updates...
+                  </div>
+                ) : history.length === 0 ? (
+                  <p className="text-xs font-semibold text-slate-400 text-center py-2">
+                    No timeline events logged yet.
+                  </p>
+                ) : (
+                  <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
+                    {history.map((entry) => (
+                      <div key={entry.id} className="relative pl-5 border-l border-slate-100 ml-2 py-0.5">
+                        <span className="absolute -left-[5px] top-2 h-2.5 w-2.5 rounded-full bg-blue-500 ring-4 ring-white" />
+                        <div className="flex flex-col gap-1 rounded-xl border border-slate-100 bg-white p-3 shadow-sm text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-slate-500 uppercase tracking-wider text-[10px]">
+                              {entry.eventType}
+                            </span>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                              {formatTimelineDate(entry.timeStamp)} • By {entry.changedBy}
+                            </span>
+                          </div>
+                          <div className="text-slate-700 mt-1">
+                            {getHistoryDescription(entry)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 

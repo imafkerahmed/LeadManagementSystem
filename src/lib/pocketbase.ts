@@ -15,6 +15,7 @@ let pbAdminInstance: PocketBase | null = null;
 export function createPocketBaseClient() {
   if (!pbClientInstance) {
     pbClientInstance = new PocketBase(pocketBaseUrl);
+    pbClientInstance.autoCancellation(false);
   }
   return pbClientInstance;
 }
@@ -22,6 +23,7 @@ export function createPocketBaseClient() {
 export async function getPocketBaseAdminClient() {
   if (!pbAdminInstance) {
     pbAdminInstance = new PocketBase(pocketBaseUrl);
+    pbAdminInstance.autoCancellation(false);
   }
 
   if (!pbAdminInstance.authStore.isValid) {
@@ -251,9 +253,11 @@ export async function setupPocketBaseCollections(): Promise<void> {
       await pb.collections.getOne("tasks");
     } catch {
       await pb.collections.create({
+        id: "8ym6u5er490f9fh",
         name: "tasks",
         type: "base",
         schema: [
+          { name: "task_id", type: "text", required: false },
           { name: "title", type: "text", required: true },
           { name: "description", type: "text" },
           {
@@ -272,7 +276,7 @@ export async function setupPocketBaseCollections(): Promise<void> {
             name: "status",
             type: "select",
             required: true,
-            options: { values: ["Pending", "In-Progress", "Completed"] },
+            options: { values: ["Pending", "In-Progress", "Completed", "Cancelled"] },
           },
           {
             name: "priority",
@@ -282,6 +286,48 @@ export async function setupPocketBaseCollections(): Promise<void> {
           },
           { name: "createdBy", type: "text" },
           { name: "notes", type: "text" },
+        ],
+        indexes: [
+          "CREATE UNIQUE INDEX `idx_xwYCK88` ON `tasks` (`task_id`)"
+        ]
+      });
+    }
+
+    // Create TaskHistory collection
+    try {
+      await pb.collections.getOne("taskHistory");
+    } catch {
+      await pb.collections.create({
+        name: "taskHistory",
+        type: "base",
+        schema: [
+          { name: "timeStamp", type: "date", required: false },
+          {
+            name: "taskId",
+            type: "relation",
+            required: false,
+            options: {
+              collectionId: "8ym6u5er490f9fh",
+              maxSelect: 1,
+              minSelect: null,
+              cascadeDelete: false,
+            },
+          },
+          { name: "eventType", type: "text", required: false },
+          {
+            name: "changedBy",
+            type: "relation",
+            required: false,
+            options: {
+              collectionId: "_pb_users_auth_",
+              maxSelect: 1,
+              minSelect: null,
+              cascadeDelete: false,
+            },
+          },
+          { name: "oldValue", type: "text", required: false },
+          { name: "newValue", type: "text", required: false },
+          { name: "comment", type: "text", required: false },
         ],
       });
     }

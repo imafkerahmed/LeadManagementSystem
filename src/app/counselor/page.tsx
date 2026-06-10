@@ -564,9 +564,12 @@ export default function CounselorPage() {
         const pb = createPocketBaseClient();
         const token = pb.authStore.token;
 
-        const response = await fetch("/api/counselor/leads", {
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        });
+        const fetchOptions: RequestInit = {};
+        if (token) {
+          fetchOptions.headers = { Authorization: `Bearer ${token}` };
+        }
+
+        const response = await fetch("/api/counselor/leads", fetchOptions);
 
         if (!response.ok) {
           const errorBody = await response.json().catch(() => ({}));

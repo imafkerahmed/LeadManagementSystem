@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createPocketBaseClient } from "@/lib/pocketbase";
+import { getPocketBaseAdminClient } from "@/lib/pocketbase";
 
 function decodeJWT(token: string): Record<string, unknown> | null {
   try {
@@ -37,13 +37,20 @@ export async function GET(request: NextRequest) {
     }
 
     const userId = payload.id as string;
-    const pb = createPocketBaseClient();
-    pb.authStore.save(token);
+    const pb = await getPocketBaseAdminClient();
 
-    const tasks = await pb.collection("tasks").getFullList({
-      filter: `assignedTo = "${userId}"`,
-      sort: "-created",
-    });
+    let tasks = [];
+    try {
+      tasks = await pb.collection("tasks").getFullList({
+        filter: `assignedTo = "${userId}"`,
+        sort: "-created",
+      });
+    } catch (error: any) {
+      if (error.status === 404 || error.message?.includes("not found")) {
+        return NextResponse.json([]);
+      }
+      throw error;
+    }
 
     const formattedTasks = tasks.map((record) => ({
       id: record.id,
@@ -109,8 +116,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const pb = createPocketBaseClient();
-    pb.authStore.save(token);
+    const pb = await getPocketBaseAdminClient();
 
     // Fetch the task first to ensure it exists and is assigned to this user
     let taskRecord;
@@ -153,6 +159,44 @@ export async function PATCH(request: NextRequest) {
     }
 
     const updatedRecord = await pb.collection("tasks").update(taskId, updates);
+
+    // Write Task History logs for staff status or notes updates
+    const now = new Date().toISOString();
+    const historyPromises = [];
+
+    if (updates.status && updates.status !== taskRecord.status) {
+      historyPromises.push(
+        pb.collection("taskHistory").create({
+          timeStamp: now,
+          taskId,
+          eventType: "Status Updated",
+          changedBy: userId,
+          oldValue: taskRecord.status,
+          newValue: updates.status as string,
+        })
+      );
+    }
+
+    if (updates.notes !== undefined && updates.notes !== taskRecord.notes) {
+      historyPromises.push(
+        pb.collection("taskHistory").create({
+          timeStamp: now,
+          taskId,
+          eventType: "Notes Added",
+          changedBy: userId,
+          comment: updates.notes as string,
+        })
+      );
+    }
+
+    if (historyPromises.length > 0) {
+      try {
+        await Promise.all(historyPromises);
+      } catch (err) {
+        console.error("Failed to log staff task updates to history:", err);
+      }
+    }
+
     return NextResponse.json(updatedRecord);
   } catch (error) {
     console.error("Error updating staff task:", error);
