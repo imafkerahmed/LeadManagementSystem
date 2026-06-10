@@ -92,7 +92,7 @@ export default function AdminTasks() {
       const usersData = (await usersRes.json()) as SystemUser[];
 
       setTasks(tasksData);
-      setUsers(usersData);
+      setUsers(usersData.filter((u) => u.tasksEnabled !== false));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to load tasks data");
     } finally {
