@@ -1,5 +1,5 @@
 // User roles
-export type UserRole = "admin" | "counselor";
+export type UserRole = "admin" | "counselor" | "only-task-view";
 
 // User model
 export interface User {
@@ -9,6 +9,28 @@ export interface User {
   role: UserRole;
   created: string;
   updated: string;
+  leadsEnabled?: boolean;
+  tasksEnabled?: boolean;
+}
+
+// Task model
+export type TaskStatus = "Pending" | "In-Progress" | "Completed" | "Cancelled";
+export type TaskPriority = "Low" | "Medium" | "High";
+
+export interface Task {
+  id: string;
+  taskId: string; // custom generated task ID e.g. AMZ/TASK/0001
+  title: string;
+  description?: string;
+  assignedTo: string; // user ID
+  assignedToName?: string; // user name resolved in frontend
+  dueDate?: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  createdBy?: string;
+  created: string;
+  updated: string;
+  notes?: string;
 }
 
 // Lead status types

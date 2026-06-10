@@ -114,9 +114,32 @@ export async function setupPocketBaseCollections(): Promise<void> {
   const pb = await getPocketBaseAdminClient();
 
   try {
-    // Create Users collection if not exists
+    // Create Users collection if not exists, or update it
     try {
-      await pb.collections.getOne("users");
+      const usersCol = await pb.collections.getOne("users");
+      let updated = false;
+
+      if (!usersCol.schema.some((f: any) => f.name === "leadsEnabled")) {
+        usersCol.schema.push({ name: "leadsEnabled", type: "bool", required: false });
+        updated = true;
+      }
+      if (!usersCol.schema.some((f: any) => f.name === "tasksEnabled")) {
+        usersCol.schema.push({ name: "tasksEnabled", type: "bool", required: false });
+        updated = true;
+      }
+
+      const roleField = usersCol.schema.find((f: any) => f.name === "role");
+      if (roleField && roleField.type === "select") {
+        const values = roleField.options?.values || [];
+        if (!values.includes("only-task-view")) {
+          roleField.options.values = [...values, "only-task-view"];
+          updated = true;
+        }
+      }
+
+      if (updated) {
+        await pb.collections.update("users", usersCol);
+      }
     } catch {
       await pb.collections.create({
         name: "users",
@@ -128,7 +151,7 @@ export async function setupPocketBaseCollections(): Promise<void> {
             name: "role",
             type: "select",
             required: true,
-            options: { values: ["admin", "student-counsellor"] },
+            options: { values: ["admin", "student-counsellor", "only-task-view"] },
           },
           {
             name: "accountStatus",
@@ -136,6 +159,8 @@ export async function setupPocketBaseCollections(): Promise<void> {
             required: true,
             options: { values: ["active", "disabled"] },
           },
+          { name: "leadsEnabled", type: "bool", required: false },
+          { name: "tasksEnabled", type: "bool", required: false },
         ],
       });
     }
@@ -217,6 +242,46 @@ export async function setupPocketBaseCollections(): Promise<void> {
           { name: "oldValue", type: "text" },
           { name: "newValue", type: "text" },
           { name: "comment", type: "text" },
+        ],
+      });
+    }
+
+    // Create Tasks collection
+    try {
+      await pb.collections.getOne("tasks");
+    } catch {
+      await pb.collections.create({
+        name: "tasks",
+        type: "base",
+        schema: [
+          { name: "title", type: "text", required: true },
+          { name: "description", type: "text" },
+          {
+            name: "assignedTo",
+            type: "relation",
+            required: true,
+            options: {
+              collectionId: "_pb_users_auth_",
+              maxSelect: 1,
+              minSelect: 0,
+              cascadeDelete: false,
+            },
+          },
+          { name: "dueDate", type: "date" },
+          {
+            name: "status",
+            type: "select",
+            required: true,
+            options: { values: ["Pending", "In-Progress", "Completed"] },
+          },
+          {
+            name: "priority",
+            type: "select",
+            required: true,
+            options: { values: ["Low", "Medium", "High"] },
+          },
+          { name: "createdBy", type: "text" },
+          { name: "notes", type: "text" },
         ],
       });
     }

@@ -8,6 +8,8 @@ type ManagedUserRecord = {
   username?: string;
   role?: string;
   accountStatus?: string;
+  leadsEnabled?: boolean;
+  tasksEnabled?: boolean;
 };
 
 type LeadListResult = {
@@ -24,6 +26,9 @@ function normalizeRole(role?: string) {
   const normalized = (role || "").trim().toLowerCase();
   if (normalized === "counselor") {
     return "student-counsellor";
+  }
+  if (normalized === "only-task-view") {
+    return "only-task-view";
   }
   return normalized || "student-counsellor";
 }
@@ -106,7 +111,7 @@ async function listManagedUsers() {
   if (users.length === 0) {
     users = (await pb.collection(AUTH_COLLECTION).getFullList({
       sort: "name",
-      fields: "id,name,email,username,role,accountStatus",
+      fields: "id,name,email,username,role,accountStatus,leadsEnabled,tasksEnabled",
     })) as ManagedUserRecord[];
   }
 
@@ -117,6 +122,8 @@ async function listManagedUsers() {
     role: string;
     accountStatus: string;
     assignedLeadCount: number;
+    leadsEnabled: boolean;
+    tasksEnabled: boolean;
   }> = [];
 
   // Fetch lead counts sequentially to avoid SDK auto-cancellation from many
@@ -140,6 +147,8 @@ async function listManagedUsers() {
       role: normalizeRole(user.role),
       accountStatus: normalizeStatus(user.accountStatus),
       assignedLeadCount: count,
+      leadsEnabled: typeof user.leadsEnabled === "boolean" ? user.leadsEnabled : true,
+      tasksEnabled: typeof user.tasksEnabled === "boolean" ? user.tasksEnabled : true,
     });
   }
 
@@ -166,12 +175,16 @@ export async function POST(request: NextRequest) {
       email?: string;
       password?: string;
       role?: string;
+      leadsEnabled?: boolean;
+      tasksEnabled?: boolean;
     };
 
     const name = (body.name || "").trim();
     const email = (body.email || "").trim().toLowerCase();
     const password = body.password || "";
     const role = normalizeRole(body.role);
+    const leadsEnabled = typeof body.leadsEnabled === "boolean" ? body.leadsEnabled : true;
+    const tasksEnabled = typeof body.tasksEnabled === "boolean" ? body.tasksEnabled : true;
 
     if (!name || !email || !password) {
       return NextResponse.json(
@@ -187,7 +200,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (role !== "admin" && role !== "student-counsellor") {
+    if (role !== "admin" && role !== "student-counsellor" && role !== "only-task-view") {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 });
     }
 
@@ -206,6 +219,8 @@ export async function POST(request: NextRequest) {
       role,
       accountStatus: "enabled",
       emailVisibility: true,
+      leadsEnabled,
+      tasksEnabled,
     })) as ManagedUserRecord;
 
     return NextResponse.json(
@@ -215,6 +230,8 @@ export async function POST(request: NextRequest) {
         email: created.email || email,
         role: normalizeRole(created.role),
         accountStatus: normalizeStatus(created.accountStatus),
+        leadsEnabled: typeof created.leadsEnabled === "boolean" ? created.leadsEnabled : true,
+        tasksEnabled: typeof created.tasksEnabled === "boolean" ? created.tasksEnabled : true,
       },
       { status: 201 },
     );
@@ -233,6 +250,8 @@ export async function PATCH(request: NextRequest) {
       name?: string;
       role?: string;
       accountStatus?: string;
+      leadsEnabled?: boolean;
+      tasksEnabled?: boolean;
     };
 
     const userId = (body.userId || "").trim();
@@ -258,7 +277,7 @@ export async function PATCH(request: NextRequest) {
 
     if (typeof body.role === "string") {
       const role = normalizeRole(body.role);
-      if (role !== "admin" && role !== "student-counsellor") {
+      if (role !== "admin" && role !== "student-counsellor" && role !== "only-task-view") {
         return NextResponse.json({ error: "Invalid role" }, { status: 400 });
       }
       updates.role = role;
@@ -276,6 +295,14 @@ export async function PATCH(request: NextRequest) {
         );
       }
       updates.accountStatus = status;
+    }
+
+    if (typeof body.leadsEnabled === "boolean") {
+      updates.leadsEnabled = body.leadsEnabled;
+    }
+
+    if (typeof body.tasksEnabled === "boolean") {
+      updates.tasksEnabled = body.tasksEnabled;
     }
 
     if (Object.keys(updates).length === 0) {
@@ -296,6 +323,8 @@ export async function PATCH(request: NextRequest) {
       email: updated.email || "",
       role: normalizeRole(updated.role),
       accountStatus: normalizeStatus(updated.accountStatus),
+      leadsEnabled: typeof updated.leadsEnabled === "boolean" ? updated.leadsEnabled : true,
+      tasksEnabled: typeof updated.tasksEnabled === "boolean" ? updated.tasksEnabled : true,
     });
   } catch (error) {
     const message =

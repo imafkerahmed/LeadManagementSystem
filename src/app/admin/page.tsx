@@ -9,9 +9,11 @@ import {
   BarChart3,
   Settings as SettingsIcon,
   LogOut,
+  ListTodo,
 } from "lucide-react";
 import AdminDashboard from "@/components/admin/Dashboard";
 import AdminLeads from "@/components/admin/Leads";
+import AdminTasks from "@/components/admin/Tasks";
 import BulkUpload from "@/components/admin/BulkUpload";
 import AdminSettings from "@/components/admin/Settings";
 import AdminReports from "@/components/admin/Reports";
@@ -29,7 +31,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-type AdminTab = "dashboard" | "leads" | "bulk" | "reports" | "settings";
+type AdminTab = "dashboard" | "leads" | "tasks" | "bulk" | "reports" | "settings";
 
 const tabs: Array<{
   id: AdminTab;
@@ -38,6 +40,7 @@ const tabs: Array<{
 }> = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "leads", label: "All Leads", icon: UsersIcon },
+  { id: "tasks", label: "Tasks", icon: ListTodo },
   { id: "bulk", label: "Bulk Upload", icon: UploadCloud },
   { id: "reports", label: "Reports", icon: BarChart3 },
   { id: "settings", label: "Settings", icon: SettingsIcon },
@@ -210,6 +213,8 @@ export default function AdminPage() {
                 "Real-time key statistics & active trends"}
               {currentTab === "leads" &&
                 "Search, browse, edit, and filter all leads"}
+              {currentTab === "tasks" &&
+                "Monitor, create, and assign staff tasks"}
               {currentTab === "bulk" && "Upload CSV file for batch imports"}
               {currentTab === "reports" &&
                 "Query performance stats and visual charts"}
@@ -223,6 +228,7 @@ export default function AdminPage() {
           <div
             className={`mx-auto transition-all duration-300 ${
               currentTab === "leads" ||
+              currentTab === "tasks" ||
               currentTab === "reports" ||
               currentTab === "dashboard"
                 ? "max-w-7xl"
@@ -231,6 +237,7 @@ export default function AdminPage() {
           >
             {currentTab === "dashboard" && <AdminDashboard />}
             {currentTab === "leads" && <AdminLeads />}
+            {currentTab === "tasks" && <AdminTasks />}
             {currentTab === "bulk" && (
               <BulkUpload operatorId={adminId} operatorLabel={adminLabel} />
             )}

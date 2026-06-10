@@ -7,16 +7,18 @@ import {
   useRef,
 } from "react";
 import { useRouter } from "next/navigation";
-import AppShell from "../../components/layout/AppShell";
 import {
+  LogOut,
+  Loader2,
   ChevronLeft,
   ChevronRight,
-  LogOut,
   X,
   MessageSquare,
-  Loader2,
   Edit2,
+  AlertCircle,
 } from "lucide-react";
+import AppShell from "@/components/layout/AppShell";
+import StaffTasks from "@/components/staff/Tasks";
 import { createPocketBaseClient } from "@/lib/pocketbase";
 import {
   LEAD_SOURCE_OPTIONS,
@@ -136,6 +138,8 @@ export default function CounselorPage() {
     name?: string;
     email?: string;
     role?: string;
+    leadsEnabled?: boolean;
+    tasksEnabled?: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -145,6 +149,8 @@ export default function CounselorPage() {
         name?: string;
         email?: string;
         role?: string;
+        leadsEnabled?: boolean;
+        tasksEnabled?: boolean;
       } | null;
 
       setAuthUser(nextAuthUser);
@@ -166,9 +172,23 @@ export default function CounselorPage() {
   const isCounselor =
     authChecked &&
     pb.authStore.isValid &&
-    authUser?.role === "student-counsellor";
+    (authUser?.role === "student-counsellor" || authUser?.role === "only-task-view");
   const counselorId = authUser?.id || "";
   const counselorName = authUser?.name || "Student Counsellor";
+
+  const leadsEnabled = authUser?.leadsEnabled !== false;
+  const tasksEnabled = authUser?.tasksEnabled !== false;
+  const [activeTab, setActiveTab] = useState<"leads" | "tasks">("leads");
+
+  useEffect(() => {
+    if (authChecked && authUser) {
+      if (authUser.leadsEnabled === false && authUser.tasksEnabled !== false) {
+        setActiveTab("tasks");
+      } else {
+        setActiveTab("leads");
+      }
+    }
+  }, [authChecked, authUser]);
 
   useEffect(() => {
     if (authChecked && !isCounselor) {
@@ -1228,14 +1248,41 @@ export default function CounselorPage() {
         </button>
       }
     >
-      <button
-        onClick={() => setAddLeadModalOpen(true)}
-        className="fixed bottom-5 right-5 z-20 inline-flex items-center gap-2 rounded-full bg-teal-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-teal-600/25 transition hover:bg-teal-700 md:hidden"
-      >
-        + Add Lead
-      </button>
+      {leadsEnabled && tasksEnabled && (
+        <div className="flex bg-slate-100/80 p-1 rounded-xl w-fit border border-slate-200/40 mb-6">
+          <button
+            onClick={() => setActiveTab("leads")}
+            className={`px-5 py-2.5 rounded-lg text-xs font-bold transition-all ${
+              activeTab === "leads"
+                ? "bg-white text-slate-800 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Leads Management
+          </button>
+          <button
+            onClick={() => setActiveTab("tasks")}
+            className={`px-5 py-2.5 rounded-lg text-xs font-bold transition-all ${
+              activeTab === "tasks"
+                ? "bg-white text-slate-800 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            My Tasks
+          </button>
+        </div>
+      )}
 
-      <div className="space-y-4">
+      {activeTab === "leads" && leadsEnabled ? (
+        <>
+          <button
+            onClick={() => setAddLeadModalOpen(true)}
+            className="fixed bottom-5 right-5 z-20 inline-flex items-center gap-2 rounded-full bg-teal-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-teal-600/25 transition hover:bg-teal-700 md:hidden"
+          >
+            + Add Lead
+          </button>
+
+          <div className="space-y-4">
         {/* Status Filter Tabs */}
         <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
           <button
@@ -2486,6 +2533,16 @@ export default function CounselorPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+        </>
+      ) : activeTab === "tasks" && tasksEnabled ? (
+        <StaffTasks />
+      ) : (
+        <div className="text-center py-20 bg-white border border-slate-100 rounded-2xl shadow-sm">
+          <AlertCircle className="h-10 w-10 mx-auto mb-2 text-rose-500 animate-pulse" />
+          <p className="font-bold text-slate-800">Feature Access Restricted</p>
+          <p className="text-sm text-slate-400 mt-1">You do not have access to this section. Please contact an administrator.</p>
         </div>
       )}
     </AppShell>

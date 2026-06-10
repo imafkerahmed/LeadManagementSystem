@@ -9,9 +9,31 @@ export async function POST() {
 
     // 1. Create Users collection
     try {
-      await pb.collections.getOne("users");
+      const usersCol = await pb.collections.getOne("users");
+      let updated = false;
+
+      if (!usersCol.schema.some((f: any) => f.name === "leadsEnabled")) {
+        usersCol.schema.push({ name: "leadsEnabled", type: "bool", required: false });
+        updated = true;
+      }
+      if (!usersCol.schema.some((f: any) => f.name === "tasksEnabled")) {
+        usersCol.schema.push({ name: "tasksEnabled", type: "bool", required: false });
+        updated = true;
+      }
+
+      const roleField = usersCol.schema.find((f: any) => f.name === "role");
+      if (roleField && roleField.type === "select") {
+        const values = roleField.options?.values || [];
+        if (!values.includes("only-task-view")) {
+          roleField.options.values = [...values, "only-task-view"];
+          updated = true;
+        }
+      }
+
+      if (updated) {
+        await pb.collections.update("users", usersCol);
+      }
     } catch {
-      // creating users collection
       await pb.collections.create({
         name: "users",
         type: "base",
@@ -23,13 +45,14 @@ export async function POST() {
             type: "select",
             required: true,
             options: {
-              values: ["admin", "counselor"],
+              values: ["admin", "counselor", "only-task-view"],
               maxSelect: 1,
             },
           },
+          { name: "leadsEnabled", type: "bool", required: false },
+          { name: "tasksEnabled", type: "bool", required: false },
         ],
       });
-      // users collection created
     }
 
     // 2. Create Leads collection
@@ -116,6 +139,52 @@ export async function POST() {
         ],
       });
       // leadHistory collection created
+    }
+
+    // 4. Create Tasks collection
+    try {
+      await pb.collections.getOne("tasks");
+    } catch {
+      await pb.collections.create({
+        name: "tasks",
+        type: "base",
+        schema: [
+          { name: "title", type: "text", required: true },
+          { name: "description", type: "text" },
+          {
+            name: "assignedTo",
+            type: "relation",
+            required: true,
+            options: {
+              collectionId: "_pb_users_auth_",
+              maxSelect: 1,
+              minSelect: 0,
+              cascadeDelete: false,
+            },
+          },
+          { name: "dueDate", type: "date" },
+          {
+            name: "status",
+            type: "select",
+            required: true,
+            options: {
+              values: ["Pending", "In-Progress", "Completed"],
+              maxSelect: 1,
+            },
+          },
+          {
+            name: "priority",
+            type: "select",
+            required: true,
+            options: {
+              values: ["Low", "Medium", "High"],
+              maxSelect: 1,
+            },
+          },
+          { name: "createdBy", type: "text" },
+          { name: "notes", type: "text" },
+        ],
+      });
     }
 
     return NextResponse.json({
