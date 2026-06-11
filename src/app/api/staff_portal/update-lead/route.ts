@@ -74,12 +74,17 @@ export async function POST(request: NextRequest) {
 
     // Determine the requester's role from the app's users collection.
     // This matches the role source used by the login flow.
+    let userRecord: UserRoleRecord;
     let isAdmin = false;
     try {
-      const userRecord = (await pb
+      userRecord = (await pb
         .collection("users")
         .getOne(counselorId)) as UserRoleRecord;
-      isAdmin = userRecord.role === "admin";
+      isAdmin =
+        userRecord.role === "admin" ||
+        userRecord.role === "super-admin" ||
+        userRecord.role === "marketing-manager" ||
+        userRecord.role === "admissions-head";
     } catch {
       return NextResponse.json(
         { error: "Unable to verify user role" },
@@ -87,10 +92,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Prevent any updates to Registered or Lost leads for non-admins
-    if ((oldStatus === "Registered" || oldStatus === "Lost") && !isAdmin) {
+    // Check dynamic user_update_registered_lost access policy
+    let canUpdateTerminal = false;
+    try {
+      const policy = await pb
+        .collection("accessControl")
+        .getFirstListItem(`sectionKey = "user_update_registered_lost"`);
+      
+      if (policy && policy.enabled !== false) {
+        const denied = policy.deniedUsers || [];
+        const allowed = policy.allowedUsers || [];
+        const roles = policy.allowedRoles || [];
+        
+        canUpdateTerminal =
+          !denied.includes(counselorId) &&
+          (allowed.includes(counselorId) || roles.includes(userRecord.role || ""));
+      }
+    } catch {
+      // Fallback to isAdmin role check if policy retrieval fails
+      canUpdateTerminal = isAdmin;
+    }
+
+    // Prevent any updates to Registered or Lost leads for unauthorized users
+    if ((oldStatus === "Registered" || oldStatus === "Lost") && !canUpdateTerminal) {
       return NextResponse.json(
         { error: "Cannot update Registered or Lost leads" },
+        { status: 403 },
+      );
+    }
+
+    // Prevent marking leads as Registered or Lost for unauthorized users
+    if (
+      (normalizedNewStatus === "Registered" || normalizedNewStatus === "Lost") &&
+      oldStatus !== normalizedNewStatus &&
+      !canUpdateTerminal
+    ) {
+      return NextResponse.json(
+        { error: "Cannot mark leads as Registered or Lost" },
         { status: 403 },
       );
     }

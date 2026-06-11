@@ -13,17 +13,15 @@ import {
   AlertDialogTitle,
   AlertDialogDescription,
 } from "@/components/ui/alert-dialog";
-import { Search, Users, UserPlus } from "lucide-react";
+import { Search, Users, UserPlus, Lock } from "lucide-react";
 
 type ManagedUser = {
   id: string;
   name: string;
   email: string;
-  role: "admin" | "student-counsellor" | "only-task-view";
+  role: "super-admin" | "admin" | "student-counsellor" | "marketing-manager" | "admissions-head";
   accountStatus: "enabled" | "disabled";
   assignedLeadCount: number;
-  leadsEnabled?: boolean;
-  tasksEnabled?: boolean;
 };
 
 type ApiError = {
@@ -40,6 +38,7 @@ export default function AdminUsers() {
           id?: string;
           name?: string;
           email?: string;
+          role?: string;
         } | null);
 
   const [users, setUsers] = useState<ManagedUser[]>([]);
@@ -49,7 +48,7 @@ export default function AdminUsers() {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<
-    "all" | "admin" | "student-counsellor" | "only-task-view"
+    "all" | "super-admin" | "admin" | "student-counsellor" | "marketing-manager" | "admissions-head"
   >("all");
   const [statusFilter, setStatusFilter] = useState<
     "all" | "enabled" | "disabled"
@@ -58,11 +57,9 @@ export default function AdminUsers() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"admin" | "student-counsellor" | "only-task-view">(
+  const [role, setRole] = useState<"super-admin" | "admin" | "student-counsellor" | "marketing-manager" | "admissions-head">(
     "student-counsellor",
   );
-  const [leadsEnabled, setLeadsEnabled] = useState(true);
-  const [tasksEnabled, setTasksEnabled] = useState(true);
 
   const [disableDialogOpen, setDisableDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<ManagedUser | null>(null);
@@ -108,8 +105,6 @@ export default function AdminUsers() {
     setEmail("");
     setPassword("");
     setRole("student-counsellor");
-    setLeadsEnabled(true);
-    setTasksEnabled(true);
   };
 
   const closeResetDialog = () => {
@@ -155,8 +150,6 @@ export default function AdminUsers() {
     setEmail(user.email);
     setPassword("");
     setRole(user.role);
-    setLeadsEnabled(user.leadsEnabled !== false);
-    setTasksEnabled(user.tasksEnabled !== false);
     setShowForm(true);
   };
 
@@ -187,16 +180,12 @@ export default function AdminUsers() {
                 userId: editingUserId,
                 name: name.trim(),
                 role,
-                leadsEnabled,
-                tasksEnabled,
               }
             : {
                 name: name.trim(),
                 email: email.trim(),
                 password,
                 role,
-                leadsEnabled,
-                tasksEnabled,
               },
         ),
       });
@@ -399,15 +388,17 @@ export default function AdminUsers() {
             value={roleFilter}
             onChange={(event) =>
               setRoleFilter(
-                event.target.value as "all" | "admin" | "student-counsellor" | "only-task-view",
+                event.target.value as "all" | "super-admin" | "admin" | "student-counsellor" | "marketing-manager" | "admissions-head",
               )
             }
             className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
           >
             <option value="all">All roles</option>
+            <option value="super-admin">Super Admin</option>
             <option value="admin">Admin</option>
             <option value="student-counsellor">Student Counsellor</option>
-            <option value="only-task-view">Task Only Staff</option>
+            <option value="marketing-manager">Marketing Manager</option>
+            <option value="admissions-head">Admissions Head</option>
           </select>
         </div>
 
@@ -487,51 +478,22 @@ export default function AdminUsers() {
               <select
                 value={role}
                 onChange={(event) => {
-                  const val = event.target.value as "admin" | "student-counsellor" | "only-task-view";
+                  const val = event.target.value as "super-admin" | "admin" | "student-counsellor" | "marketing-manager" | "admissions-head";
                   setRole(val);
-                  if (val === "only-task-view") {
-                    setLeadsEnabled(false);
-                    setTasksEnabled(true);
-                  } else {
-                    setLeadsEnabled(true);
-                    setTasksEnabled(true);
-                  }
                 }}
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
               >
                 <option value="student-counsellor">Student Counsellor</option>
-                <option value="only-task-view">Task Only Staff</option>
+                <option value="marketing-manager">Marketing Manager</option>
+                <option value="admissions-head">Admissions Head</option>
                 <option value="admin">Admin</option>
+                {authModel?.role === "super-admin" && (
+                  <option value="super-admin">Super Admin</option>
+                )}
               </select>
             </div>
 
-            <div className="space-y-1.5 md:col-span-2 border-t border-slate-100 pt-4 mt-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">
-                Feature Permissions
-              </label>
-              <div className="flex gap-6">
-                <label className="inline-flex items-center gap-2.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={leadsEnabled}
-                    onChange={(e) => setLeadsEnabled(e.target.checked)}
-                    disabled={role === "admin"}
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 h-4.5 w-4.5 cursor-pointer"
-                  />
-                  <span className="text-sm font-semibold text-slate-600">Leads Management</span>
-                </label>
-                <label className="inline-flex items-center gap-2.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={tasksEnabled}
-                    onChange={(e) => setTasksEnabled(e.target.checked)}
-                    disabled={role === "admin"}
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 h-4.5 w-4.5 cursor-pointer"
-                  />
-                  <span className="text-sm font-semibold text-slate-600">Tasks Management</span>
-                </label>
-              </div>
-            </div>
+            {/* feature permission flags removed - now fully managed via dynamic access policies */}
           </div>
 
           <div className="flex gap-2 pt-2">
@@ -562,7 +524,6 @@ export default function AdminUsers() {
               <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100">
                 <th className="px-4 py-3 font-semibold rounded-l-2xl">User</th>
                 <th className="px-4 py-3 font-semibold">Role</th>
-                <th className="px-4 py-3 font-semibold">Permissions</th>
                 <th className="px-4 py-3 font-semibold">Assigned Leads</th>
                 <th className="px-4 py-3 font-semibold">Status</th>
                 <th className="px-4 py-3 font-semibold text-right rounded-r-2xl">
@@ -575,7 +536,7 @@ export default function AdminUsers() {
                 <tr>
                   <td
                     className="px-4 py-8 text-center text-slate-400 font-medium"
-                    colSpan={6}
+                    colSpan={5}
                   >
                     <div className="flex items-center justify-center gap-2">
                       <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-500 border-t-transparent" />
@@ -587,7 +548,7 @@ export default function AdminUsers() {
                 <tr>
                   <td
                     className="px-4 py-8 text-center text-slate-400"
-                    colSpan={6}
+                    colSpan={5}
                   >
                     No users match the selected filters
                   </td>
@@ -595,6 +556,7 @@ export default function AdminUsers() {
               ) : (
                 filteredUsers.map((user) => {
                   const isEnabled = user.accountStatus === "enabled";
+                  const isActionDisabled = user.role === "super-admin" && authModel?.role !== "super-admin";
 
                   return (
                     <tr
@@ -610,13 +572,21 @@ export default function AdminUsers() {
                         </div>
                       </td>
                       <td className="px-4 py-3 font-medium text-slate-600">
-                        {user.role === "admin" ? (
+                        {user.role === "super-admin" ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                            Super Admin
+                          </span>
+                        ) : user.role === "admin" ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
                             Admin
                           </span>
-                        ) : user.role === "only-task-view" ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                            Task Staff
+                        ) : user.role === "marketing-manager" ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-100">
+                            Marketing Manager
+                          </span>
+                        ) : user.role === "admissions-head" ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100">
+                            Admissions Head
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-200">
@@ -624,30 +594,7 @@ export default function AdminUsers() {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-1.5 flex-wrap">
-                          {user.role === "admin" ? (
-                            <span className="text-[10px] font-bold text-slate-400">ALL</span>
-                          ) : (
-                            <>
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
-                                user.leadsEnabled !== false
-                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                                  : "bg-slate-100 text-slate-400 border border-slate-200"
-                              }`}>
-                                Leads
-                              </span>
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
-                                user.tasksEnabled !== false
-                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                                  : "bg-slate-100 text-slate-400 border border-slate-200"
-                              }`}>
-                                Tasks
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </td>
+                      {/* Permissions column deleted */}
                       <td className="px-4 py-3 text-slate-600">
                         <span className="font-bold text-slate-700">
                           {user.assignedLeadCount}
@@ -660,29 +607,38 @@ export default function AdminUsers() {
                             type="checkbox"
                             className="sr-only peer"
                             checked={isEnabled}
+                            disabled={isActionDisabled}
                             onChange={(event) =>
                               handleStatusToggle(user, event.target.checked)
                             }
                           />
-                          <span className="relative h-6 w-11 rounded-full bg-slate-200 transition-all peer-checked:bg-emerald-500 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-all peer-checked:after:translate-x-5" />
+                          <span className="relative h-6 w-11 rounded-full bg-slate-200 transition-all peer-checked:bg-emerald-500 peer-disabled:opacity-60 peer-disabled:cursor-not-allowed after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-all peer-checked:after:translate-x-5" />
                           <span className="text-xs font-semibold text-slate-500 peer-checked:text-emerald-600">
                             {isEnabled ? "Enabled" : "Disabled"}
                           </span>
                         </label>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => openEditForm(user)}
-                          className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-all"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => setResetUser(user)}
-                          className="ml-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-all"
-                        >
-                          Reset Password
-                        </button>
+                        {!isActionDisabled ? (
+                          <>
+                            <button
+                              onClick={() => openEditForm(user)}
+                              className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-all"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => setResetUser(user)}
+                              className="ml-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-all"
+                            >
+                              Reset Password
+                            </button>
+                          </>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-slate-450 font-semibold italic text-slate-400">
+                            <Lock className="h-3 w-3" /> System Managed
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );

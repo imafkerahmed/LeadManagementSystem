@@ -28,8 +28,6 @@ export default function Home() {
     const authUser = pb.authStore.model as {
       role?: string;
       accountStatus?: string;
-      leadsEnabled?: boolean;
-      tasksEnabled?: boolean;
     } | null;
 
     if (!pb.authStore.isValid || !authUser?.role) {
@@ -45,22 +43,19 @@ export default function Home() {
       return () => window.clearTimeout(timer);
     }
 
-    if (authUser.role === "admin") {
+    if (
+      authUser.role === "admin" ||
+      authUser.role === "super-admin" ||
+      authUser.role === "marketing-manager" ||
+      authUser.role === "admissions-head"
+    ) {
       router.replace("/admin");
       return;
     }
 
-    if (authUser.role === "student-counsellor" || authUser.role === "only-task-view") {
-      const leads = authUser.leadsEnabled !== false;
-      const tasks = authUser.tasksEnabled !== false;
-
-      if (!leads && !tasks) {
-        pb.authStore.clear();
-        setError("Your account permissions do not grant access to the system.");
-        return;
-      }
-
-      router.replace("/counselor");
+    if (authUser.role === "student-counsellor") {
+      router.replace("/staff_portal");
+      return;
     }
   }, [router]);
 
@@ -78,8 +73,6 @@ export default function Home() {
       const authUser = pb.authStore.model as {
         role?: string;
         accountStatus?: string;
-        leadsEnabled?: boolean;
-        tasksEnabled?: boolean;
       } | null;
 
       // Block login immediately if the account is disabled
@@ -97,22 +90,18 @@ export default function Home() {
         return;
       }
 
-      if (authUser.role === "admin") {
+      if (
+        authUser.role === "admin" ||
+        authUser.role === "super-admin" ||
+        authUser.role === "marketing-manager" ||
+        authUser.role === "admissions-head"
+      ) {
         router.replace("/admin");
         return;
       }
 
-      if (authUser.role === "student-counsellor" || authUser.role === "only-task-view") {
-        const leads = authUser.leadsEnabled !== false;
-        const tasks = authUser.tasksEnabled !== false;
-
-        if (!leads && !tasks) {
-          pb.authStore.clear();
-          setError("Your account permissions do not grant access to the system.");
-          return;
-        }
-
-        router.replace("/counselor");
+      if (authUser.role === "student-counsellor") {
+        router.replace("/staff_portal");
         return;
       }
 

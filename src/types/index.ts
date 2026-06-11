@@ -1,5 +1,5 @@
 // User roles
-export type UserRole = "admin" | "counselor" | "only-task-view";
+export type UserRole = "super-admin" | "admin" | "student-counsellor";
 
 // User model
 export interface User {
@@ -9,8 +9,6 @@ export interface User {
   role: UserRole;
   created: string;
   updated: string;
-  leadsEnabled?: boolean;
-  tasksEnabled?: boolean;
 }
 
 // Task model

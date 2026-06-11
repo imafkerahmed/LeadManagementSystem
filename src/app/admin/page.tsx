@@ -10,6 +10,7 @@ import {
   Settings as SettingsIcon,
   LogOut,
   ListTodo,
+  Shield,
 } from "lucide-react";
 import AdminDashboard from "@/components/admin/Dashboard";
 import AdminLeads from "@/components/admin/Leads";
@@ -49,9 +50,20 @@ const tabs: Array<{
 const isValidTab = (value: string | null): value is AdminTab =>
   tabs.some((tab) => tab.id === value);
 
+const tabKeys: Record<AdminTab, string> = {
+  dashboard: "admin_dashboard",
+  leads: "admin_leads",
+  tasks: "admin_tasks",
+  bulk: "admin_bulk",
+  reports: "admin_reports",
+  settings: "admin_settings",
+};
+
 export default function AdminPage() {
   const router = useRouter();
   const [currentTab, setCurrentTab] = useState<AdminTab>("dashboard");
+  const [allowedTabs, setAllowedTabs] = useState<AdminTab[]>([]);
+  const [isRulesLoading, setIsRulesLoading] = useState(true);
 
   const [authChecked, setAuthChecked] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -82,7 +94,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     const pb = createPocketBaseClient();
-    const syncAuth = () => {
+    const syncAuth = async () => {
       const authUser = pb.authStore.model as {
         id?: string;
         name?: string;
@@ -90,7 +102,12 @@ export default function AdminPage() {
         role?: string;
       } | null;
 
-      const validAdmin = pb.authStore.isValid && authUser?.role === "admin";
+      const validAdmin =
+        pb.authStore.isValid &&
+        (authUser?.role === "admin" ||
+          authUser?.role === "super-admin" ||
+          authUser?.role === "marketing-manager" ||
+          authUser?.role === "admissions-head");
 
       // Defer the initial auth snapshot so PocketBase can finish restoring state.
       setAuthChecked(true);
@@ -106,6 +123,43 @@ export default function AdminPage() {
       setAdminLabel(authUser?.email || authUser?.name || "Admin");
       setAdminName(authUser?.name || authUser?.email || "Admin");
       setAdminRole(authUser?.role || "Admin");
+
+      // Fetch dynamic access rules
+      try {
+        const policies = await pb.collection("accessControl").getFullList();
+        const userId = authUser?.id || "";
+        const userRole = authUser?.role || "";
+        const resolved: AdminTab[] = [];
+
+        tabs.forEach((tab) => {
+          const sectionKey = tabKeys[tab.id];
+          const policy = policies.find((p) => p.sectionKey === sectionKey);
+          if (policy) {
+            const enabled = policy.enabled;
+            const denied = policy.deniedUsers || [];
+            const allowed = policy.allowedUsers || [];
+            const roles = policy.allowedRoles || [];
+
+            const hasTabAccess =
+              enabled !== false &&
+              !denied.includes(userId) &&
+              (allowed.includes(userId) || roles.includes(userRole));
+
+            if (hasTabAccess) {
+              resolved.push(tab.id);
+            }
+          } else {
+            resolved.push(tab.id);
+          }
+        });
+
+        setAllowedTabs(resolved);
+        setIsRulesLoading(false);
+      } catch (err) {
+        console.error("Failed to load access controls:", err);
+        setAllowedTabs(tabs.map((t) => t.id));
+        setIsRulesLoading(false);
+      }
     };
 
     const timer = window.setTimeout(syncAuth, 0);
@@ -119,7 +173,20 @@ export default function AdminPage() {
     };
   }, [router]);
 
-  if (!authChecked) {
+  useEffect(() => {
+    if (!isRulesLoading && allowedTabs.length > 0 && !allowedTabs.includes(currentTab)) {
+      const params = new URLSearchParams(window.location.search);
+      let tabParam = params.get("tab");
+      if (tabParam === "users") tabParam = "settings";
+      
+      const validatedTab = tabParam as AdminTab | null;
+      if (!validatedTab || !allowedTabs.includes(validatedTab)) {
+        setCurrentTab(allowedTabs[0]);
+      }
+    }
+  }, [isRulesLoading, allowedTabs, currentTab]);
+
+  if (!authChecked || (isAdmin && isRulesLoading)) {
     return (
       <div className="min-h-screen bg-white px-4 py-8 sm:px-6 sm:py-10">
         <div className="mx-auto w-full max-w-5xl space-y-6">
@@ -141,6 +208,18 @@ export default function AdminPage() {
     return null;
   }
 
+  if (allowedTabs.length === 0) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#fafbfc] px-4 text-center">
+        <Shield className="h-12 w-12 text-rose-500 mb-3 animate-pulse" />
+        <h3 className="font-bold text-slate-800 text-lg">Administrative Access Restricted</h3>
+        <p className="text-sm text-slate-400 mt-1 max-w-sm">
+          Your account does not have access permissions for any sections in the admin area. Please contact a super administrator.
+        </p>
+      </div>
+    );
+  }
+
   const setTab = (tab: AdminTab) => {
     setCurrentTab(tab);
     if (tab === "dashboard") {
@@ -160,29 +239,38 @@ export default function AdminPage() {
         <>
           <AdminSidebarHeader />
           <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
-            {tabs.map((t) => {
-              const Icon = t.icon;
-              const isActive = currentTab === t.id;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => setTab(t.id)}
-                  className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${
-                    isActive
-                      ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/15"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                  }`}
-                >
-                  <Icon
-                    className={`w-4 h-4 ${isActive ? "text-white" : "text-slate-400 group-hover:text-slate-600"}`}
-                  />
-                  <span>{t.label}</span>
-                </button>
-              );
-            })}
+            {tabs
+              .filter((t) => allowedTabs.includes(t.id))
+              .map((t) => {
+                const Icon = t.icon;
+                const isActive = currentTab === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setTab(t.id)}
+                    className={`w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${
+                      isActive
+                        ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/15"
+                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                    }`}
+                  >
+                    <Icon
+                      className={`w-4 h-4 ${isActive ? "text-white" : "text-slate-400 group-hover:text-slate-600"}`}
+                    />
+                    <span>{t.label}</span>
+                  </button>
+                );
+              })}
           </nav>
 
           <div className="border-t border-slate-100 p-4 bg-slate-50/30 flex flex-col gap-2">
+            <button
+              onClick={() => router.push("/staff_portal")}
+              className="w-full flex items-center gap-3 rounded-xl px-4 py-2.5 text-xs font-bold transition-all duration-200 text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-100"
+            >
+              <ListTodo className="w-4 h-4 text-blue-500" />
+              <span>Go to Staff Portal</span>
+            </button>
             <button
               onClick={() => setLogoutOpen(true)}
               className="w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200 text-slate-500 hover:bg-slate-50 hover:text-rose-600"
@@ -235,14 +323,14 @@ export default function AdminPage() {
                 : "max-w-5xl"
             }`}
           >
-            {currentTab === "dashboard" && <AdminDashboard />}
-            {currentTab === "leads" && <AdminLeads />}
-            {currentTab === "tasks" && <AdminTasks />}
-            {currentTab === "bulk" && (
+            {currentTab === "dashboard" && allowedTabs.includes("dashboard") && <AdminDashboard />}
+            {currentTab === "leads" && allowedTabs.includes("leads") && <AdminLeads />}
+            {currentTab === "tasks" && allowedTabs.includes("tasks") && <AdminTasks />}
+            {currentTab === "bulk" && allowedTabs.includes("bulk") && (
               <BulkUpload operatorId={adminId} operatorLabel={adminLabel} />
             )}
-            {currentTab === "reports" && <AdminReports />}
-            {currentTab === "settings" && <AdminSettings />}
+            {currentTab === "reports" && allowedTabs.includes("reports") && <AdminReports />}
+            {currentTab === "settings" && allowedTabs.includes("settings") && <AdminSettings />}
           </div>
         </main>
       </div>

@@ -16,6 +16,7 @@ import {
   MessageSquare,
   Edit2,
   AlertCircle,
+  Shield,
 } from "lucide-react";
 import AppShell from "@/components/layout/AppShell";
 import StaffTasks from "@/components/staff/Tasks";
@@ -138,24 +139,33 @@ export default function CounselorPage() {
     name?: string;
     email?: string;
     role?: string;
-    leadsEnabled?: boolean;
-    tasksEnabled?: boolean;
   } | null>(null);
 
+  const [accessPolicies, setAccessPolicies] = useState<any[]>([]);
+  const [isAccessLoading, setIsAccessLoading] = useState(true);
+
   useEffect(() => {
-    const syncAuth = () => {
+    const syncAuth = async () => {
       const nextAuthUser = pb.authStore.model as {
         id?: string;
         name?: string;
         email?: string;
         role?: string;
-        leadsEnabled?: boolean;
-        tasksEnabled?: boolean;
       } | null;
 
       setAuthUser(nextAuthUser);
       setAuthChecked(true);
       setAuthReady(true);
+
+      // Fetch Access Control rules
+      try {
+        const list = await pb.collection("accessControl").getFullList();
+        setAccessPolicies(list);
+      } catch (err) {
+        console.error("Failed to fetch access rules:", err);
+      } finally {
+        setIsAccessLoading(false);
+      }
     };
 
     const timer = window.setTimeout(syncAuth, 0);
@@ -172,23 +182,44 @@ export default function CounselorPage() {
   const isCounselor =
     authChecked &&
     pb.authStore.isValid &&
-    (authUser?.role === "student-counsellor" || authUser?.role === "only-task-view");
+    (authUser?.role === "student-counsellor" ||
+     authUser?.role === "admin" ||
+     authUser?.role === "super-admin" ||
+     authUser?.role === "marketing-manager" ||
+     authUser?.role === "admissions-head");
   const counselorId = authUser?.id || "";
   const counselorName = authUser?.name || "Student Counsellor";
 
-  const leadsEnabled = authUser?.leadsEnabled !== false;
-  const tasksEnabled = authUser?.tasksEnabled !== false;
+  const getPolicyAccess = (sectionKey: string, defaultVal: boolean) => {
+    if (isAccessLoading) return false;
+    const policy = accessPolicies.find((p) => p.sectionKey === sectionKey);
+    if (!policy) return defaultVal;
+
+    if (policy.enabled === false) return false;
+
+    const userId = authUser?.id || "";
+    const userRole = authUser?.role || "";
+    const denied = policy.deniedUsers || [];
+    const allowed = policy.allowedUsers || [];
+    const roles = policy.allowedRoles || [];
+
+    return !denied.includes(userId) && (allowed.includes(userId) || roles.includes(userRole));
+  };
+
+  const leadsEnabled = getPolicyAccess("user_leads", true);
+  const tasksEnabled = getPolicyAccess("user_tasks", true);
+  const canAddLead = getPolicyAccess("user_add_lead", true);
   const [activeTab, setActiveTab] = useState<"leads" | "tasks">("leads");
 
   useEffect(() => {
-    if (authChecked && authUser) {
-      if (authUser.leadsEnabled === false && authUser.tasksEnabled !== false) {
+    if (authChecked && authUser && !isAccessLoading) {
+      if (!leadsEnabled && tasksEnabled) {
         setActiveTab("tasks");
-      } else {
+      } else if (leadsEnabled) {
         setActiveTab("leads");
       }
     }
-  }, [authChecked, authUser]);
+  }, [authChecked, authUser, isAccessLoading, leadsEnabled, tasksEnabled]);
 
   useEffect(() => {
     if (authChecked && !isCounselor) {
@@ -302,23 +333,41 @@ export default function CounselorPage() {
   const getValidNextStatuses = (
     currentStatus: string | undefined,
   ): string[] => {
-    if (!currentStatus || currentStatus.trim() === "") return statusFlow;
+    const baseFlow = [...statusFlow];
+    const canUpdateTerminal = getPolicyAccess("user_update_registered_lost", false);
+    
+    // Filter terminal status choices if not permitted
+    let allowedFlow = baseFlow;
+    if (!canUpdateTerminal) {
+      allowedFlow = baseFlow.filter(s => s !== "Registered" && s !== "Lost");
+    }
+
+    if (!currentStatus || currentStatus.trim() === "") return allowedFlow;
     const normalizedCurrentStatus = normalizeLeadStatus(currentStatus);
-    const currentIndex = statusFlow.indexOf(normalizedCurrentStatus);
-    if (currentIndex === -1) return statusFlow;
+    const currentIndex = allowedFlow.indexOf(normalizedCurrentStatus);
+    if (currentIndex === -1) {
+      // If current status is terminal but we can't update terminal states,
+      // allow remaining in it to post comments
+      if (normalizedCurrentStatus === "Registered" || normalizedCurrentStatus === "Lost") {
+        return [normalizedCurrentStatus];
+      }
+      return allowedFlow;
+    }
+    
     // If already in a terminal state, can only stay in same status (for comments)
     if (
       normalizedCurrentStatus === "Registered" ||
       normalizedCurrentStatus === "Lost"
     )
       return [normalizedCurrentStatus];
+      
     // If current status is New, it cannot be updated to New again.
     if (normalizedCurrentStatus === "New") {
-      return statusFlow.slice(currentIndex + 1);
+      return allowedFlow.slice(currentIndex + 1);
     }
     // Include the current status so comment-only submissions are allowed,
     // then allow forward statuses (no going back).
-    return [normalizedCurrentStatus, ...statusFlow.slice(currentIndex + 1)];
+    return [normalizedCurrentStatus, ...allowedFlow.slice(currentIndex + 1)];
   };
 
   const getDefaultModalStatus = useCallback((currentStatus: string) => {
@@ -569,7 +618,7 @@ export default function CounselorPage() {
           fetchOptions.headers = { Authorization: `Bearer ${token}` };
         }
 
-        const response = await fetch("/api/counselor/leads", fetchOptions);
+        const response = await fetch("/api/staff_portal/leads", fetchOptions);
 
         if (!response.ok) {
           const errorBody = await response.json().catch(() => ({}));
@@ -810,7 +859,7 @@ export default function CounselorPage() {
 
     try {
       setIsUpdating(true);
-      const response = await fetch("/api/counselor/update-lead", {
+      const response = await fetch("/api/staff_portal/update-lead", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -844,6 +893,11 @@ export default function CounselorPage() {
   };
 
   const handleAddLead = async () => {
+    const canAddLead = getPolicyAccess("user_add_lead", true);
+    if (!canAddLead) {
+      showToast("You do not have permission to add leads.", "error");
+      return;
+    }
     const trimmedName = newName.trim();
     const trimmedMobile = newMobile.trim().replace(/^0+/, "");
     const trimmedCourse = newCourse.trim();
@@ -870,7 +924,7 @@ export default function CounselorPage() {
 
     try {
       setIsUpdating(true);
-      const response = await fetch("/api/counselor/add-lead", {
+      const response = await fetch("/api/staff_portal/add-lead", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1024,12 +1078,10 @@ export default function CounselorPage() {
       const newDate = dateMap[followupNum];
       const existingDate = existingMap[followupNum];
 
-      // Check if counselor is trying to modify already-set follow-up date
-      // Only admins can modify existing follow-up dates
-      const isAdmin =
-        authUser?.role === "admin" || pb.authStore.model?.role === "admin";
+      // Check if user has policy to modify existing follow-up dates
+      const canEditFollowup = getPolicyAccess("user_edit_followup", false);
 
-      if (!isAdmin && existingDate && existingDate !== newDate) {
+      if (!canEditFollowup && existingDate && existingDate !== newDate) {
         showToast(
           "Cannot modify existing follow-up dates. Contact admin.",
           "error",
@@ -1193,7 +1245,7 @@ export default function CounselorPage() {
   // Deduplicate statuses to ensure unique keys when rendering options
   const dedupedValidNextStatuses = Array.from(new Set(validNextStatuses));
 
-  if (!isMounted) {
+  if (!authReady || isAccessLoading) {
     return (
       <div className="min-h-screen bg-white px-4 py-8 sm:px-6 sm:py-10">
         <div className="mx-auto w-full max-w-5xl space-y-6">
@@ -1238,17 +1290,31 @@ export default function CounselorPage() {
       title="Amazon College"
       subtitle={counselorName}
       headerRight={
-        <button
-          onClick={() => {
-            const pb = createPocketBaseClient();
-            pb.authStore.clear();
-            router.replace("/");
-          }}
-          className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50"
-        >
-          <LogOut className="h-4 w-4" />
-          Logout
-        </button>
+        <div className="flex items-center gap-3">
+          {(authUser?.role === "admin" ||
+            authUser?.role === "super-admin" ||
+            authUser?.role === "marketing-manager" ||
+            authUser?.role === "admissions-head") && (
+            <button
+              onClick={() => router.push("/admin")}
+              className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 transition-all shadow-sm"
+            >
+              <Shield className="h-4 w-4 text-blue-500" />
+              Admin Panel
+            </button>
+          )}
+          <button
+            onClick={() => {
+              const pb = createPocketBaseClient();
+              pb.authStore.clear();
+              router.replace("/");
+            }}
+            className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50 shadow-sm"
+          >
+            <LogOut className="h-4 w-4" />
+            Logout
+          </button>
+        </div>
       }
     >
       {leadsEnabled && tasksEnabled && (
@@ -1278,12 +1344,14 @@ export default function CounselorPage() {
 
       {activeTab === "leads" && leadsEnabled ? (
         <>
-          <button
-            onClick={() => setAddLeadModalOpen(true)}
-            className="fixed bottom-5 right-5 z-20 inline-flex items-center gap-2 rounded-full bg-teal-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-teal-600/25 transition hover:bg-teal-700 md:hidden"
-          >
-            + Add Lead
-          </button>
+          {canAddLead && (
+            <button
+              onClick={() => setAddLeadModalOpen(true)}
+              className="fixed bottom-5 right-5 z-20 inline-flex items-center gap-2 rounded-full bg-teal-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-teal-600/25 transition hover:bg-teal-700 md:hidden"
+            >
+              + Add Lead
+            </button>
+          )}
 
           <div className="space-y-4">
         {/* Status Filter Tabs */}
@@ -1325,12 +1393,14 @@ export default function CounselorPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full max-w-md rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
           />
-          <button
-            onClick={() => setAddLeadModalOpen(true)}
-            className="hidden rounded-md bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-700 md:inline-flex"
-          >
-            + Add Lead
-          </button>
+          {canAddLead && (
+            <button
+              onClick={() => setAddLeadModalOpen(true)}
+              className="hidden rounded-md bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-700 md:inline-flex"
+            >
+              + Add Lead
+            </button>
+          )}
         </div>
 
         {!authReady ? (
@@ -2231,7 +2301,9 @@ export default function CounselorPage() {
                                     : "Scheduled";
                           const isAdmin =
                             authUser?.role === "admin" ||
-                            pb.authStore.model?.role === "admin";
+                            authUser?.role === "super-admin" ||
+                            authUser?.role === "marketing-manager" ||
+                            authUser?.role === "admissions-head";
                           const isCounselorModifyingExisting =
                             !isAdmin && Boolean(followup.savedDate);
                           const isDisabled =
@@ -2542,10 +2614,27 @@ export default function CounselorPage() {
       ) : activeTab === "tasks" && tasksEnabled ? (
         <StaffTasks />
       ) : (
-        <div className="text-center py-20 bg-white border border-slate-100 rounded-2xl shadow-sm">
-          <AlertCircle className="h-10 w-10 mx-auto mb-2 text-rose-500 animate-pulse" />
-          <p className="font-bold text-slate-800">Feature Access Restricted</p>
-          <p className="text-sm text-slate-400 mt-1">You do not have access to this section. Please contact an administrator.</p>
+        <div className="mx-auto max-w-md my-16 text-center bg-white border border-slate-100 rounded-3xl p-8 shadow-lg space-y-6">
+          <div className="mx-auto w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500 border border-rose-100">
+            <AlertCircle className="h-8 w-8 animate-pulse" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="font-bold text-slate-800 text-sm">Access Denied - No Allocated Sections</h3>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Your account has not been assigned to any portal sections. Please contact your system administrator to configure your access overrides.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              const pb = createPocketBaseClient();
+              pb.authStore.clear();
+              router.replace("/");
+            }}
+            className="w-full py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign Out
+          </button>
         </div>
       )}
     </AppShell>

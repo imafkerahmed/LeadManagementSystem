@@ -24,6 +24,8 @@
 .DS_Store
 *.pem
 AGENTS.md
+CLAUDE.md
+POCKETBASE_SETUP.md
 
 # debug
 npm-debug.log*

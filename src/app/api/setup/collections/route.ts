@@ -12,22 +12,50 @@ export async function POST() {
       const usersCol = await pb.collections.getOne("users");
       let updated = false;
 
-      if (!usersCol.schema.some((f: any) => f.name === "leadsEnabled")) {
-        usersCol.schema.push({ name: "leadsEnabled", type: "bool", required: false });
+      // Clean up legacy fields
+      const leadsIdx = usersCol.schema.findIndex((f: any) => f.name === "leadsEnabled");
+      if (leadsIdx > -1) {
+        usersCol.schema.splice(leadsIdx, 1);
         updated = true;
       }
-      if (!usersCol.schema.some((f: any) => f.name === "tasksEnabled")) {
-        usersCol.schema.push({ name: "tasksEnabled", type: "bool", required: false });
+      const tasksIdx = usersCol.schema.findIndex((f: any) => f.name === "tasksEnabled");
+      if (tasksIdx > -1) {
+        usersCol.schema.splice(tasksIdx, 1);
         updated = true;
       }
 
       const roleField = usersCol.schema.find((f: any) => f.name === "role");
       if (roleField && roleField.type === "select") {
-        const values = roleField.options?.values || [];
-        if (!values.includes("only-task-view")) {
-          roleField.options.values = [...values, "only-task-view"];
+        const targetValues = ["super-admin", "admin", "student-counsellor", "marketing-manager", "admissions-head"];
+        const currentValues = roleField.options?.values || [];
+        const hasDiff =
+          currentValues.length !== targetValues.length ||
+          !targetValues.every((val: string) => currentValues.includes(val));
+
+        if (hasDiff) {
+          roleField.options.values = targetValues;
           updated = true;
         }
+      }
+
+      // Secure the users collection client-side API rules
+      const targetListRule = null as any;
+      const targetViewRule = '@request.auth.id != ""';
+      const targetCreateRule = null as any;
+      const targetUpdateRule = 'id = @request.auth.id';
+      const targetDeleteRule = null as any;
+
+      if (usersCol.listRule !== targetListRule ||
+          usersCol.viewRule !== targetViewRule ||
+          usersCol.createRule !== targetCreateRule ||
+          usersCol.updateRule !== targetUpdateRule ||
+          usersCol.deleteRule !== targetDeleteRule) {
+        usersCol.listRule = targetListRule;
+        usersCol.viewRule = targetViewRule;
+        usersCol.createRule = targetCreateRule;
+        usersCol.updateRule = targetUpdateRule;
+        usersCol.deleteRule = targetDeleteRule;
+        updated = true;
       }
 
       if (updated) {
@@ -45,13 +73,22 @@ export async function POST() {
             type: "select",
             required: true,
             options: {
-              values: ["admin", "counselor", "only-task-view"],
+              values: ["super-admin", "admin", "student-counsellor", "marketing-manager", "admissions-head"],
               maxSelect: 1,
             },
           },
-          { name: "leadsEnabled", type: "bool", required: false },
-          { name: "tasksEnabled", type: "bool", required: false },
+          {
+            name: "accountStatus",
+            type: "select",
+            required: true,
+            options: { values: ["active", "disabled"] },
+          },
         ],
+        listRule: null,
+        viewRule: '@request.auth.id != ""',
+        createRule: null,
+        updateRule: 'id = @request.auth.id',
+        deleteRule: null,
       });
     }
 
@@ -229,6 +266,97 @@ export async function POST() {
           { name: "comment", type: "text", required: false },
         ],
       });
+    }
+    try {
+      const acCol = await pb.collections.getOne("accessControl");
+      const targetPageField = acCol.schema.find((f: any) => f.name === "targetPage");
+      if (targetPageField && targetPageField.type === "select") {
+        const targetValues = ["admin", "user"];
+        const currentValues = targetPageField.options?.values || [];
+        const hasDiff =
+          currentValues.length !== targetValues.length ||
+          !targetValues.every((val: string) => currentValues.includes(val));
+        if (hasDiff) {
+          targetPageField.options.values = targetValues;
+          await pb.collections.update("accessControl", acCol);
+        }
+      }
+    } catch {
+      await pb.collections.create({
+        name: "accessControl",
+        type: "base",
+        schema: [
+          { name: "sectionKey", type: "text", required: true, unique: true },
+          { name: "displayName", type: "text", required: true },
+          {
+            name: "targetPage",
+            type: "select",
+            required: true,
+            options: {
+              values: ["admin", "user"],
+              maxSelect: 1,
+            },
+          },
+          { name: "allowedRoles", type: "json", required: true },
+          {
+            name: "allowedUsers",
+            type: "relation",
+            required: false,
+            options: {
+              collectionId: "_pb_users_auth_",
+              maxSelect: null,
+              cascadeDelete: false,
+            },
+          },
+          {
+            name: "deniedUsers",
+            type: "relation",
+            required: false,
+            options: {
+              collectionId: "_pb_users_auth_",
+              maxSelect: null,
+              cascadeDelete: false,
+            },
+          },
+          { name: "enabled", type: "bool", required: true },
+        ],
+        listRule: '@request.auth.id != ""',
+        viewRule: '@request.auth.id != ""',
+        createRule: "",
+        updateRule: '@request.auth.role = "super-admin"',
+        deleteRule: "",
+      });
+    }
+
+    // Seed default rules (idempotent seeder: only create if sectionKey does not exist)
+    const defaultRules = [
+      { sectionKey: "admin_dashboard", displayName: "Dashboard Tab", targetPage: "admin", allowedRoles: ["super-admin", "admin", "admissions-head", "marketing-manager"], allowedUsers: [], deniedUsers: [], enabled: true },
+      { sectionKey: "admin_leads", displayName: "All Leads Tab", targetPage: "admin", allowedRoles: ["super-admin", "admin", "admissions-head", "marketing-manager"], allowedUsers: [], deniedUsers: [], enabled: true },
+      { sectionKey: "admin_tasks", displayName: "Tasks Tab", targetPage: "admin", allowedRoles: ["super-admin", "admin", "admissions-head"], allowedUsers: [], deniedUsers: [], enabled: true },
+      { sectionKey: "admin_bulk", displayName: "Bulk Upload Tab", targetPage: "admin", allowedRoles: ["super-admin", "admin", "marketing-manager"], allowedUsers: [], deniedUsers: [], enabled: true },
+      { sectionKey: "admin_reports", displayName: "Reports Tab", targetPage: "admin", allowedRoles: ["super-admin", "admin", "admissions-head", "marketing-manager"], allowedUsers: [], deniedUsers: [], enabled: true },
+      { sectionKey: "admin_settings", displayName: "Settings Tab", targetPage: "admin", allowedRoles: ["super-admin", "admin"], allowedUsers: [], deniedUsers: [], enabled: true },
+      { sectionKey: "admin_user_management", displayName: "User Directory Control", targetPage: "admin", allowedRoles: ["super-admin", "admin"], allowedUsers: [], deniedUsers: [], enabled: true },
+      { sectionKey: "admin_leads_edit", displayName: "Edit Lead Details", targetPage: "admin", allowedRoles: ["super-admin", "admin", "admissions-head"], allowedUsers: [], deniedUsers: [], enabled: true },
+      { sectionKey: "admin_leads_delete", displayName: "Delete Lead Records", targetPage: "admin", allowedRoles: ["super-admin", "admin"], allowedUsers: [], deniedUsers: [], enabled: true },
+      { sectionKey: "admin_tasks_create", displayName: "Create New Tasks", targetPage: "admin", allowedRoles: ["super-admin", "admin", "admissions-head"], allowedUsers: [], deniedUsers: [], enabled: true },
+      { sectionKey: "admin_tasks_edit", displayName: "Edit Task Details", targetPage: "admin", allowedRoles: ["super-admin", "admin", "admissions-head"], allowedUsers: [], deniedUsers: [], enabled: true },
+      { sectionKey: "admin_tasks_delete", displayName: "Delete Task Records", targetPage: "admin", allowedRoles: ["super-admin", "admin", "admissions-head"], allowedUsers: [], deniedUsers: [], enabled: true },
+      
+      { sectionKey: "user_leads", displayName: "Leads Tab", targetPage: "user", allowedRoles: ["student-counsellor"], allowedUsers: [], deniedUsers: [], enabled: true },
+      { sectionKey: "user_tasks", displayName: "Tasks Tab", targetPage: "user", allowedRoles: ["student-counsellor"], allowedUsers: [], deniedUsers: [], enabled: true },
+      { sectionKey: "user_add_lead", displayName: "Create Lead Records", targetPage: "user", allowedRoles: ["student-counsellor"], allowedUsers: [], deniedUsers: [], enabled: true },
+      { sectionKey: "user_edit_followup", displayName: "Modify Follow-Up Dates", targetPage: "user", allowedRoles: ["super-admin", "admin", "admissions-head"], allowedUsers: [], deniedUsers: [], enabled: true },
+      { sectionKey: "user_update_registered_lost", displayName: "Set Terminal Statuses", targetPage: "user", allowedRoles: ["super-admin", "admin", "admissions-head"], allowedUsers: [], deniedUsers: [], enabled: true },
+      { sectionKey: "user_tasks_complete", displayName: "Complete Task Records", targetPage: "user", allowedRoles: ["student-counsellor"], allowedUsers: [], deniedUsers: [], enabled: true }
+    ];
+
+    for (const rule of defaultRules) {
+      try {
+        await pb.collection("accessControl").getFirstListItem(`sectionKey = "${rule.sectionKey}"`);
+      } catch {
+        await pb.collection("accessControl").create(rule);
+      }
     }
 
     return NextResponse.json({

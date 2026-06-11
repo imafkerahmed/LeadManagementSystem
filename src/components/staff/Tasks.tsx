@@ -29,6 +29,8 @@ export default function StaffTasks() {
   // Filters/Tabs
   const [activeTab, setActiveTab] = useState<"active" | "completed" | "all">("active");
   const [searchTerm, setSearchTerm] = useState("");
+  const [accessPolicies, setAccessPolicies] = useState<any[]>([]);
+  const [isAccessLoading, setIsAccessLoading] = useState(true);
 
   // History state
   interface TaskHistoryEntry {
@@ -72,7 +74,36 @@ export default function StaffTasks() {
 
   useEffect(() => {
     void loadTasks();
+
+    const fetchPolicies = async () => {
+      try {
+        const pb = createPocketBaseClient();
+        const list = await pb.collection("accessControl").getFullList();
+        setAccessPolicies(list);
+      } catch (err) {
+        console.error("Failed to load access policies in staff tasks:", err);
+      } finally {
+        setIsAccessLoading(false);
+      }
+    };
+    void fetchPolicies();
   }, []);
+
+  const getPolicyAccess = (sectionKey: string, defaultVal: boolean) => {
+    if (isAccessLoading) return false;
+    const policy = accessPolicies.find((p) => p.sectionKey === sectionKey);
+    if (!policy) return defaultVal;
+    if (policy.enabled === false) return false;
+    const pb = createPocketBaseClient();
+    const userId = pb.authStore.model?.id || "";
+    const userRole = pb.authStore.model?.role || "";
+    const denied = policy.deniedUsers || [];
+    const allowed = policy.allowedUsers || [];
+    const roles = policy.allowedRoles || [];
+    return !denied.includes(userId) && (allowed.includes(userId) || roles.includes(userRole));
+  };
+
+  const canCompleteTasks = getPolicyAccess("user_tasks_complete", true);
 
   const fetchTaskHistory = async (taskId: string) => {
     setIsLoadingHistory(true);
@@ -99,6 +130,10 @@ export default function StaffTasks() {
   }, [viewTask]);
 
   const handleUpdateStatus = async (taskId: string, newStatus: TaskStatus, notesText?: string) => {
+    if (newStatus === "Completed" && !canCompleteTasks) {
+      toast.error("You do not have permission to complete tasks.");
+      return;
+    }
     setIsUpdating(taskId);
     try {
       const pb = createPocketBaseClient();
@@ -445,7 +480,11 @@ export default function StaffTasks() {
                 <div className="border-t border-slate-100 pt-4 space-y-3">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Update Task Status</h4>
                   
-                  {viewTask.status === "Pending" ? (
+                  {!canCompleteTasks ? (
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-xs text-slate-400 font-semibold leading-relaxed">
+                      Task completion is restricted by system policies.
+                    </div>
+                  ) : viewTask.status === "Pending" ? (
                     <button
                       onClick={() => void handleUpdateStatus(viewTask.id, "In-Progress")}
                       disabled={isUpdating !== null}

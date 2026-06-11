@@ -40,7 +40,13 @@ async function setupCollections() {
           type: "select",
           required: true,
           options: {
-            values: ["admin", "student-counsellor"],
+            values: [
+              "super-admin",
+              "admin",
+              "student-counsellor",
+              "marketing-manager",
+              "admissions-head",
+            ],
             maxSelect: 1,
           },
         },
@@ -95,6 +101,46 @@ async function setupCollections() {
         { name: "oldValue", type: "text" },
         { name: "newValue", type: "text" },
         { name: "comment", type: "text" },
+      ],
+    },
+    {
+      name: "accessControl",
+      displayName: "Access Control",
+      description: "Dynamic access policies for pages & features",
+      fields: [
+        { name: "sectionKey", type: "text", required: true, unique: true },
+        { name: "displayName", type: "text", required: true },
+        {
+          name: "targetPage",
+          type: "select",
+          required: true,
+          options: {
+            values: ["admin", "user"],
+            maxSelect: 1,
+          },
+        },
+        { name: "allowedRoles", type: "json", required: true },
+        {
+          name: "allowedUsers",
+          type: "relation",
+          required: false,
+          options: {
+            collectionId: "_pb_users_auth_",
+            maxSelect: null,
+            cascadeDelete: false,
+          },
+        },
+        {
+          name: "deniedUsers",
+          type: "relation",
+          required: false,
+          options: {
+            collectionId: "_pb_users_auth_",
+            maxSelect: null,
+            cascadeDelete: false,
+          },
+        },
+        { name: "enabled", type: "bool", required: true },
       ],
     },
   ];

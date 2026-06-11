@@ -338,8 +338,14 @@ export default function AdminLeads() {
   } | null;
   const currentUserName =
     authModel?.name || authModel?.email || "Amazon College Team";
-  const isAdmin = authModel?.role === "admin";
+  const isAdmin =
+    authModel?.role === "admin" ||
+    authModel?.role === "super-admin" ||
+    authModel?.role === "marketing-manager" ||
+    authModel?.role === "admissions-head";
   const [authReady, setAuthReady] = useState(false);
+  const [accessPolicies, setAccessPolicies] = useState<any[]>([]);
+  const [isAccessLoading, setIsAccessLoading] = useState(true);
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [filteredLeads, setFilteredLeads] = useState<Lead[]>([]);
@@ -388,6 +394,18 @@ export default function AdminLeads() {
   useEffect(() => {
     const pb = createPocketBaseClient();
 
+    const fetchAccessPolicies = async () => {
+      try {
+        const list = await pb.collection("accessControl").getFullList();
+        setAccessPolicies(list);
+      } catch (err) {
+        console.error("Failed to load access policies in Leads:", err);
+      } finally {
+        setIsAccessLoading(false);
+      }
+    };
+    fetchAccessPolicies();
+
     const syncAuth = () => {
       setAuthReady(true);
     };
@@ -402,6 +420,23 @@ export default function AdminLeads() {
       unsubscribe();
     };
   }, []);
+
+  const getPolicyAccess = (sectionKey: string, defaultVal: boolean) => {
+    if (isAccessLoading) return false;
+    const policy = accessPolicies.find((p) => p.sectionKey === sectionKey);
+    if (!policy) return defaultVal;
+    if (policy.enabled === false) return false;
+    const pb = createPocketBaseClient();
+    const userId = pb.authStore.model?.id || "";
+    const userRole = pb.authStore.model?.role || "";
+    const denied = policy.deniedUsers || [];
+    const allowed = policy.allowedUsers || [];
+    const roles = policy.allowedRoles || [];
+    return !denied.includes(userId) && (allowed.includes(userId) || roles.includes(userRole));
+  };
+
+  const canEditLeads = getPolicyAccess("admin_leads_edit", true);
+  const canDeleteLeads = getPolicyAccess("admin_leads_delete", true);
 
   const selectedLeadRef = useRef<Lead | null>(null);
   const isEditingRef = useRef<boolean>(false);
@@ -1169,6 +1204,10 @@ export default function AdminLeads() {
   };
 
   const handleDelete = (leadId: string) => {
+    if (!canDeleteLeads) {
+      toast.error("You do not have permission to delete leads.");
+      return;
+    }
     setDeleteConfirmLeadId(leadId);
     setDeleteConfirmDialogOpen(true);
   };
@@ -1194,6 +1233,10 @@ export default function AdminLeads() {
   };
 
   const handleLeadUpdate = async () => {
+    if (!canEditLeads) {
+      toast.error("You do not have permission to edit leads.");
+      return;
+    }
     if (!selectedLead) {
       return;
     }
@@ -1278,7 +1321,11 @@ export default function AdminLeads() {
 
       // Follow-up fields: enforce same non-admin restrictions as individual save
       const userRole = pb.authStore.model?.role;
-      const isAdminUser = userRole === "admin";
+      const isAdminUser =
+        userRole === "admin" ||
+        userRole === "super-admin" ||
+        userRole === "marketing-manager" ||
+        userRole === "admissions-head";
 
       if (!isAdminUser) {
         if (
@@ -1526,7 +1573,11 @@ export default function AdminLeads() {
 
       // Check if user is admin
       const userRole = pb.authStore.model?.role;
-      const isAdmin = userRole === "admin";
+      const isAdmin =
+        userRole === "admin" ||
+        userRole === "super-admin" ||
+        userRole === "marketing-manager" ||
+        userRole === "admissions-head";
 
       // Non-admins can't modify existing dates
       if (!isAdmin && existingDate && existingDate !== newDate) {
@@ -2125,16 +2176,30 @@ export default function AdminLeads() {
                     <div className="flex gap-3 pt-2">
                       <button
                         onClick={() => {
-                          setIsEditing((current) => !current);
-                          syncDraftFromLead(selectedLead);
+                          if (canEditLeads) {
+                            setIsEditing((current) => !current);
+                            syncDraftFromLead(selectedLead);
+                          } else {
+                            toast.error("You do not have permission to edit leads.");
+                          }
                         }}
-                        className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm transition-all"
+                        className={`flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm transition-all ${
+                          !canEditLeads ? "opacity-60 cursor-not-allowed border-slate-100" : ""
+                        }`}
                       >
                         {isEditing ? "Cancel Edit" : "Edit Details"}
                       </button>
                       <button
-                        onClick={() => handleDelete(selectedLead.id)}
-                        className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-rose-100 bg-rose-50/50 text-rose-600 hover:bg-rose-50 px-4 py-2.5 text-xs font-bold shadow-sm transition-all"
+                        onClick={() => {
+                          if (canDeleteLeads) {
+                            handleDelete(selectedLead.id);
+                          } else {
+                            toast.error("You do not have permission to delete leads.");
+                          }
+                        }}
+                        className={`flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-rose-100 bg-rose-50/50 text-rose-600 hover:bg-rose-50 px-4 py-2.5 text-xs font-bold shadow-sm transition-all ${
+                          !canDeleteLeads ? "opacity-60 cursor-not-allowed border-rose-50/20 text-rose-400" : ""
+                        }`}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                         Delete Lead

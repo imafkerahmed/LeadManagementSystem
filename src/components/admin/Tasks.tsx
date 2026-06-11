@@ -34,6 +34,8 @@ export default function AdminTasks() {
   const [users, setUsers] = useState<SystemUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [accessPolicies, setAccessPolicies] = useState<any[]>([]);
+  const [isAccessLoading, setIsAccessLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
 
@@ -82,7 +84,6 @@ export default function AdminTasks() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   const loadData = async () => {
-    setIsLoading(true);
     try {
       const pb = createPocketBaseClient();
       const token = pb.authStore.token;
@@ -91,9 +92,10 @@ export default function AdminTasks() {
         fetchOptions.headers = { Authorization: `Bearer ${token}` };
       }
 
-      const [tasksRes, usersRes] = await Promise.all([
+      const [tasksRes, usersRes, policiesList] = await Promise.all([
         fetch("/api/admin/tasks", fetchOptions),
         fetch("/api/admin/users", fetchOptions),
+        pb.collection("accessControl").getFullList().catch(() => [])
       ]);
 
       if (!tasksRes.ok) throw new Error("Failed to load tasks");
@@ -103,13 +105,33 @@ export default function AdminTasks() {
       const usersData = (await usersRes.json()) as SystemUser[];
 
       setTasks(tasksData);
-      setUsers(usersData.filter((u) => u.tasksEnabled !== false));
+      setUsers(usersData);
+      setAccessPolicies(policiesList);
+      setIsAccessLoading(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to load tasks data");
     } finally {
       setIsLoading(false);
     }
   };
+
+  const getPolicyAccess = (sectionKey: string, defaultVal: boolean) => {
+    if (isAccessLoading) return false;
+    const policy = accessPolicies.find((p) => p.sectionKey === sectionKey);
+    if (!policy) return defaultVal;
+    if (policy.enabled === false) return false;
+    const pb = createPocketBaseClient();
+    const userId = pb.authStore.model?.id || "";
+    const userRole = pb.authStore.model?.role || "";
+    const denied = policy.deniedUsers || [];
+    const allowed = policy.allowedUsers || [];
+    const roles = policy.allowedRoles || [];
+    return !denied.includes(userId) && (allowed.includes(userId) || roles.includes(userRole));
+  };
+
+  const canCreateTasks = getPolicyAccess("admin_tasks_create", true);
+  const canEditTasks = getPolicyAccess("admin_tasks_edit", true);
+  const canDeleteTasks = getPolicyAccess("admin_tasks_delete", true);
 
   useEffect(() => {
     void loadData();
@@ -151,11 +173,19 @@ export default function AdminTasks() {
   };
 
   const openCreateForm = () => {
+    if (!canCreateTasks) {
+      toast.error("You do not have permission to create tasks.");
+      return;
+    }
     resetForm();
     setShowForm(true);
   };
 
   const openEditForm = (task: Task) => {
+    if (!canEditTasks) {
+      toast.error("You do not have permission to edit tasks.");
+      return;
+    }
     setEditingTaskId(task.id);
     setTitle(task.title);
     setDescription(task.description || "");
@@ -168,6 +198,14 @@ export default function AdminTasks() {
   };
 
   const saveTask = async () => {
+    if (editingTaskId && !canEditTasks) {
+      toast.error("You do not have permission to edit tasks.");
+      return;
+    }
+    if (!editingTaskId && !canCreateTasks) {
+      toast.error("You do not have permission to create tasks.");
+      return;
+    }
     if (!title.trim()) {
       toast.error("Title is required");
       return;
@@ -219,6 +257,10 @@ export default function AdminTasks() {
   };
 
   const deleteTask = async () => {
+    if (!canDeleteTasks) {
+      toast.error("You do not have permission to delete tasks.");
+      return;
+    }
     if (!deleteTaskId) return;
 
     try {
@@ -718,17 +760,31 @@ export default function AdminTasks() {
                       </td>
                       <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <button
-                          onClick={() => openEditForm(t)}
-                          className="rounded-lg border border-slate-200 bg-white hover:bg-slate-50 p-1.5 text-slate-600 shadow-sm transition-all"
+                          onClick={() => {
+                            if (canEditTasks) {
+                              openEditForm(t);
+                            } else {
+                              toast.error("You do not have permission to edit tasks.");
+                            }
+                          }}
+                          className={`rounded-lg border border-slate-200 bg-white hover:bg-slate-50 p-1.5 text-slate-600 shadow-sm transition-all ${
+                            !canEditTasks ? "opacity-60 cursor-not-allowed border-slate-100" : ""
+                          }`}
                         >
                           <Edit className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => {
-                            setDeleteTaskId(t.id);
-                            setDeleteDialogOpen(true);
+                            if (canDeleteTasks) {
+                              setDeleteTaskId(t.id);
+                              setDeleteDialogOpen(true);
+                            } else {
+                              toast.error("You do not have permission to delete tasks.");
+                            }
                           }}
-                          className="ml-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 p-1.5 text-rose-600 shadow-sm transition-all"
+                          className={`ml-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 p-1.5 text-rose-600 shadow-sm transition-all ${
+                            !canDeleteTasks ? "opacity-60 cursor-not-allowed text-rose-400 border-slate-100" : ""
+                          }`}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
