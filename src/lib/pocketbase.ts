@@ -122,12 +122,16 @@ export async function setupPocketBaseCollections(): Promise<void> {
       let updated = false;
 
       // Clean up legacy fields
-      const leadsIdx = usersCol.schema.findIndex((f: any) => f.name === "leadsEnabled");
+      const leadsIdx = usersCol.schema.findIndex(
+        (f: any) => f.name === "leadsEnabled",
+      );
       if (leadsIdx > -1) {
         usersCol.schema.splice(leadsIdx, 1);
         updated = true;
       }
-      const tasksIdx = usersCol.schema.findIndex((f: any) => f.name === "tasksEnabled");
+      const tasksIdx = usersCol.schema.findIndex(
+        (f: any) => f.name === "tasksEnabled",
+      );
       if (tasksIdx > -1) {
         usersCol.schema.splice(tasksIdx, 1);
         updated = true;
@@ -135,7 +139,13 @@ export async function setupPocketBaseCollections(): Promise<void> {
 
       const roleField = usersCol.schema.find((f: any) => f.name === "role");
       if (roleField && roleField.type === "select") {
-        const targetValues = ["super-admin", "admin", "student-counsellor", "marketing-manager", "admissions-head"];
+        const targetValues = [
+          "super-admin",
+          "admin",
+          "student-counsellor",
+          "marketing-manager",
+          "admissions-head",
+        ];
         const currentValues = roleField.options?.values || [];
         const hasDiff =
           currentValues.length !== targetValues.length ||
@@ -151,14 +161,16 @@ export async function setupPocketBaseCollections(): Promise<void> {
       const targetListRule = null as any;
       const targetViewRule = '@request.auth.id != ""';
       const targetCreateRule = null as any;
-      const targetUpdateRule = 'id = @request.auth.id';
+      const targetUpdateRule = "id = @request.auth.id";
       const targetDeleteRule = null as any;
 
-      if (usersCol.listRule !== targetListRule ||
-          usersCol.viewRule !== targetViewRule ||
-          usersCol.createRule !== targetCreateRule ||
-          usersCol.updateRule !== targetUpdateRule ||
-          usersCol.deleteRule !== targetDeleteRule) {
+      if (
+        usersCol.listRule !== targetListRule ||
+        usersCol.viewRule !== targetViewRule ||
+        usersCol.createRule !== targetCreateRule ||
+        usersCol.updateRule !== targetUpdateRule ||
+        usersCol.deleteRule !== targetDeleteRule
+      ) {
         usersCol.listRule = targetListRule;
         usersCol.viewRule = targetViewRule;
         usersCol.createRule = targetCreateRule;
@@ -181,7 +193,15 @@ export async function setupPocketBaseCollections(): Promise<void> {
             name: "role",
             type: "select",
             required: true,
-            options: { values: ["super-admin", "admin", "student-counsellor", "marketing-manager", "admissions-head"] },
+            options: {
+              values: [
+                "super-admin",
+                "admin",
+                "student-counsellor",
+                "marketing-manager",
+                "admissions-head",
+              ],
+            },
           },
           {
             name: "accountStatus",
@@ -193,7 +213,7 @@ export async function setupPocketBaseCollections(): Promise<void> {
         listRule: null,
         viewRule: '@request.auth.id != ""',
         createRule: null,
-        updateRule: 'id = @request.auth.id',
+        updateRule: "id = @request.auth.id",
         deleteRule: null,
       });
     }
@@ -218,7 +238,14 @@ export async function setupPocketBaseCollections(): Promise<void> {
             type: "select",
             required: true,
             options: {
-              values: ["New", "Ringing-No-Answer", "Contacted", "Follow-up", "Registered", "Lost"],
+              values: [
+                "New",
+                "Ringing-No-Answer",
+                "Contacted",
+                "Follow-up",
+                "Registered",
+                "Lost",
+              ],
             },
           },
           { name: "assignedTo", type: "text", required: true },
@@ -307,7 +334,9 @@ export async function setupPocketBaseCollections(): Promise<void> {
             name: "status",
             type: "select",
             required: true,
-            options: { values: ["Pending", "In-Progress", "Completed", "Cancelled"] },
+            options: {
+              values: ["Pending", "In-Progress", "Completed", "Cancelled"],
+            },
           },
           {
             name: "priority",
@@ -318,9 +347,7 @@ export async function setupPocketBaseCollections(): Promise<void> {
           { name: "createdBy", type: "text" },
           { name: "notes", type: "text" },
         ],
-        indexes: [
-          "CREATE UNIQUE INDEX `idx_xwYCK88` ON `tasks` (`task_id`)"
-        ]
+        indexes: ["CREATE UNIQUE INDEX `idx_xwYCK88` ON `tasks` (`task_id`)"],
       });
     }
 
@@ -365,7 +392,9 @@ export async function setupPocketBaseCollections(): Promise<void> {
 
     try {
       const acCol = await pb.collections.getOne("accessControl");
-      const targetPageField = acCol.schema.find((f: any) => f.name === "targetPage");
+      const targetPageField = acCol.schema.find(
+        (f: any) => f.name === "targetPage",
+      );
       if (targetPageField && targetPageField.type === "select") {
         const targetValues = ["admin", "user"];
         const currentValues = targetPageField.options?.values || [];
@@ -426,30 +455,191 @@ export async function setupPocketBaseCollections(): Promise<void> {
 
     // Seed default rules (idempotent seeder: only create if sectionKey does not exist)
     const defaultRules = [
-      { sectionKey: "admin_dashboard", displayName: "Dashboard Tab", targetPage: "admin", allowedRoles: ["super-admin", "admin", "admissions-head", "marketing-manager"], allowedUsers: [], deniedUsers: [], enabled: true },
-      { sectionKey: "admin_leads", displayName: "All Leads Tab", targetPage: "admin", allowedRoles: ["super-admin", "admin", "admissions-head", "marketing-manager"], allowedUsers: [], deniedUsers: [], enabled: true },
-      { sectionKey: "admin_tasks", displayName: "Tasks Tab", targetPage: "admin", allowedRoles: ["super-admin", "admin", "admissions-head"], allowedUsers: [], deniedUsers: [], enabled: true },
-      { sectionKey: "admin_bulk", displayName: "Bulk Upload Tab", targetPage: "admin", allowedRoles: ["super-admin", "admin", "marketing-manager"], allowedUsers: [], deniedUsers: [], enabled: true },
-      { sectionKey: "admin_reports", displayName: "Reports Tab", targetPage: "admin", allowedRoles: ["super-admin", "admin", "admissions-head", "marketing-manager"], allowedUsers: [], deniedUsers: [], enabled: true },
-      { sectionKey: "admin_settings", displayName: "Settings Tab", targetPage: "admin", allowedRoles: ["super-admin", "admin"], allowedUsers: [], deniedUsers: [], enabled: true },
-      { sectionKey: "admin_user_management", displayName: "User Directory Control", targetPage: "admin", allowedRoles: ["super-admin", "admin"], allowedUsers: [], deniedUsers: [], enabled: true },
-      { sectionKey: "admin_leads_edit", displayName: "Edit Lead Details", targetPage: "admin", allowedRoles: ["super-admin", "admin", "admissions-head"], allowedUsers: [], deniedUsers: [], enabled: true },
-      { sectionKey: "admin_leads_delete", displayName: "Delete Lead Records", targetPage: "admin", allowedRoles: ["super-admin", "admin"], allowedUsers: [], deniedUsers: [], enabled: true },
-      { sectionKey: "admin_tasks_create", displayName: "Create New Tasks", targetPage: "admin", allowedRoles: ["super-admin", "admin", "admissions-head"], allowedUsers: [], deniedUsers: [], enabled: true },
-      { sectionKey: "admin_tasks_edit", displayName: "Edit Task Details", targetPage: "admin", allowedRoles: ["super-admin", "admin", "admissions-head"], allowedUsers: [], deniedUsers: [], enabled: true },
-      { sectionKey: "admin_tasks_delete", displayName: "Delete Task Records", targetPage: "admin", allowedRoles: ["super-admin", "admin", "admissions-head"], allowedUsers: [], deniedUsers: [], enabled: true },
-      
-      { sectionKey: "user_leads", displayName: "Leads Tab", targetPage: "user", allowedRoles: ["student-counsellor"], allowedUsers: [], deniedUsers: [], enabled: true },
-      { sectionKey: "user_tasks", displayName: "Tasks Tab", targetPage: "user", allowedRoles: ["student-counsellor"], allowedUsers: [], deniedUsers: [], enabled: true },
-      { sectionKey: "user_add_lead", displayName: "Create Lead Records", targetPage: "user", allowedRoles: ["student-counsellor"], allowedUsers: [], deniedUsers: [], enabled: true },
-      { sectionKey: "user_edit_followup", displayName: "Modify Follow-Up Dates", targetPage: "user", allowedRoles: ["super-admin", "admin", "admissions-head"], allowedUsers: [], deniedUsers: [], enabled: true },
-      { sectionKey: "user_update_registered_lost", displayName: "Set Terminal Statuses", targetPage: "user", allowedRoles: ["super-admin", "admin", "admissions-head"], allowedUsers: [], deniedUsers: [], enabled: true },
-      { sectionKey: "user_tasks_complete", displayName: "Complete Task Records", targetPage: "user", allowedRoles: ["student-counsellor"], allowedUsers: [], deniedUsers: [], enabled: true }
+      {
+        sectionKey: "admin_dashboard",
+        displayName: "Dashboard Tab",
+        targetPage: "admin",
+        allowedRoles: [
+          "super-admin",
+          "admin",
+          "admissions-head",
+          "marketing-manager",
+        ],
+        allowedUsers: [],
+        deniedUsers: [],
+        enabled: true,
+      },
+      {
+        sectionKey: "admin_leads",
+        displayName: "All Leads Tab",
+        targetPage: "admin",
+        allowedRoles: [
+          "super-admin",
+          "admin",
+          "admissions-head",
+          "marketing-manager",
+        ],
+        allowedUsers: [],
+        deniedUsers: [],
+        enabled: true,
+      },
+      {
+        sectionKey: "admin_tasks",
+        displayName: "Tasks Tab",
+        targetPage: "admin",
+        allowedRoles: ["super-admin", "admin", "admissions-head"],
+        allowedUsers: [],
+        deniedUsers: [],
+        enabled: true,
+      },
+      {
+        sectionKey: "admin_bulk",
+        displayName: "Bulk Upload Tab",
+        targetPage: "admin",
+        allowedRoles: ["super-admin", "admin", "marketing-manager"],
+        allowedUsers: [],
+        deniedUsers: [],
+        enabled: true,
+      },
+      {
+        sectionKey: "admin_reports",
+        displayName: "Reports Tab",
+        targetPage: "admin",
+        allowedRoles: [
+          "super-admin",
+          "admin",
+          "admissions-head",
+          "marketing-manager",
+        ],
+        allowedUsers: [],
+        deniedUsers: [],
+        enabled: true,
+      },
+      {
+        sectionKey: "admin_settings",
+        displayName: "Settings Tab",
+        targetPage: "admin",
+        allowedRoles: ["super-admin", "admin"],
+        allowedUsers: [],
+        deniedUsers: [],
+        enabled: true,
+      },
+      {
+        sectionKey: "admin_user_management",
+        displayName: "User Directory Control",
+        targetPage: "admin",
+        allowedRoles: ["super-admin", "admin"],
+        allowedUsers: [],
+        deniedUsers: [],
+        enabled: true,
+      },
+      {
+        sectionKey: "admin_leads_edit",
+        displayName: "Edit Lead Details",
+        targetPage: "admin",
+        allowedRoles: ["super-admin", "admin", "admissions-head"],
+        allowedUsers: [],
+        deniedUsers: [],
+        enabled: true,
+      },
+      {
+        sectionKey: "admin_leads_delete",
+        displayName: "Delete Lead Records",
+        targetPage: "admin",
+        allowedRoles: ["super-admin", "admin"],
+        allowedUsers: [],
+        deniedUsers: [],
+        enabled: true,
+      },
+      {
+        sectionKey: "admin_tasks_create",
+        displayName: "Create New Tasks",
+        targetPage: "admin",
+        allowedRoles: ["super-admin", "admin", "admissions-head"],
+        allowedUsers: [],
+        deniedUsers: [],
+        enabled: true,
+      },
+      {
+        sectionKey: "admin_tasks_edit",
+        displayName: "Edit Task Details",
+        targetPage: "admin",
+        allowedRoles: ["super-admin", "admin", "admissions-head"],
+        allowedUsers: [],
+        deniedUsers: [],
+        enabled: true,
+      },
+      {
+        sectionKey: "admin_tasks_delete",
+        displayName: "Delete Task Records",
+        targetPage: "admin",
+        allowedRoles: ["super-admin", "admin", "admissions-head"],
+        allowedUsers: [],
+        deniedUsers: [],
+        enabled: true,
+      },
+
+      {
+        sectionKey: "user_leads",
+        displayName: "Leads Tab",
+        targetPage: "user",
+        allowedRoles: ["student-counsellor"],
+        allowedUsers: [],
+        deniedUsers: [],
+        enabled: true,
+      },
+      {
+        sectionKey: "user_tasks",
+        displayName: "Tasks Tab",
+        targetPage: "user",
+        allowedRoles: ["student-counsellor"],
+        allowedUsers: [],
+        deniedUsers: [],
+        enabled: true,
+      },
+      {
+        sectionKey: "user_add_lead",
+        displayName: "Create Lead Records",
+        targetPage: "user",
+        allowedRoles: ["student-counsellor"],
+        allowedUsers: [],
+        deniedUsers: [],
+        enabled: true,
+      },
+      {
+        sectionKey: "user_edit_followup",
+        displayName: "Modify Follow-Up Dates",
+        targetPage: "user",
+        allowedRoles: ["super-admin", "admin", "admissions-head"],
+        allowedUsers: [],
+        deniedUsers: [],
+        enabled: true,
+      },
+      {
+        sectionKey: "user_update_registered_lost",
+        displayName: "Set Terminal Statuses",
+        targetPage: "user",
+        allowedRoles: ["super-admin", "admin", "admissions-head"],
+        allowedUsers: [],
+        deniedUsers: [],
+        enabled: true,
+      },
+      {
+        sectionKey: "user_tasks_complete",
+        displayName: "Complete Task Records",
+        targetPage: "user",
+        allowedRoles: ["student-counsellor"],
+        allowedUsers: [],
+        deniedUsers: [],
+        enabled: true,
+      },
     ];
 
     for (const rule of defaultRules) {
       try {
-        await pb.collection("accessControl").getFirstListItem(`sectionKey = "${rule.sectionKey}"`);
+        await pb
+          .collection("accessControl")
+          .getFirstListItem(`sectionKey = "${rule.sectionKey}"`);
       } catch {
         await pb.collection("accessControl").create(rule);
       }

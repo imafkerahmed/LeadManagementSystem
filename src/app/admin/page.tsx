@@ -32,7 +32,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-type AdminTab = "dashboard" | "leads" | "tasks" | "bulk" | "reports" | "settings";
+type AdminTab =
+  | "dashboard"
+  | "leads"
+  | "tasks"
+  | "bulk"
+  | "reports"
+  | "settings";
 
 const tabs: Array<{
   id: AdminTab;
@@ -174,11 +180,15 @@ export default function AdminPage() {
   }, [router]);
 
   useEffect(() => {
-    if (!isRulesLoading && allowedTabs.length > 0 && !allowedTabs.includes(currentTab)) {
+    if (
+      !isRulesLoading &&
+      allowedTabs.length > 0 &&
+      !allowedTabs.includes(currentTab)
+    ) {
       const params = new URLSearchParams(window.location.search);
       let tabParam = params.get("tab");
       if (tabParam === "users") tabParam = "settings";
-      
+
       const validatedTab = tabParam as AdminTab | null;
       if (!validatedTab || !allowedTabs.includes(validatedTab)) {
         setCurrentTab(allowedTabs[0]);
@@ -212,9 +222,12 @@ export default function AdminPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#fafbfc] px-4 text-center">
         <Shield className="h-12 w-12 text-rose-500 mb-3 animate-pulse" />
-        <h3 className="font-bold text-slate-800 text-lg">Administrative Access Restricted</h3>
+        <h3 className="font-bold text-slate-800 text-lg">
+          Administrative Access Restricted
+        </h3>
         <p className="text-sm text-slate-400 mt-1 max-w-sm">
-          Your account does not have access permissions for any sections in the admin area. Please contact a super administrator.
+          Your account does not have access permissions for any sections in the
+          admin area. Please contact a super administrator.
         </p>
       </div>
     );
@@ -323,14 +336,23 @@ export default function AdminPage() {
                 : "max-w-5xl"
             }`}
           >
-            {currentTab === "dashboard" && allowedTabs.includes("dashboard") && <AdminDashboard />}
-            {currentTab === "leads" && allowedTabs.includes("leads") && <AdminLeads />}
-            {currentTab === "tasks" && allowedTabs.includes("tasks") && <AdminTasks />}
+            {currentTab === "dashboard" &&
+              allowedTabs.includes("dashboard") && <AdminDashboard />}
+            {currentTab === "leads" && allowedTabs.includes("leads") && (
+              <AdminLeads />
+            )}
+            {currentTab === "tasks" && allowedTabs.includes("tasks") && (
+              <AdminTasks />
+            )}
             {currentTab === "bulk" && allowedTabs.includes("bulk") && (
               <BulkUpload operatorId={adminId} operatorLabel={adminLabel} />
             )}
-            {currentTab === "reports" && allowedTabs.includes("reports") && <AdminReports />}
-            {currentTab === "settings" && allowedTabs.includes("settings") && <AdminSettings />}
+            {currentTab === "reports" && allowedTabs.includes("reports") && (
+              <AdminReports />
+            )}
+            {currentTab === "settings" && allowedTabs.includes("settings") && (
+              <AdminSettings />
+            )}
           </div>
         </main>
       </div>

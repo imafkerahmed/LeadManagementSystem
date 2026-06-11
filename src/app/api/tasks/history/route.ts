@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     }
 
     const pb = await getPocketBaseAdminClient();
-    
+
     let history = [];
     try {
       history = await pb.collection("taskHistory").getFullList({
@@ -30,7 +30,9 @@ export async function GET(request: NextRequest) {
     }
 
     const formatted = history.map((record) => {
-      const user = record.expand?.changedBy as { name?: string; email?: string } | undefined;
+      const user = record.expand?.changedBy as
+        | { name?: string; email?: string }
+        | undefined;
       return {
         id: record.id,
         timeStamp: record.timeStamp || record.created,

@@ -56,7 +56,9 @@ export async function GET() {
     }
 
     const tasks = records.map((record) => {
-      const assignee = record.expand?.assignedTo as { name?: string; email?: string } | undefined;
+      const assignee = record.expand?.assignedTo as
+        | { name?: string; email?: string }
+        | undefined;
       return {
         id: record.id,
         taskId: record.task_id || record.id,
@@ -110,7 +112,7 @@ export async function POST(request: NextRequest) {
     }
 
     const pb = await getPocketBaseAdminClient();
-    
+
     // Check if assignee exists
     try {
       await pb.collection("users").getOne(assignedTo);
@@ -179,7 +181,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Error creating task:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to create task" },
+      {
+        error: error instanceof Error ? error.message : "Failed to create task",
+      },
       { status: 500 },
     );
   }
@@ -213,16 +217,15 @@ export async function PATCH(request: NextRequest) {
     try {
       originalRecord = await pb.collection("tasks").getOne(taskId);
     } catch {
-      return NextResponse.json(
-        { error: "Task not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
     const updates: Record<string, unknown> = {};
     if (typeof body.title === "string") updates.title = body.title.trim();
-    if (typeof body.description === "string") updates.description = body.description.trim();
-    if (typeof body.assignedTo === "string") updates.assignedTo = body.assignedTo.trim();
+    if (typeof body.description === "string")
+      updates.description = body.description.trim();
+    if (typeof body.assignedTo === "string")
+      updates.assignedTo = body.assignedTo.trim();
     if (body.dueDate !== undefined) updates.dueDate = body.dueDate || null;
     if (typeof body.priority === "string") updates.priority = body.priority;
     if (typeof body.status === "string") updates.status = body.status;
@@ -252,17 +255,26 @@ export async function PATCH(request: NextRequest) {
             changedBy: adminId,
             oldValue: originalRecord.status,
             newValue: updates.status,
-          })
+          }),
         );
       }
 
-      if (updates.assignedTo && updates.assignedTo !== originalRecord.assignedTo) {
+      if (
+        updates.assignedTo &&
+        updates.assignedTo !== originalRecord.assignedTo
+      ) {
         let oldName = originalRecord.assignedTo;
         let newName = updates.assignedTo as string;
         try {
           const [oldUser, newUser] = await Promise.all([
-            pb.collection("users").getOne(originalRecord.assignedTo).catch(() => null),
-            pb.collection("users").getOne(updates.assignedTo as string).catch(() => null),
+            pb
+              .collection("users")
+              .getOne(originalRecord.assignedTo)
+              .catch(() => null),
+            pb
+              .collection("users")
+              .getOne(updates.assignedTo as string)
+              .catch(() => null),
           ]);
           if (oldUser) oldName = oldUser.name || oldUser.email || oldName;
           if (newUser) newName = newUser.name || newUser.email || newName;
@@ -276,7 +288,7 @@ export async function PATCH(request: NextRequest) {
             changedBy: adminId,
             oldValue: oldName,
             newValue: newName,
-          })
+          }),
         );
       }
 
@@ -289,13 +301,17 @@ export async function PATCH(request: NextRequest) {
             changedBy: adminId,
             oldValue: originalRecord.priority,
             newValue: updates.priority,
-          })
+          }),
         );
       }
 
       if (updates.dueDate !== undefined) {
-        const origDueDate = originalRecord.dueDate ? originalRecord.dueDate.split("T")[0] : "";
-        const nextDueDate = updates.dueDate ? (updates.dueDate as string).split("T")[0] : "";
+        const origDueDate = originalRecord.dueDate
+          ? originalRecord.dueDate.split("T")[0]
+          : "";
+        const nextDueDate = updates.dueDate
+          ? (updates.dueDate as string).split("T")[0]
+          : "";
         if (origDueDate !== nextDueDate) {
           historyPromises.push(
             pb.collection("taskHistory").create({
@@ -305,7 +321,7 @@ export async function PATCH(request: NextRequest) {
               changedBy: adminId,
               oldValue: origDueDate || "None",
               newValue: nextDueDate || "Cleared",
-            })
+            }),
           );
         }
       }
@@ -318,11 +334,14 @@ export async function PATCH(request: NextRequest) {
             eventType: "Task Details Updated",
             changedBy: adminId,
             comment: `Title updated from "${originalRecord.title}" to "${updates.title}"`,
-          })
+          }),
         );
       }
 
-      if (updates.description !== undefined && updates.description !== originalRecord.description) {
+      if (
+        updates.description !== undefined &&
+        updates.description !== originalRecord.description
+      ) {
         historyPromises.push(
           pb.collection("taskHistory").create({
             timeStamp: now,
@@ -330,11 +349,14 @@ export async function PATCH(request: NextRequest) {
             eventType: "Task Details Updated",
             changedBy: adminId,
             comment: "Task description updated",
-          })
+          }),
         );
       }
 
-      if (updates.notes !== undefined && updates.notes !== originalRecord.notes) {
+      if (
+        updates.notes !== undefined &&
+        updates.notes !== originalRecord.notes
+      ) {
         historyPromises.push(
           pb.collection("taskHistory").create({
             timeStamp: now,
@@ -342,7 +364,7 @@ export async function PATCH(request: NextRequest) {
             eventType: "Notes Added",
             changedBy: adminId,
             comment: updates.notes as string,
-          })
+          }),
         );
       }
 
@@ -359,7 +381,9 @@ export async function PATCH(request: NextRequest) {
   } catch (error) {
     console.error("Error updating task:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update task" },
+      {
+        error: error instanceof Error ? error.message : "Failed to update task",
+      },
       { status: 500 },
     );
   }
@@ -385,23 +409,30 @@ export async function DELETE(request: NextRequest) {
         filter: `taskId = "${id}"`,
       });
       await Promise.all(
-        historyRecords.map((r) => pb.collection("taskHistory").delete(r.id))
+        historyRecords.map((r) => pb.collection("taskHistory").delete(r.id)),
       );
     } catch (err: any) {
       if (err.status !== 404 && !err.message?.includes("not found")) {
-        console.error("Failed to clean up task history records during deletion:", err);
+        console.error(
+          "Failed to clean up task history records during deletion:",
+          err,
+        );
       }
     }
 
     await pb.collection("tasks").delete(id);
 
-    return NextResponse.json({ success: true, message: "Task deleted successfully" });
+    return NextResponse.json({
+      success: true,
+      message: "Task deleted successfully",
+    });
   } catch (error) {
     console.error("Error deleting task:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to delete task" },
+      {
+        error: error instanceof Error ? error.message : "Failed to delete task",
+      },
       { status: 500 },
     );
   }
 }
-

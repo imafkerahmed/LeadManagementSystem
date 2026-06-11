@@ -3,7 +3,6 @@ import {
   useState,
   useEffect,
   useCallback,
-  useSyncExternalStore,
   useRef,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -126,11 +125,6 @@ const PAGE_SIZE = 10;
 
 export default function CounselorPage() {
   const router = useRouter();
-  const isMounted = useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false,
-  );
   const pb = createPocketBaseClient();
   const [authChecked, setAuthChecked] = useState(false);
   const [authReady, setAuthReady] = useState(false);

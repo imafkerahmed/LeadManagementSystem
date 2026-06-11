@@ -123,10 +123,7 @@ export async function PATCH(request: NextRequest) {
     try {
       taskRecord = await pb.collection("tasks").getOne(taskId);
     } catch {
-      return NextResponse.json(
-        { error: "Task not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
     if (taskRecord.assignedTo !== userId) {
@@ -138,7 +135,12 @@ export async function PATCH(request: NextRequest) {
 
     const updates: Record<string, unknown> = {};
     if (typeof status === "string") {
-      if (status !== "Pending" && status !== "In-Progress" && status !== "Completed" && status !== "Cancelled") {
+      if (
+        status !== "Pending" &&
+        status !== "In-Progress" &&
+        status !== "Completed" &&
+        status !== "Cancelled"
+      ) {
         return NextResponse.json(
           { error: "Invalid status value" },
           { status: 400 },
@@ -173,7 +175,7 @@ export async function PATCH(request: NextRequest) {
           changedBy: userId,
           oldValue: taskRecord.status,
           newValue: updates.status as string,
-        })
+        }),
       );
     }
 
@@ -185,7 +187,7 @@ export async function PATCH(request: NextRequest) {
           eventType: "Notes Added",
           changedBy: userId,
           comment: updates.notes as string,
-        })
+        }),
       );
     }
 
@@ -201,7 +203,9 @@ export async function PATCH(request: NextRequest) {
   } catch (error) {
     console.error("Error updating staff task:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update task" },
+      {
+        error: error instanceof Error ? error.message : "Failed to update task",
+      },
       { status: 500 },
     );
   }
