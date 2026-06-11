@@ -396,23 +396,6 @@ export default function AdminTasks() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-6">
-      {/* Action buttons row */}
-      <div className="flex justify-end items-center gap-2 pb-4 border-b border-slate-100">
-        <button
-          onClick={openCreateForm}
-          className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 shadow-sm transition-all"
-        >
-          <Plus className="h-4 w-4" />
-          Create Task
-        </button>
-        <button
-          onClick={() => void loadData()}
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 shadow-sm transition-all"
-        >
-          Refresh
-        </button>
-      </div>
-
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm flex items-center justify-between">
@@ -450,6 +433,23 @@ export default function AdminTasks() {
           </div>
           <div className="p-3 bg-rose-50 text-rose-500 rounded-xl"><AlertCircle className="h-5 w-5" /></div>
         </div>
+      </div>
+
+      {/* Action buttons row */}
+      <div className="flex justify-end items-center gap-2">
+        <button
+          onClick={openCreateForm}
+          className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 shadow-sm transition-all"
+        >
+          <Plus className="h-4 w-4" />
+          Create Task
+        </button>
+        <button
+          onClick={() => void loadData()}
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 shadow-sm transition-all"
+        >
+          Refresh
+        </button>
       </div>
 
       {/* Filters */}
