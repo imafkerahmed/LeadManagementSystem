@@ -50,32 +50,27 @@ export default function AdminSettings() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Welcome/Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-3xl p-6 text-white shadow-md">
-        <h3 className="text-lg font-bold">Admin Settings Console</h3>
-        <p className="text-xs text-blue-100 mt-1 max-w-xl">
-          Manage system administrators, counselor accounts, security configurations, and feature permissions for Amazon College Lead Management.
-        </p>
-      </div>
-
       {/* Menu Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* User Card */}
         <div
           onClick={() => setCurrentView("users")}
-          className="group relative bg-white border border-slate-100 rounded-3xl p-6 shadow-sm hover:shadow-md hover:border-blue-100 transition-all duration-300 cursor-pointer flex flex-col gap-4"
+          className="group relative overflow-hidden bg-white border border-blue-100/30 rounded-2xl p-6 shadow-sm hover:shadow-md hover:scale-[1.01] hover:border-blue-100 transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[160px]"
         >
-          <div className="absolute top-0 left-0 bottom-0 w-[4px] bg-blue-600 rounded-l-3xl group-hover:w-[6px] transition-all" />
-          <div className="flex items-start justify-between">
-            <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
-              <Users className="h-6 w-6" />
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-transparent rounded-bl-full pointer-events-none opacity-50 transition-opacity group-hover:opacity-80 duration-500" />
+          <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-blue-500" />
+          
+          <div className="flex items-start justify-between relative z-10">
+            <div className="p-3 bg-blue-50 text-blue-600 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
+              <Users className="h-5 w-5" />
             </div>
-            <span className="text-[10px] font-bold text-blue-600 bg-blue-50/50 px-2 py-0.5 rounded-full uppercase tracking-wider">
+            <span className="text-[9px] font-bold text-blue-600 bg-blue-50/50 px-2 py-0.5 rounded-full uppercase tracking-wider">
               Management
             </span>
           </div>
-          <div>
-            <h4 className="text-base font-bold text-slate-800 group-hover:text-blue-600 transition-colors">Users</h4>
+          
+          <div className="relative z-10 mt-4">
+            <h4 className="text-sm font-bold text-slate-800 group-hover:text-blue-600 transition-colors">User</h4>
             <p className="text-xs text-slate-400 mt-1 leading-relaxed">
               Create, edit, reset passwords, and disable system operators. Manage individual leads and tasks credentials.
             </p>
@@ -85,19 +80,22 @@ export default function AdminSettings() {
         {/* Access Control Card */}
         <div
           onClick={() => setCurrentView("access_control")}
-          className="group relative bg-white border border-slate-100 rounded-3xl p-6 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all duration-300 cursor-pointer flex flex-col gap-4"
+          className="group relative overflow-hidden bg-white border border-indigo-100/30 rounded-2xl p-6 shadow-sm hover:shadow-md hover:scale-[1.01] hover:border-indigo-100 transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[160px]"
         >
-          <div className="absolute top-0 left-0 bottom-0 w-[4px] bg-indigo-600 rounded-l-3xl group-hover:w-[6px] transition-all" />
-          <div className="flex items-start justify-between">
-            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
-              <Shield className="h-6 w-6" />
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-transparent rounded-bl-full pointer-events-none opacity-50 transition-opacity group-hover:opacity-80 duration-500" />
+          <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-indigo-500" />
+          
+          <div className="flex items-start justify-between relative z-10">
+            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
+              <Shield className="h-5 w-5" />
             </div>
-            <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50/50 px-2 py-0.5 rounded-full uppercase tracking-wider">
+            <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50/50 px-2 py-0.5 rounded-full uppercase tracking-wider">
               Security
             </span>
           </div>
-          <div>
-            <h4 className="text-base font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">Access Control</h4>
+          
+          <div className="relative z-10 mt-4">
+            <h4 className="text-sm font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">Access Control</h4>
             <p className="text-xs text-slate-400 mt-1 leading-relaxed">
               View permission mapping matrix and manage active role access levels. Configure global security policies.
             </p>
@@ -127,7 +125,7 @@ function AccessControlPanel() {
   return (
     <div className="space-y-6">
       {/* Section 1: Role Permissions Matrix */}
-      <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm space-y-4">
+      <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm space-y-4">
         <div>
           <h4 className="font-bold text-slate-800 flex items-center gap-2">
             <Shield className="h-5 w-5 text-indigo-600" />
@@ -185,7 +183,7 @@ function AccessControlPanel() {
       </div>
 
       {/* Section 2: Global Security Policies */}
-      <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm space-y-4">
+      <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm space-y-4">
         <div>
           <h4 className="font-bold text-slate-800 flex items-center gap-2">
             <Lock className="h-5 w-5 text-indigo-600" />
