@@ -396,34 +396,21 @@ export default function AdminTasks() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-6">
-      {/* Header section */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-100">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-blue-50 rounded-xl text-blue-600">
-            <ListTodo className="h-6 w-6" />
-          </div>
-          <div>
-            <h3 className="text-xl font-bold text-slate-800">Task Management</h3>
-            <p className="text-sm text-slate-400">
-              Create, monitor, and assign tasks to system staff
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={openCreateForm}
-            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 shadow-sm transition-all"
-          >
-            <Plus className="h-4 w-4" />
-            Create Task
-          </button>
-          <button
-            onClick={() => void loadData()}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 shadow-sm transition-all"
-          >
-            Refresh
-          </button>
-        </div>
+      {/* Action buttons row */}
+      <div className="flex justify-end items-center gap-2 pb-4 border-b border-slate-100">
+        <button
+          onClick={openCreateForm}
+          className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 shadow-sm transition-all"
+        >
+          <Plus className="h-4 w-4" />
+          Create Task
+        </button>
+        <button
+          onClick={() => void loadData()}
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 shadow-sm transition-all"
+        >
+          Refresh
+        </button>
       </div>
 
       {/* KPI Cards */}
