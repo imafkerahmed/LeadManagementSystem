@@ -435,23 +435,6 @@ export default function AdminTasks() {
         </div>
       </div>
 
-      {/* Action buttons row */}
-      <div className="flex justify-end items-center gap-2">
-        <button
-          onClick={openCreateForm}
-          className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 shadow-sm transition-all"
-        >
-          <Plus className="h-4 w-4" />
-          Create Task
-        </button>
-        <button
-          onClick={() => void loadData()}
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 shadow-sm transition-all"
-        >
-          Refresh
-        </button>
-      </div>
-
       {/* Filters */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
         <div className="md:col-span-1 space-y-1.5">
@@ -506,6 +489,23 @@ export default function AdminTasks() {
             <option value="High">High</option>
           </select>
         </div>
+      </div>
+
+      {/* Action buttons row */}
+      <div className="flex justify-end items-center gap-2">
+        <button
+          onClick={openCreateForm}
+          className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 shadow-sm transition-all"
+        >
+          <Plus className="h-4 w-4" />
+          Create Task
+        </button>
+        <button
+          onClick={() => void loadData()}
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 shadow-sm transition-all"
+        >
+          Refresh
+        </button>
       </div>
 
       {/* Add/Edit Task Form Modal */}
