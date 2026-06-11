@@ -13,6 +13,8 @@ import {
   Calendar,
   User,
   ListTodo,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Task, TaskStatus, TaskPriority, User as SystemUser } from "@/types";
 import { createPocketBaseClient } from "@/lib/pocketbase";
@@ -40,6 +42,15 @@ export default function AdminTasks() {
   const [assigneeFilter, setAssigneeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
+
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Reset to first page when search filters change
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, assigneeFilter, statusFilter, priorityFilter]);
 
   // Form state
   const [title, setTitle] = useState("");
@@ -297,6 +308,22 @@ export default function AdminTasks() {
       return matchesSearch && matchesAssignee && matchesPriority && matchesStatus;
     });
   }, [tasks, searchTerm, assigneeFilter, statusFilter, priorityFilter]);
+
+  const totalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(filteredTasks.length / pageSize));
+  }, [filteredTasks.length, pageSize]);
+
+  // Adjust page number if it exceeds total pages
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
+  const paginatedTasks = useMemo(() => {
+    const startIndex = (page - 1) * pageSize;
+    return filteredTasks.slice(startIndex, startIndex + pageSize);
+  }, [filteredTasks, page, pageSize]);
 
   const getStatusColor = (status: TaskStatus, dueDateStr?: string) => {
     if (status === "Completed") return "bg-emerald-50 text-emerald-700 border-emerald-100";
@@ -648,12 +675,12 @@ export default function AdminTasks() {
                 </tr>
               ) : filteredTasks.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-8 text-center text-slate-400" colSpan={6}>
+                  <td className="px-4 py-8 text-center text-slate-400 font-medium" colSpan={6}>
                     No tasks found matching current filters.
                   </td>
                 </tr>
               ) : (
-                filteredTasks.map((t) => {
+                paginatedTasks.map((t) => {
                   const isOverdue =
                     t.status !== "Completed" &&
                     t.dueDate &&
@@ -714,6 +741,84 @@ export default function AdminTasks() {
           </table>
         </div>
       </div>
+
+      {/* Pagination */}
+      {filteredTasks.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-100 pt-4">
+          <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600">
+            <span>
+              Page {page} of {totalPages} ({filteredTasks.length} tasks)
+            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Show:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer font-semibold shadow-sm"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="inline-flex items-center gap-1 px-3 py-2 border border-slate-200 bg-white rounded-xl text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-all font-semibold shadow-sm text-sm"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Prev
+            </button>
+
+            <div className="inline-flex items-center gap-1">
+              {Array.from({ length: totalPages }).map((_, idx) => {
+                const p = idx + 1;
+                if (
+                  p === 1 ||
+                  p === totalPages ||
+                  (p >= page - 2 && p <= page + 2)
+                ) {
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p)}
+                      className={`px-3 py-1 rounded-lg border text-xs font-bold transition-all ${
+                        p === page
+                          ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  );
+                }
+
+                const isBefore = p < page - 2 && p > 1;
+                const isAfter = p > page + 2 && p < totalPages;
+                if (isBefore && idx === 1) return <span key={`e-${p}`} className="text-slate-400 px-1">...</span>;
+                if (isAfter && idx === totalPages - 2)
+                  return <span key={`e2-${p}`} className="text-slate-400 px-1">...</span>;
+                return null;
+              })}
+            </div>
+
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="inline-flex items-center gap-1 px-3 py-2 border border-slate-200 bg-white rounded-xl text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-all font-semibold shadow-sm text-sm"
+            >
+              Next
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Task Details Dialog Modal */}
       {viewTask && (
