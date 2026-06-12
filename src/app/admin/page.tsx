@@ -370,16 +370,7 @@ export default function AdminPage() {
         </header>
 
         <main className="flex-1 overflow-y-auto px-8 py-8 bg-[#fafbfc]">
-          <div
-            className={`mx-auto transition-all duration-300 ${
-              currentTab === "leads" ||
-              currentTab === "tasks" ||
-              currentTab === "reports" ||
-              currentTab === "dashboard"
-                ? "max-w-7xl"
-                : "max-w-5xl"
-            }`}
-          >
+          <div className="mx-auto transition-all duration-300 max-w-7xl">
             {currentTab === "dashboard" &&
               allowedTabs.includes("dashboard") && <AdminDashboard />}
             {currentTab === "leads" && allowedTabs.includes("leads") && (
