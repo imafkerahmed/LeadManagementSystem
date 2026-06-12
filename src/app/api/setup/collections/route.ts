@@ -1,9 +1,39 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getPocketBaseAdminClient } from "@/lib/pocketbase";
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
     const pb = await getPocketBaseAdminClient();
+
+    // Secure the setup route in production once initialized
+    const isDev = process.env.NODE_ENV === "development";
+    const setupKeyHeader = request.headers.get("x-setup-key") || "";
+    const expectedSetupKey = process.env.SETUP_SECRET_TOKEN || "";
+    
+    let hasExistingUsers = false;
+    try {
+      const usersList = await pb.collection("users").getList(1, 1);
+      if (usersList.totalItems > 0) {
+        hasExistingUsers = true;
+      }
+    } catch {
+      // Collection does not exist yet
+    }
+
+    const isAuthorized = 
+      isDev || 
+      (!hasExistingUsers) || 
+      (expectedSetupKey && setupKeyHeader === expectedSetupKey);
+
+    if (!isAuthorized) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: "Forbidden: Setup collections cannot be run. Initial setup is already completed and environment is not in development mode." 
+        },
+        { status: 403 }
+      );
+    }
 
     // Setting up PocketBase collections...
 

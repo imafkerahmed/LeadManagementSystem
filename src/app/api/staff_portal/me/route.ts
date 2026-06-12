@@ -3,12 +3,11 @@ import { getPocketBaseAdminClient } from "@/lib/pocketbase";
 
 export async function GET(request: Request) {
   try {
-    // Get userId from query params (passed from client)
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
+    // Get userId from verified middleware header
+    const userId = request.headers.get("x-user-id");
 
     if (!userId) {
-      return NextResponse.json({ error: "userId required" }, { status: 400 });
+      return NextResponse.json({ error: "userId required (must be authenticated)" }, { status: 401 });
     }
 
     const pb = await getPocketBaseAdminClient();

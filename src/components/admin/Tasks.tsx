@@ -719,108 +719,206 @@ export default function AdminTasks() {
 
       {/* Task Table */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
-        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-auto">
-          <table className="w-full min-w-[800px] text-sm border-separate border-spacing-0">
-            <thead className="sticky top-0 z-10 bg-slate-50">
-              <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100">
-                <th className="px-4 py-3 font-semibold rounded-l-2xl">Task</th>
-                <th className="px-4 py-3 font-semibold">Assignee</th>
-                <th className="px-4 py-3 font-semibold">Due Date</th>
-                <th className="px-4 py-3 font-semibold">Priority</th>
-                <th className="px-4 py-3 font-semibold">Status</th>
-                <th className="px-4 py-3 font-semibold text-right rounded-r-2xl">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {isLoading ? (
-                <tr>
-                  <td className="px-4 py-8 text-center text-slate-400 font-medium" colSpan={6}>
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-500 border-t-transparent" />
-                      Loading tasks database...
-                    </div>
-                  </td>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full min-w-[800px] text-sm border-separate border-spacing-0">
+              <thead className="sticky top-0 z-10 bg-slate-50">
+                <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100">
+                  <th className="px-4 py-3 font-semibold rounded-l-2xl">Task</th>
+                  <th className="px-4 py-3 font-semibold">Assignee</th>
+                  <th className="px-4 py-3 font-semibold">Due Date</th>
+                  <th className="px-4 py-3 font-semibold">Priority</th>
+                  <th className="px-4 py-3 font-semibold">Status</th>
+                  <th className="px-4 py-3 font-semibold text-right rounded-r-2xl">Actions</th>
                 </tr>
-              ) : filteredTasks.length === 0 ? (
-                <tr>
-                  <td className="px-4 py-8 text-center text-slate-400 font-medium" colSpan={6}>
-                    No tasks found matching current filters.
-                  </td>
-                </tr>
-              ) : (
-                paginatedTasks.map((t) => {
-                  const isOverdue =
-                    t.status !== "Completed" &&
-                    t.dueDate &&
-                    new Date(t.dueDate).setHours(0, 0, 0, 0) < new Date().setHours(0, 0, 0, 0);
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {isLoading ? (
+                  <tr>
+                    <td className="px-4 py-8 text-center text-slate-400 font-medium" colSpan={6}>
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-500 border-t-transparent" />
+                        Loading tasks database...
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredTasks.length === 0 ? (
+                  <tr>
+                    <td className="px-4 py-8 text-center text-slate-400 font-medium" colSpan={6}>
+                      No tasks found matching current filters.
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedTasks.map((t) => {
+                    const isOverdue =
+                      t.status !== "Completed" &&
+                      t.dueDate &&
+                      new Date(t.dueDate).setHours(0, 0, 0, 0) < new Date().setHours(0, 0, 0, 0);
 
-                  return (
-                    <tr
-                      key={t.id}
-                      className="hover:bg-slate-50/30 transition-colors duration-200 cursor-pointer"
-                      onClick={() => setViewTask(t)}
-                    >
-                      <td className="px-4 py-3 max-w-[280px]">
-                        <div className="text-[10px] font-mono text-slate-400">{t.taskId}</div>
-                        <div className="font-semibold text-slate-800 truncate">{t.title}</div>
-                        <div className="text-xs text-slate-400 mt-0.5 truncate">{t.description || "No description"}</div>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600 font-medium">{t.assignedToName}</td>
-                      <td className="px-4 py-3 text-slate-500">
-                        <div className="flex items-center gap-1.5">
-                          <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                          <span className={isOverdue ? "text-rose-600 font-semibold" : ""}>
-                            {formatDate(t.dueDate)}
+                    return (
+                      <tr
+                        key={t.id}
+                        className="hover:bg-slate-50/30 transition-colors duration-200 cursor-pointer"
+                        onClick={() => setViewTask(t)}
+                      >
+                        <td className="px-4 py-3 max-w-[280px]">
+                          <div className="text-[10px] font-mono text-slate-400">{t.taskId}</div>
+                          <div className="font-semibold text-slate-800 truncate">{t.title}</div>
+                          <div className="text-xs text-slate-400 mt-0.5 truncate">{t.description || "No description"}</div>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600 font-medium">{t.assignedToName}</td>
+                        <td className="px-4 py-3 text-slate-500">
+                          <div className="flex items-center gap-1.5">
+                            <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                            <span className={isOverdue ? "text-rose-600 font-semibold" : ""}>
+                              {formatDate(t.dueDate)}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${getPriorityColor(t.priority)}`}>
+                            {t.priority}
                           </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${getPriorityColor(t.priority)}`}>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${getStatusColor(t.status, t.dueDate)}`}>
+                            {isOverdue ? "Overdue" : t.status === "In-Progress" ? "In Progress" : t.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => {
+                              if (canEditTasks) {
+                                openEditForm(t);
+                              } else {
+                                toast.error("You do not have permission to edit tasks.");
+                              }
+                            }}
+                            className={`rounded-lg border border-slate-200 bg-white hover:bg-slate-50 p-1.5 text-slate-600 shadow-sm transition-all ${
+                              !canEditTasks ? "opacity-60 cursor-not-allowed border-slate-100" : ""
+                            }`}
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (canDeleteTasks) {
+                                setDeleteTaskId(t.id);
+                                setDeleteDialogOpen(true);
+                              } else {
+                                toast.error("You do not have permission to delete tasks.");
+                              }
+                            }}
+                            className={`ml-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 p-1.5 text-rose-600 shadow-sm transition-all ${
+                              !canDeleteTasks ? "opacity-60 cursor-not-allowed text-rose-400 border-slate-100" : ""
+                            }`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Card List View */}
+          <div className="md:hidden space-y-3 p-4">
+            {isLoading ? (
+              <div className="flex items-center justify-center gap-2 py-8 text-slate-400 font-medium">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-500 border-t-transparent" />
+                Loading tasks database...
+              </div>
+            ) : filteredTasks.length === 0 ? (
+              <div className="text-center text-slate-400 font-medium py-8">
+                No tasks found matching current filters.
+              </div>
+            ) : (
+              paginatedTasks.map((t) => {
+                const isOverdue =
+                  t.status !== "Completed" &&
+                  t.dueDate &&
+                  new Date(t.dueDate).setHours(0, 0, 0, 0) < new Date().setHours(0, 0, 0, 0);
+
+                return (
+                  <div key={t.id} className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-xs font-semibold text-slate-500">
+                        {t.taskId}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold border ${getPriorityColor(t.priority)}`}>
                           {t.priority}
                         </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${getStatusColor(t.status, t.dueDate)}`}>
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold border ${getStatusColor(t.status, t.dueDate)}`}>
                           {isOverdue ? "Overdue" : t.status === "In-Progress" ? "In Progress" : t.status}
                         </span>
-                      </td>
-                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => {
-                            if (canEditTasks) {
-                              openEditForm(t);
-                            } else {
-                              toast.error("You do not have permission to edit tasks.");
-                            }
-                          }}
-                          className={`rounded-lg border border-slate-200 bg-white hover:bg-slate-50 p-1.5 text-slate-600 shadow-sm transition-all ${
-                            !canEditTasks ? "opacity-60 cursor-not-allowed border-slate-100" : ""
-                          }`}
-                        >
-                          <Edit className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (canDeleteTasks) {
-                              setDeleteTaskId(t.id);
-                              setDeleteDialogOpen(true);
-                            } else {
-                              toast.error("You do not have permission to delete tasks.");
-                            }
-                          }}
-                          className={`ml-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 p-1.5 text-rose-600 shadow-sm transition-all ${
-                            !canDeleteTasks ? "opacity-60 cursor-not-allowed text-rose-400 border-slate-100" : ""
-                          }`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="text-sm font-extrabold text-slate-800">{t.title}</h4>
+                      {t.description && (
+                        <p className="text-xs text-slate-400 mt-1 line-clamp-2">{t.description}</p>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs border-t border-slate-50 pt-3">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Assignee</span>
+                        <span className="text-slate-600 font-medium">{t.assignedToName || "Unassigned"}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Due Date</span>
+                        <span className="text-slate-600 font-medium">{formatDate(t.dueDate)}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 border-t border-slate-50 pt-3 mt-1">
+                      <button
+                        onClick={() => setViewTask(t)}
+                        className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2 text-xs font-bold text-slate-600 shadow-sm transition-all cursor-pointer"
+                      >
+                        View Activity
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (canEditTasks) {
+                            openEditForm(t);
+                          } else {
+                            toast.error("You do not have permission to edit tasks.");
+                          }
+                        }}
+                        className={`rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2 text-xs font-bold text-slate-600 shadow-sm transition-all ${
+                          !canEditTasks ? "opacity-60 cursor-not-allowed" : ""
+                        }`}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (canDeleteTasks) {
+                            setDeleteTaskId(t.id);
+                            setDeleteDialogOpen(true);
+                          } else {
+                            toast.error("You do not have permission to delete tasks.");
+                          }
+                        }}
+                        className={`rounded-xl border border-rose-100 bg-rose-50/50 hover:bg-rose-50 px-4 py-2 text-xs font-bold text-rose-600 shadow-sm transition-all ${
+                          !canDeleteTasks ? "opacity-60 cursor-not-allowed" : ""
+                        }`}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
       </div>
 

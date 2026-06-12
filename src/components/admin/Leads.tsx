@@ -1854,94 +1854,151 @@ export default function AdminLeads() {
             </div>
           </div>
         ) : (
-          <div className="max-h-[calc(100vh-320px)] overflow-y-auto overflow-x-auto scrollbar-thin">
-            <table className="w-full table-fixed min-w-[900px]">
-              <thead className="sticky top-0 z-10 bg-gray-50">
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                    ID
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                    Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                    Mobile
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                    Course
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                    Next Follow-up
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                    Assigned To
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                    Action
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleLeads.map((lead) => (
-                  <tr
-                    key={lead.id}
-                    className="border-b border-gray-100 hover:bg-gray-50 transition"
-                  >
-                    <td className="px-6 py-3 text-sm font-mono text-gray-600">
+          <div className="max-h-[calc(100vh-320px)] overflow-y-auto">
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-100 bg-white">
+              <table className="w-full table-fixed min-w-[900px]">
+                <thead className="sticky top-0 z-10 bg-gray-50">
+                  <tr className="border-b border-gray-200 bg-gray-50">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                      ID
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                      Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                      Mobile
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                      Course
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                      Next Follow-up
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                      Assigned To
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                      Action
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleLeads.map((lead) => (
+                    <tr
+                      key={lead.id}
+                      className="border-b border-gray-100 hover:bg-gray-50 transition"
+                    >
+                      <td className="px-6 py-3 text-sm font-mono text-gray-600">
+                        {lead.leadId}
+                      </td>
+                      <td className="px-6 py-3 text-sm font-medium text-gray-900">
+                        {lead.studentName}
+                      </td>
+                      <td className="px-6 py-3 text-sm text-gray-600">
+                        {lead.mobileWithCountry ||
+                          `${lead.countryCode || "+94"}${lead.mobile}`}
+                      </td>
+                      <td className="px-6 py-3 text-sm text-gray-600">
+                        {lead.course}
+                      </td>
+                      <td className="px-6 py-3 text-sm">
+                        {(() => {
+                          const nf = getNextFollowup(lead);
+                          if (!nf || !nf.date)
+                            return (
+                              <span className="text-sm text-gray-400">-</span>
+                            );
+                          const status = getFollowupStatus(nf.date, nf.completed);
+                          return (
+                            <span
+                              className={`inline-block px-2 py-1 rounded text-xs font-medium ${getFollowupStatusColor(status)}`}
+                            >
+                              {formatFollowupDateOnly(nf.date)}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-6 py-3">
+                        <span
+                          className={`inline-block px-2 py-1 rounded text-xs font-medium ${statusColors[lead.status]}`}
+                        >
+                          {lead.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3 text-sm text-gray-600">
+                        {lead.assignedTo}
+                      </td>
+                      <td className="px-6 py-3 text-sm">
+                        <button
+                          onClick={() => openSidebarFor(lead, "view")}
+                          className="text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card List View */}
+            <div className="md:hidden space-y-3 p-1">
+              {visibleLeads.map((lead) => (
+                <div key={lead.id} className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs font-semibold text-slate-500">
                       {lead.leadId}
-                    </td>
-                    <td className="px-6 py-3 text-sm font-medium text-gray-900">
-                      {lead.studentName}
-                    </td>
-                    <td className="px-6 py-3 text-sm text-gray-600">
-                      {lead.mobileWithCountry ||
-                        `${lead.countryCode || "+94"}${lead.mobile}`}
-                    </td>
-                    <td className="px-6 py-3 text-sm text-gray-600">
-                      {lead.course}
-                    </td>
-                    <td className="px-6 py-3 text-sm">
+                    </span>
+                    <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${statusColors[lead.status]}`}>
+                      {lead.status}
+                    </span>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-sm font-extrabold text-slate-800">{lead.studentName}</h4>
+                    <p className="text-xs text-slate-400 mt-0.5">{lead.course}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs border-t border-slate-50 pt-2.5">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Mobile</span>
+                      <span className="text-slate-600 font-medium">{lead.mobileWithCountry || `${lead.countryCode || "+94"}${lead.mobile}`}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Assigned To</span>
+                      <span className="text-slate-600 font-medium">{lead.assignedTo}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between border-t border-slate-50 pt-2.5 mt-0.5">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Next Follow-up</span>
                       {(() => {
                         const nf = getNextFollowup(lead);
-                        if (!nf || !nf.date)
-                          return (
-                            <span className="text-sm text-gray-400">-</span>
-                          );
+                        if (!nf || !nf.date) return <span className="text-slate-400 font-medium">—</span>;
                         const status = getFollowupStatus(nf.date, nf.completed);
                         return (
-                          <span
-                            className={`inline-block px-2 py-1 rounded text-xs font-medium ${getFollowupStatusColor(status)}`}
-                          >
+                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${getFollowupStatusColor(status)}`}>
                             {formatFollowupDateOnly(nf.date)}
                           </span>
                         );
                       })()}
-                    </td>
-                    <td className="px-6 py-3">
-                      <span
-                        className={`inline-block px-2 py-1 rounded text-xs font-medium ${statusColors[lead.status]}`}
-                      >
-                        {lead.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3 text-sm text-gray-600">
-                      {lead.assignedTo}
-                    </td>
-                    <td className="px-6 py-3 text-sm">
-                      <button
-                        onClick={() => openSidebarFor(lead, "view")}
-                        className="text-blue-600 hover:text-blue-800 font-medium"
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                    <button
+                      onClick={() => openSidebarFor(lead, "view")}
+                      className="rounded-xl bg-slate-900 hover:bg-slate-800 px-4 py-2 text-xs font-bold text-white shadow-sm transition-all cursor-pointer"
+                    >
+                      View Details
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
