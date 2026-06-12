@@ -110,6 +110,111 @@ export async function POST() {
       });
     }
 
+    // Secure existing Leads, LeadHistory, Tasks, and TaskHistory collections' API rules if they already exist
+    try {
+      const leadsCol = await pb.collections.getOne("leads");
+      const targetLeadsListRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin" || @request.auth.role = "marketing-manager" || @request.auth.role = "admissions-head" || (assignedTo = @request.auth.id && @request.auth.role = "student-counsellor")';
+      const targetLeadsViewRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin" || @request.auth.role = "marketing-manager" || @request.auth.role = "admissions-head" || (assignedTo = @request.auth.id && @request.auth.role = "student-counsellor")';
+      const targetLeadsCreateRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin" || @request.auth.role = "student-counsellor" || @request.auth.role = "marketing-manager" || @request.auth.role = "admissions-head"';
+      const targetLeadsUpdateRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin" || @request.auth.role = "marketing-manager" || @request.auth.role = "admissions-head" || (assignedTo = @request.auth.id && @request.auth.role = "student-counsellor")';
+      const targetLeadsDeleteRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin"';
+
+      if (
+        leadsCol.listRule !== targetLeadsListRule ||
+        leadsCol.viewRule !== targetLeadsViewRule ||
+        leadsCol.createRule !== targetLeadsCreateRule ||
+        leadsCol.updateRule !== targetLeadsUpdateRule ||
+        leadsCol.deleteRule !== targetLeadsDeleteRule
+      ) {
+        leadsCol.listRule = targetLeadsListRule;
+        leadsCol.viewRule = targetLeadsViewRule;
+        leadsCol.createRule = targetLeadsCreateRule;
+        leadsCol.updateRule = targetLeadsUpdateRule;
+        leadsCol.deleteRule = targetLeadsDeleteRule;
+        await pb.collections.update("leads", leadsCol);
+      }
+    } catch (err) {
+      console.error("Failed to secure leads collection rules:", err);
+    }
+
+    try {
+      const historyCol = await pb.collections.getOne("leadHistory");
+      const targetHistoryListRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin" || @request.auth.role = "marketing-manager" || @request.auth.role = "admissions-head" || changedBy = @request.auth.id || leadId.assignedTo = @request.auth.id';
+      const targetHistoryViewRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin" || @request.auth.role = "marketing-manager" || @request.auth.role = "admissions-head" || changedBy = @request.auth.id || leadId.assignedTo = @request.auth.id';
+      const targetHistoryCreateRule = '@request.auth.id != ""';
+      const targetHistoryUpdateRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin"';
+      const targetHistoryDeleteRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin"';
+
+      if (
+        historyCol.listRule !== targetHistoryListRule ||
+        historyCol.viewRule !== targetHistoryViewRule ||
+        historyCol.createRule !== targetHistoryCreateRule ||
+        historyCol.updateRule !== targetHistoryUpdateRule ||
+        historyCol.deleteRule !== targetHistoryDeleteRule
+      ) {
+        historyCol.listRule = targetHistoryListRule;
+        historyCol.viewRule = targetHistoryViewRule;
+        historyCol.createRule = targetHistoryCreateRule;
+        historyCol.updateRule = targetHistoryUpdateRule;
+        historyCol.deleteRule = targetHistoryDeleteRule;
+        await pb.collections.update("leadHistory", historyCol);
+      }
+    } catch (err) {
+      console.error("Failed to secure leadHistory collection rules:", err);
+    }
+
+    try {
+      const tasksCol = await pb.collections.getOne("tasks");
+      const targetTasksListRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin" || @request.auth.role = "marketing-manager" || @request.auth.role = "admissions-head" || assignedTo = @request.auth.id';
+      const targetTasksViewRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin" || @request.auth.role = "marketing-manager" || @request.auth.role = "admissions-head" || assignedTo = @request.auth.id';
+      const targetTasksCreateRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin" || @request.auth.role = "admissions-head"';
+      const targetTasksUpdateRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin" || @request.auth.role = "admissions-head" || assignedTo = @request.auth.id';
+      const targetTasksDeleteRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin"';
+
+      if (
+        tasksCol.listRule !== targetTasksListRule ||
+        tasksCol.viewRule !== targetTasksViewRule ||
+        tasksCol.createRule !== targetTasksCreateRule ||
+        tasksCol.updateRule !== targetTasksUpdateRule ||
+        tasksCol.deleteRule !== targetTasksDeleteRule
+      ) {
+        tasksCol.listRule = targetTasksListRule;
+        tasksCol.viewRule = targetTasksViewRule;
+        tasksCol.createRule = targetTasksCreateRule;
+        tasksCol.updateRule = targetTasksUpdateRule;
+        tasksCol.deleteRule = targetTasksDeleteRule;
+        await pb.collections.update("tasks", tasksCol);
+      }
+    } catch (err) {
+      console.error("Failed to secure tasks collection rules:", err);
+    }
+
+    try {
+      const taskHistoryCol = await pb.collections.getOne("taskHistory");
+      const targetTaskHistoryListRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin" || @request.auth.role = "marketing-manager" || @request.auth.role = "admissions-head" || changedBy = @request.auth.id || taskId.assignedTo = @request.auth.id';
+      const targetTaskHistoryViewRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin" || @request.auth.role = "marketing-manager" || @request.auth.role = "admissions-head" || changedBy = @request.auth.id || taskId.assignedTo = @request.auth.id';
+      const targetTaskHistoryCreateRule = '@request.auth.id != ""';
+      const targetTaskHistoryUpdateRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin"';
+      const targetTaskHistoryDeleteRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin"';
+
+      if (
+        taskHistoryCol.listRule !== targetTaskHistoryListRule ||
+        taskHistoryCol.viewRule !== targetTaskHistoryViewRule ||
+        taskHistoryCol.createRule !== targetTaskHistoryCreateRule ||
+        taskHistoryCol.updateRule !== targetTaskHistoryUpdateRule ||
+        taskHistoryCol.deleteRule !== targetTaskHistoryDeleteRule
+      ) {
+        taskHistoryCol.listRule = targetTaskHistoryListRule;
+        taskHistoryCol.viewRule = targetTaskHistoryViewRule;
+        taskHistoryCol.createRule = targetTaskHistoryCreateRule;
+        taskHistoryCol.updateRule = targetTaskHistoryUpdateRule;
+        taskHistoryCol.deleteRule = targetTaskHistoryDeleteRule;
+        await pb.collections.update("taskHistory", taskHistoryCol);
+      }
+    } catch (err) {
+      console.error("Failed to secure taskHistory collection rules:", err);
+    }
+
     // 2. Create Leads collection
     try {
       await pb.collections.getOne("leads");

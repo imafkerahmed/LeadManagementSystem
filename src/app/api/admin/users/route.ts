@@ -113,38 +113,31 @@ async function listManagedUsers() {
     })) as ManagedUserRecord[];
   }
 
-  const enriched: Array<{
-    id: string;
-    name: string;
-    email: string;
-    role: string;
-    accountStatus: string;
-    assignedLeadCount: number;
-  }> = [];
+  // Fetch lead counts in parallel to avoid sequential network roundtrips
+  const enriched = await Promise.all(
+    users.map(async (user) => {
+      let count = 0;
+      try {
+        const leadCounts = (await pb.collection("leads").getList(1, 1, {
+          filter: userAssignmentFilter(user),
+          requestKey: null,
+        })) as LeadListResult;
+        count = leadCounts.totalItems || 0;
+      } catch (err) {
+        console.error(`Failed to fetch lead count for user ${user.id}:`, err);
+        count = 0;
+      }
 
-  // Fetch lead counts sequentially to avoid SDK auto-cancellation from many
-  // parallel requests (PocketBase JS SDK may abort concurrent calls).
-  for (const user of users) {
-    let count = 0;
-    try {
-      const leadCounts = (await pb.collection("leads").getList(1, 1, {
-        filter: userAssignmentFilter(user),
-      })) as LeadListResult;
-      count = leadCounts.totalItems || 0;
-    } catch (err) {
-      console.error(`Failed to fetch lead count for user ${user.id}:`, err);
-      count = 0;
-    }
-
-    enriched.push({
-      id: user.id,
-      name: user.name || user.username || user.email || user.id,
-      email: user.email || "",
-      role: normalizeRole(user.role),
-      accountStatus: normalizeStatus(user.accountStatus),
-      assignedLeadCount: count,
-    });
-  }
+      return {
+        id: user.id,
+        name: user.name || user.username || user.email || user.id,
+        email: user.email || "",
+        role: normalizeRole(user.role),
+        accountStatus: normalizeStatus(user.accountStatus),
+        assignedLeadCount: count,
+      };
+    })
+  );
 
   return enriched;
 }

@@ -16,6 +16,7 @@ import {
   Edit2,
   AlertCircle,
   Shield,
+  Search,
 } from "lucide-react";
 import AppShell from "@/components/layout/AppShell";
 import StaffTasks from "@/components/staff/Tasks";
@@ -128,6 +129,7 @@ export default function CounselorPage() {
   const pb = createPocketBaseClient();
   const [authChecked, setAuthChecked] = useState(false);
   const [authReady, setAuthReady] = useState(false);
+  const [isCounselor, setIsCounselor] = useState(false);
   const [authUser, setAuthUser] = useState<{
     id?: string;
     name?: string;
@@ -147,7 +149,16 @@ export default function CounselorPage() {
         role?: string;
       } | null;
 
+      const isValidCounsellor =
+        pb.authStore.isValid &&
+        (nextAuthUser?.role === "student-counsellor" ||
+         nextAuthUser?.role === "admin" ||
+         nextAuthUser?.role === "super-admin" ||
+         nextAuthUser?.role === "marketing-manager" ||
+         nextAuthUser?.role === "admissions-head");
+
       setAuthUser(nextAuthUser);
+      setIsCounselor(isValidCounsellor);
       setAuthChecked(true);
       setAuthReady(true);
 
@@ -172,15 +183,6 @@ export default function CounselorPage() {
       unsubscribe();
     };
   }, [pb]);
-
-  const isCounselor =
-    authChecked &&
-    pb.authStore.isValid &&
-    (authUser?.role === "student-counsellor" ||
-     authUser?.role === "admin" ||
-     authUser?.role === "super-admin" ||
-     authUser?.role === "marketing-manager" ||
-     authUser?.role === "admissions-head");
   const counselorId = authUser?.id || "";
   const counselorName = authUser?.name || "Student Counsellor";
 
@@ -204,16 +206,31 @@ export default function CounselorPage() {
   const tasksEnabled = getPolicyAccess("user_tasks", true);
   const canAddLead = getPolicyAccess("user_add_lead", true);
   const [activeTab, setActiveTab] = useState<"leads" | "tasks">("leads");
+  const tabRestoredRef = useRef(false);
 
   useEffect(() => {
-    if (authChecked && authUser && !isAccessLoading) {
-      if (!leadsEnabled && tasksEnabled) {
+    if (authChecked && authUser && !isAccessLoading && !tabRestoredRef.current) {
+      const savedTab = localStorage.getItem("staff_portal_tab") as "leads" | "tasks" | null;
+      if (savedTab === "tasks" && tasksEnabled) {
         setActiveTab("tasks");
-      } else if (leadsEnabled) {
+      } else if (savedTab === "leads" && leadsEnabled) {
         setActiveTab("leads");
+      } else {
+        if (!leadsEnabled && tasksEnabled) {
+          setActiveTab("tasks");
+        } else if (leadsEnabled) {
+          setActiveTab("leads");
+        }
       }
+      tabRestoredRef.current = true;
     }
   }, [authChecked, authUser, isAccessLoading, leadsEnabled, tasksEnabled]);
+
+  useEffect(() => {
+    if (tabRestoredRef.current) {
+      localStorage.setItem("staff_portal_tab", activeTab);
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (authChecked && !isCounselor) {
@@ -1185,6 +1202,7 @@ export default function CounselorPage() {
 
   // Filter leads by status if a status filter is selected
   const [searchTerm, setSearchTerm] = useState("");
+  const [taskSearchTerm, setTaskSearchTerm] = useState("");
 
   const filteredLeads = (
     statusFilter ? leads.filter((lead) => lead.status === statusFilter) : leads
@@ -1284,17 +1302,18 @@ export default function CounselorPage() {
       title="Amazon College"
       subtitle={counselorName}
       headerRight={
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3">
           {(authUser?.role === "admin" ||
             authUser?.role === "super-admin" ||
             authUser?.role === "marketing-manager" ||
             authUser?.role === "admissions-head") && (
             <button
               onClick={() => router.push("/admin")}
-              className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 transition-all shadow-sm"
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 p-2 sm:px-3 sm:py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 transition-all shadow-sm"
+              title="Admin Panel"
             >
-              <Shield className="h-4 w-4 text-blue-500" />
-              Admin Panel
+              <Shield className="h-4 w-4 text-blue-500 flex-shrink-0" />
+              <span className="hidden sm:inline">Admin Panel</span>
             </button>
           )}
           <button
@@ -1303,36 +1322,51 @@ export default function CounselorPage() {
               pb.authStore.clear();
               router.replace("/");
             }}
-            className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50 shadow-sm"
+            className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-200 p-2 sm:px-3 sm:py-2 text-sm font-medium hover:bg-slate-50 shadow-sm"
+            title="Logout"
           >
-            <LogOut className="h-4 w-4" />
-            Logout
+            <LogOut className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden sm:inline">Logout</span>
           </button>
         </div>
       }
     >
       {leadsEnabled && tasksEnabled && (
-        <div className="flex bg-slate-100/80 p-1 rounded-xl w-fit border border-slate-200/40 mb-6">
-          <button
-            onClick={() => setActiveTab("leads")}
-            className={`px-5 py-2.5 rounded-lg text-xs font-bold transition-all ${
-              activeTab === "leads"
-                ? "bg-white text-slate-800 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            Leads Management
-          </button>
-          <button
-            onClick={() => setActiveTab("tasks")}
-            className={`px-5 py-2.5 rounded-lg text-xs font-bold transition-all ${
-              activeTab === "tasks"
-                ? "bg-white text-slate-800 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            My Tasks
-          </button>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+          <div className="flex bg-slate-100/80 p-1 rounded-xl w-fit border border-slate-200/40 shrink-0">
+            <button
+              onClick={() => setActiveTab("leads")}
+              className={`px-5 py-2.5 rounded-lg text-xs font-bold transition-all ${
+                activeTab === "leads"
+                  ? "bg-white text-slate-800 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Leads Management
+            </button>
+            <button
+              onClick={() => setActiveTab("tasks")}
+              className={`px-5 py-2.5 rounded-lg text-xs font-bold transition-all ${
+                activeTab === "tasks"
+                  ? "bg-white text-slate-800 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              My Tasks
+            </button>
+          </div>
+
+          {activeTab === "tasks" && (
+            <div className="relative w-full sm:max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                value={taskSearchTerm}
+                onChange={(e) => setTaskSearchTerm(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 py-2.5 text-sm text-slate-700 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm"
+                placeholder="Search tasks..."
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -1349,10 +1383,10 @@ export default function CounselorPage() {
 
           <div className="space-y-4">
         {/* Status Filter Tabs */}
-        <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+        <div className="flex overflow-x-auto max-w-full pb-3 border-b border-slate-200 gap-2 scrollbar-none whitespace-nowrap [ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden shrink-0">
           <button
             onClick={() => setStatusFilter(null)}
-            className={`rounded-md px-3 py-2 text-sm font-medium transition ${
+            className={`rounded-md px-3 py-2 text-sm font-medium transition shrink-0 ${
               statusFilter === null
                 ? "bg-slate-900 text-white"
                 : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
@@ -1366,7 +1400,7 @@ export default function CounselorPage() {
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
-                className={`rounded-md px-3 py-2 text-sm font-medium transition ${
+                className={`rounded-md px-3 py-2 text-sm font-medium transition shrink-0 ${
                   statusFilter === status
                     ? "bg-slate-900 text-white"
                     : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
@@ -1429,7 +1463,7 @@ export default function CounselorPage() {
           </div>
         ) : (
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-col">
-            <div className="max-h-[calc(100vh-300px)] overflow-y-auto">
+            <div className="max-h-[calc(100vh-460px)] sm:max-h-[calc(100vh-320px)] overflow-y-auto">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200 text-sm">
                   <thead className="border-b border-slate-200 bg-white text-left text-slate-700 shadow-sm">
@@ -2606,7 +2640,7 @@ export default function CounselorPage() {
       )}
         </>
       ) : activeTab === "tasks" && tasksEnabled ? (
-        <StaffTasks />
+        <StaffTasks searchTerm={taskSearchTerm} />
       ) : (
         <div className="mx-auto max-w-md my-16 text-center bg-white border border-slate-100 rounded-3xl p-8 shadow-lg space-y-6">
           <div className="mx-auto w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500 border border-rose-100">

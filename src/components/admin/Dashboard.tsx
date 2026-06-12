@@ -112,6 +112,13 @@ interface DashboardStats {
   monthlyStatusStats: MonthlyStatusStat[];
   monthlyCounselorStats: MonthlyCounselorStats;
   recentActivity: RecentActivityItem[];
+  totalTasks: number;
+  pendingTasks: number;
+  inProgressTasks: number;
+  completedTasks: number;
+  overdueTasks: number;
+  highPriorityTasks: number;
+  taskCompletionRate: number;
 }
 
 const ACTIVITY_PAGE_SIZE = 5;
@@ -263,10 +270,21 @@ export default function AdminDashboard() {
         }
       };
 
-      const [leads, history, userResponse, adminResponse, authUsersResponse] =
+      const getTasks = async () => {
+        try {
+          return await pb.collection("tasks").getFullList({
+            sort: "-created",
+          });
+        } catch {
+          return [];
+        }
+      };
+
+      const [leads, history, tasks, userResponse, adminResponse, authUsersResponse] =
         await Promise.all([
           getLeads(),
           getHistory(),
+          getTasks(),
           fetch("/api/users/lookup"),
           fetch("/api/admins/lookup"),
           fetch("/api/auth-users/lookup"),
@@ -486,6 +504,25 @@ export default function AdminDashboard() {
           created: entry.created || "",
         }));
 
+      const totalTasks = tasks.length;
+      const pendingTasks = tasks.filter((t: any) => t.status === "Pending" || !t.status).length;
+      const inProgressTasks = tasks.filter((t: any) => t.status === "In-Progress").length;
+      const completedTasks = tasks.filter((t: any) => t.status === "Completed").length;
+      const highPriorityTasks = tasks.filter((t: any) => t.priority === "High").length;
+      
+      const overdueTasks = tasks.filter((t: any) => {
+        if (t.status === "Completed" || !t.dueDate) return false;
+        try {
+          const due = new Date(t.dueDate);
+          due.setHours(0, 0, 0, 0);
+          return due < today;
+        } catch {
+          return false;
+        }
+      }).length;
+      
+      const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
       const data: DashboardStats = {
         totalLeads,
         newLeads,
@@ -499,6 +536,13 @@ export default function AdminDashboard() {
         monthlyStatusStats,
         monthlyCounselorStats,
         recentActivity,
+        totalTasks,
+        pendingTasks,
+        inProgressTasks,
+        completedTasks,
+        overdueTasks,
+        highPriorityTasks,
+        taskCompletionRate,
       };
 
       setStats(data);
@@ -523,6 +567,13 @@ export default function AdminDashboard() {
           monthlyStatusStats: [],
           monthlyCounselorStats: {},
           recentActivity: [],
+          totalTasks: 0,
+          pendingTasks: 0,
+          inProgressTasks: 0,
+          completedTasks: 0,
+          overdueTasks: 0,
+          highPriorityTasks: 0,
+          taskCompletionRate: 0,
         };
         setStats(defaultStats);
       }
@@ -545,10 +596,14 @@ export default function AdminDashboard() {
     pb.collection("leadHistory").subscribe("*", () => {
       void fetchStats();
     });
+    pb.collection("tasks").subscribe("*", () => {
+      void fetchStats();
+    });
 
     return () => {
       pb.collection("leads").unsubscribe("*");
       pb.collection("leadHistory").unsubscribe("*");
+      pb.collection("tasks").unsubscribe("*");
     };
   }, [fetchStats]);
 
@@ -822,6 +877,65 @@ export default function AdminDashboard() {
             </div>
           );
         })}
+      </div>
+
+      {/* Task Management Overview */}
+      <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-6 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:scale-[1.005] group">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6 pb-4 border-b border-slate-50">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-indigo-50 rounded-xl text-indigo-600">
+              <CheckCircle className="h-5 w-5 animate-pulse" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-slate-800">
+                Task Management Metrics
+              </h3>
+              <p className="text-sm text-slate-400">
+                Performance dashboard for counselor tasks and action checklists.
+              </p>
+            </div>
+          </div>
+          <div className="text-xs font-semibold text-slate-500 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-full border border-emerald-100 flex items-center gap-1.5 shadow-sm">
+            Completion Rate: {stats.taskCompletionRate}%
+          </div>
+        </div>
+
+        {/* Task Stats Cards Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+          {[
+            { label: "Total Tasks", value: stats.totalTasks, color: "text-slate-700 bg-slate-50 border-slate-200/60" },
+            { label: "To Do", value: stats.pendingTasks, color: "text-blue-600 bg-blue-50 border-blue-100" },
+            { label: "In Progress", value: stats.inProgressTasks, color: "text-indigo-600 bg-indigo-50 border-indigo-100" },
+            { label: "Completed", value: stats.completedTasks, color: "text-emerald-600 bg-emerald-50 border-emerald-100" },
+            { label: "Overdue", value: stats.overdueTasks, color: stats.overdueTasks > 0 ? "text-rose-600 bg-rose-50 border-rose-100 font-bold animate-pulse" : "text-slate-500 bg-slate-50 border-slate-200/60" },
+            { label: "High Priority", value: stats.highPriorityTasks, color: "text-amber-600 bg-amber-50 border-amber-100" },
+          ].map((item) => (
+            <div key={item.label} className={`border rounded-xl p-4 flex flex-col justify-between ${item.color} shadow-sm transition-transform duration-200 hover:scale-[1.02]`}>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                {item.label}
+              </span>
+              <h4 className="text-2xl font-bold mt-1 tracking-tight">
+                {item.value}
+              </h4>
+            </div>
+          ))}
+        </div>
+
+        {/* Progress Bar */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+            <span>Overall Task Completion Progress</span>
+            <span className="text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/30">
+              {stats.completedTasks} / {stats.totalTasks} Tasks ({stats.taskCompletionRate}%)
+            </span>
+          </div>
+          <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden border border-slate-200/20 shadow-inner">
+            <div 
+              className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${stats.taskCompletionRate}%` }}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Monthly Status Bar Chart Widget */}

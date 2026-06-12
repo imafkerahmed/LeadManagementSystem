@@ -102,7 +102,6 @@ export async function POST(request: NextRequest) {
     const assignedTo = (body.assignedTo || "").trim();
     const dueDate = body.dueDate || "";
     const priority = body.priority || "Medium";
-    const createdBy = body.createdBy || "Admin";
 
     if (!title || !assignedTo) {
       return NextResponse.json(
@@ -148,6 +147,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Resolve creator admin name from token
+    const adminId = await getAdminUserId(request, pb);
+    let resolvedCreatedBy = "Admin";
+    if (adminId) {
+      try {
+        const creator = await pb.collection("users").getOne(adminId);
+        resolvedCreatedBy = creator.name || creator.email || "Admin";
+      } catch (err) {
+        console.error("Failed to fetch creator name:", err);
+      }
+    }
+
     const record = await pb.collection("tasks").create({
       task_id: nextTaskId,
       title,
@@ -156,12 +167,11 @@ export async function POST(request: NextRequest) {
       dueDate: dueDate || null,
       status: "Pending",
       priority,
-      createdBy,
+      createdBy: resolvedCreatedBy,
       notes: "",
     });
 
     // Write to TaskHistory
-    const adminId = await getAdminUserId(request, pb);
     if (adminId) {
       try {
         await pb.collection("taskHistory").create({
@@ -170,7 +180,7 @@ export async function POST(request: NextRequest) {
           eventType: "Task Created",
           changedBy: adminId,
           newValue: "Pending",
-          comment: "Task created by Admin",
+          comment: `Task created by ${resolvedCreatedBy}`,
         });
       } catch (err) {
         console.error("Failed to log task creation history:", err);

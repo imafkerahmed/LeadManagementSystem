@@ -31,10 +31,10 @@ export default function AppShell({
 
         <div className="flex-1 flex flex-col overflow-hidden">
           {!hideHeader && (
-            <header className="border-b border-slate-100 bg-white/70 backdrop-blur-md px-8 py-5 flex items-center justify-between shadow-sm relative z-10">
-              <div className="mx-auto w-full max-w-7xl flex items-center justify-between gap-3">
-                <div className="flex items-center gap-4">
-                  <div className="relative h-12 w-12 rounded-xl overflow-hidden shadow-sm border border-slate-100 flex-shrink-0 bg-white">
+            <header className="border-b border-slate-100 bg-white/70 backdrop-blur-md px-4 py-3 sm:px-8 sm:py-5 flex items-center justify-between shadow-sm relative z-10">
+              <div className="mx-auto w-full max-w-7xl flex items-center justify-between gap-2 sm:gap-3">
+                <div className="flex items-center gap-2.5 sm:gap-4">
+                  <div className="relative h-10 w-10 sm:h-12 sm:w-12 rounded-xl overflow-hidden shadow-sm border border-slate-100 flex-shrink-0 bg-white">
                     <Image
                       src="/images/amazon-logo.jpeg"
                       alt="Amazon College Logo"
@@ -43,11 +43,11 @@ export default function AppShell({
                     />
                   </div>
                   <div>
-                    <h1 className="text-lg font-extrabold tracking-tight sm:text-xl text-slate-900 leading-tight">
+                    <h1 className="text-sm font-extrabold tracking-tight sm:text-xl text-slate-900 leading-tight">
                       {title}
                     </h1>
                     {subtitle ? (
-                      <p className="text-xs text-slate-400 mt-0.5 font-medium">
+                      <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 font-medium">
                         {subtitle}
                       </p>
                     ) : null}

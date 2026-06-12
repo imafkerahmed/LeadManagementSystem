@@ -92,10 +92,22 @@ export default function AdminTasks() {
         fetchOptions.headers = { Authorization: `Bearer ${token}` };
       }
 
-      const [tasksRes, usersRes, policiesList] = await Promise.all([
+      // Fetch access control policies independently to avoid blocking permission checks on slower API calls
+      const fetchAccessPolicies = async () => {
+        try {
+          const list = await pb.collection("accessControl").getFullList();
+          setAccessPolicies(list);
+        } catch (err) {
+          console.error("Failed to load access policies in Tasks:", err);
+        } finally {
+          setIsAccessLoading(false);
+        }
+      };
+      void fetchAccessPolicies();
+
+      const [tasksRes, usersRes] = await Promise.all([
         fetch("/api/admin/tasks", fetchOptions),
         fetch("/api/admin/users", fetchOptions),
-        pb.collection("accessControl").getFullList().catch(() => [])
       ]);
 
       if (!tasksRes.ok) throw new Error("Failed to load tasks");
@@ -106,8 +118,6 @@ export default function AdminTasks() {
 
       setTasks(tasksData);
       setUsers(usersData);
-      setAccessPolicies(policiesList);
-      setIsAccessLoading(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to load tasks data");
     } finally {

@@ -150,7 +150,14 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (typeof notes === "string") {
-      updates.notes = notes;
+      const trimmedNotes = notes.trim();
+      if (trimmedNotes === "" && status !== "Completed") {
+        return NextResponse.json(
+          { error: "Notes cannot be empty or blank" },
+          { status: 400 },
+        );
+      }
+      updates.notes = trimmedNotes;
     }
 
     if (Object.keys(updates).length === 0) {
@@ -179,7 +186,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    if (updates.notes !== undefined && updates.notes !== taskRecord.notes) {
+    if (updates.notes !== undefined && (updates.notes as string).trim() !== "" && updates.notes !== taskRecord.notes) {
       historyPromises.push(
         pb.collection("taskHistory").create({
           timeStamp: now,
