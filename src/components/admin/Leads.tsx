@@ -1854,8 +1854,8 @@ export default function AdminLeads() {
             </div>
           </div>
         ) : (
-          <div className="max-h-[calc(100vh-320px)] overflow-y-auto overflow-x-hidden">
-            <table className="w-full table-fixed">
+          <div className="max-h-[calc(100vh-320px)] overflow-y-auto overflow-x-auto scrollbar-thin">
+            <table className="w-full table-fixed min-w-[900px]">
               <thead className="sticky top-0 z-10 bg-gray-50">
                 <tr className="border-b border-gray-200 bg-gray-50">
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">

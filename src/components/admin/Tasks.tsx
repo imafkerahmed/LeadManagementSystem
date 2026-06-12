@@ -720,7 +720,7 @@ export default function AdminTasks() {
       {/* Task Table */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-auto">
-          <table className="w-full text-sm border-separate border-spacing-0">
+          <table className="w-full min-w-[800px] text-sm border-separate border-spacing-0">
             <thead className="sticky top-0 z-10 bg-slate-50">
               <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100">
                 <th className="px-4 py-3 font-semibold rounded-l-2xl">Task</th>

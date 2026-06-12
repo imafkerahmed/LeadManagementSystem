@@ -927,7 +927,7 @@ export default function AdminReports() {
                     Lead Details Log
                   </h3>
                   <div className="overflow-x-auto rounded-xl border border-slate-100 bg-white">
-                    <table className="w-full border-separate border-spacing-0 text-sm">
+                    <table className="w-full border-separate border-spacing-0 text-sm min-w-[800px]">
                       <thead>
                         <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100">
                           <th className="px-4 py-3 font-semibold rounded-l-xl">
@@ -1341,7 +1341,7 @@ export default function AdminReports() {
                 Task Details Log
               </h3>
               <div className="overflow-x-auto rounded-xl border border-slate-100 bg-white">
-                <table className="w-full border-separate border-spacing-0 text-sm">
+                <table className="w-full border-separate border-spacing-0 text-sm min-w-[800px]">
                   <thead>
                     <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100">
                       <th className="px-4 py-3 font-semibold rounded-l-xl">Task ID</th>
