@@ -41,9 +41,68 @@ interface PolicyRecord {
 const pb = createPocketBaseClient();
 
 export default function AdminSettings() {
-  const [currentView, setCurrentView] = useState<
+  const [currentView, _setCurrentView] = useState<
     "menu" | "users" | "access_control" | "role_policy" | "user_policy"
   >("menu");
+
+  const setCurrentView = (view: "menu" | "users" | "access_control" | "role_policy" | "user_policy") => {
+    _setCurrentView(view);
+    try {
+      localStorage.setItem("admin_settings_view", view);
+      const params = new URLSearchParams(window.location.search);
+      if (view === "menu") {
+        params.delete("sub");
+      } else {
+        params.set("sub", view);
+      }
+      const newSearch = params.toString();
+      const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : "");
+      window.history.replaceState(null, "", newUrl);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      let view = params.get("sub") as "menu" | "users" | "access_control" | "role_policy" | "user_policy" | null;
+      if (!view) {
+        const saved = localStorage.getItem("admin_settings_view") as "menu" | "users" | "access_control" | "role_policy" | "user_policy" | null;
+        if (
+          saved === "menu" ||
+          saved === "users" ||
+          saved === "access_control" ||
+          saved === "role_policy" ||
+          saved === "user_policy"
+        ) {
+          view = saved;
+        }
+      }
+      if (
+        view === "menu" ||
+        view === "users" ||
+        view === "access_control" ||
+        view === "role_policy" ||
+        view === "user_policy"
+      ) {
+        _setCurrentView(view || "menu");
+
+        const params = new URLSearchParams(window.location.search);
+        if (view && view !== "menu") {
+          params.set("sub", view);
+        } else {
+          params.delete("sub");
+        }
+        const newSearch = params.toString();
+        const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : "");
+        window.history.replaceState(null, "", newUrl);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
   const [policies, setPolicies] = useState<PolicyRecord[]>([]);
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);

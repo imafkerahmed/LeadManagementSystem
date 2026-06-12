@@ -59,6 +59,7 @@ export default function AdminTasks() {
   const [description, setDescription] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [previousDueDate, setPreviousDueDate] = useState<string | null>(null);
   const [priority, setPriority] = useState<TaskPriority>("Medium");
   const [status, setStatus] = useState<TaskStatus>("Pending");
   const [notes, setNotes] = useState("");
@@ -148,17 +149,23 @@ export default function AdminTasks() {
   }, []);
 
   const fetchTaskHistory = async (taskId: string) => {
+    console.log("[fetchTaskHistory] Fetching history for taskId:", taskId);
     setIsLoadingHistory(true);
     setHistory([]);
     try {
       const response = await fetch(`/api/tasks/history?taskId=${taskId}`);
+      console.log("[fetchTaskHistory] Response status:", response.status, "ok:", response.ok);
       if (response.ok) {
         const data = await response.json();
+        console.log("[fetchTaskHistory] Fetched history items:", data.length);
         setHistory(data);
+      } else {
+        console.warn("[fetchTaskHistory] Response not ok:", response.statusText);
       }
     } catch (error) {
-      console.error("Error fetching task history:", error);
+      console.error("[fetchTaskHistory] Error fetching task history:", error);
     } finally {
+      console.log("[fetchTaskHistory] Setting isLoadingHistory to false");
       setIsLoadingHistory(false);
     }
   };
@@ -177,6 +184,7 @@ export default function AdminTasks() {
     setDescription("");
     setAssignedTo(users[0]?.id || "");
     setDueDate("");
+    setPreviousDueDate(null);
     setPriority("Medium");
     setStatus("Pending");
     setNotes("");
@@ -200,7 +208,8 @@ export default function AdminTasks() {
     setTitle(task.title);
     setDescription(task.description || "");
     setAssignedTo(task.assignedTo);
-    setDueDate(task.dueDate ? task.dueDate.split("T")[0] : "");
+    setDueDate(task.dueDate ? task.dueDate.split(" ")[0].split("T")[0] : "");
+    setPreviousDueDate(task.dueDate || null);
     setPriority(task.priority);
     setStatus(task.status);
     setNotes(task.notes || "");
@@ -634,7 +643,14 @@ export default function AdminTasks() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Due Date</label>
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Due Date</label>
+                  {editingTaskId && previousDueDate && (
+                    <span className="text-[11px] font-medium text-slate-400">
+                      Previous: <span className="font-semibold text-slate-500">{formatDate(previousDueDate)}</span>
+                    </span>
+                  )}
+                </div>
                 <input
                   type="date"
                   value={dueDate}

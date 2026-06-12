@@ -127,17 +127,23 @@ export default function StaffTasks({
   const canCompleteTasks = getPolicyAccess("user_tasks_complete", true);
 
   const fetchTaskHistory = async (taskId: string) => {
+    console.log("[fetchTaskHistory - Staff] Fetching history for taskId:", taskId);
     setIsLoadingHistory(true);
     setHistory([]);
     try {
       const response = await fetch(`/api/tasks/history?taskId=${taskId}`);
+      console.log("[fetchTaskHistory - Staff] Response status:", response.status, "ok:", response.ok);
       if (response.ok) {
         const data = await response.json();
+        console.log("[fetchTaskHistory - Staff] Fetched history items:", data.length);
         setHistory(data);
+      } else {
+        console.warn("[fetchTaskHistory - Staff] Response not ok:", response.statusText);
       }
     } catch (error) {
-      console.error("Error fetching task history:", error);
+      console.error("[fetchTaskHistory - Staff] Error fetching task history:", error);
     } finally {
+      console.log("[fetchTaskHistory - Staff] Setting isLoadingHistory to false");
       setIsLoadingHistory(false);
     }
   };

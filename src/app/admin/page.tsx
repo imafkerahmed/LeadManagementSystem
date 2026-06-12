@@ -83,13 +83,23 @@ export default function AdminPage() {
     // read URL on mount to restore active tab
     try {
       const params = new URLSearchParams(window.location.search);
-      let tab = params.get("tab");
-      if (tab === "users") {
-        tab = "settings";
+      let tabStr = params.get("tab");
+      if (tabStr === "users") {
+        tabStr = "settings";
+      }
+
+      let tab: AdminTab | null = null;
+      if (isValidTab(tabStr)) {
+        tab = tabStr;
+      } else {
+        const saved = localStorage.getItem("admin_portal_tab") as AdminTab | null;
+        if (isValidTab(saved)) {
+          tab = saved;
+        }
       }
 
       // Defer state update to avoid synchronous setState in effect
-      if (isValidTab(tab)) {
+      if (tab) {
         const timer = window.setTimeout(() => setCurrentTab(tab), 0);
         return () => window.clearTimeout(timer);
       }
@@ -186,15 +196,44 @@ export default function AdminPage() {
       !allowedTabs.includes(currentTab)
     ) {
       const params = new URLSearchParams(window.location.search);
-      let tabParam = params.get("tab");
-      if (tabParam === "users") tabParam = "settings";
+      let tabParamStr = params.get("tab");
+      if (tabParamStr === "users") tabParamStr = "settings";
 
-      const validatedTab = tabParam as AdminTab | null;
-      if (!validatedTab || !allowedTabs.includes(validatedTab)) {
-        setCurrentTab(allowedTabs[0]);
+      const validatedTab = tabParamStr && isValidTab(tabParamStr) ? tabParamStr : null;
+      if (validatedTab && allowedTabs.includes(validatedTab)) {
+        setCurrentTab(validatedTab);
+      } else {
+        const saved = localStorage.getItem("admin_portal_tab") as AdminTab | null;
+        if (saved && allowedTabs.includes(saved)) {
+          setCurrentTab(saved);
+        } else {
+          setCurrentTab(allowedTabs[0]);
+        }
       }
     }
   }, [isRulesLoading, allowedTabs, currentTab]);
+
+  useEffect(() => {
+    if (authChecked && !isRulesLoading && allowedTabs.includes(currentTab)) {
+      try {
+        localStorage.setItem("admin_portal_tab", currentTab);
+        const params = new URLSearchParams(window.location.search);
+        params.set("tab", currentTab);
+        
+        // Clear sub if it doesn't belong to reports or settings
+        const sub = params.get("sub");
+        if (sub && currentTab !== "reports" && currentTab !== "settings") {
+          params.delete("sub");
+        }
+        
+        const newSearch = params.toString();
+        const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : "");
+        window.history.replaceState(null, "", newUrl);
+      } catch {
+        // ignore
+      }
+    }
+  }, [currentTab, authChecked, isRulesLoading, allowedTabs]);
 
   if (!authChecked || (isAdmin && isRulesLoading)) {
     return (
@@ -235,6 +274,11 @@ export default function AdminPage() {
 
   const setTab = (tab: AdminTab) => {
     setCurrentTab(tab);
+    try {
+      localStorage.setItem("admin_portal_tab", tab);
+    } catch {
+      // ignore
+    }
     if (tab === "dashboard") {
       router.replace("/admin", { scroll: false });
       return;
