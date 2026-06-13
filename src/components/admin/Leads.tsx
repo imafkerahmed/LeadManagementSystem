@@ -1351,20 +1351,29 @@ export default function AdminLeads() {
         }
       }
 
-      if ((selectedLead.followup1Date || "") !== (followup1Date || "")) {
-        payload.followup1Date = followup1Date || null;
-      }
-      payload.followup1Completed = followup1Completed;
+      if (nextStatus === "New") {
+        payload.followup1Date = null;
+        payload.followup1Completed = false;
+        payload.followup2Date = null;
+        payload.followup2Completed = false;
+        payload.followup3Date = null;
+        payload.followup3Completed = false;
+      } else {
+        if ((selectedLead.followup1Date || "") !== (followup1Date || "")) {
+          payload.followup1Date = followup1Date || null;
+        }
+        payload.followup1Completed = followup1Completed;
 
-      if ((selectedLead.followup2Date || "") !== (followup2Date || "")) {
-        payload.followup2Date = followup2Date || null;
-      }
-      payload.followup2Completed = followup2Completed;
+        if ((selectedLead.followup2Date || "") !== (followup2Date || "")) {
+          payload.followup2Date = followup2Date || null;
+        }
+        payload.followup2Completed = followup2Completed;
 
-      if ((selectedLead.followup3Date || "") !== (followup3Date || "")) {
-        payload.followup3Date = followup3Date || null;
+        if ((selectedLead.followup3Date || "") !== (followup3Date || "")) {
+          payload.followup3Date = followup3Date || null;
+        }
+        payload.followup3Completed = followup3Completed;
       }
-      payload.followup3Completed = followup3Completed;
 
       await pb.collection("leads").update(selectedLead.id, payload);
 
@@ -1554,6 +1563,11 @@ export default function AdminLeads() {
 
   const handleSaveIndividualFollowup = async (followupNum: 1 | 2 | 3) => {
     if (!selectedLead) return;
+
+    if (draftStatus === "New") {
+      toast.error("Cannot set follow-up date for leads in New status.");
+      return;
+    }
 
     try {
       setSavingFollowup(followupNum);

@@ -90,6 +90,14 @@ export async function POST(request: NextRequest) {
 
     if (normalizedNewStatus) {
       updates.status = normalizedNewStatus;
+      if (normalizedNewStatus === "New") {
+        updates.followup1Date = null;
+        updates.followup1Completed = false;
+        updates.followup2Date = null;
+        updates.followup2Completed = false;
+        updates.followup3Date = null;
+        updates.followup3Completed = false;
+      }
     }
 
     if (newCounselor) {

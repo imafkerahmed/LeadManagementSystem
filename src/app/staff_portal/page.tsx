@@ -1073,6 +1073,11 @@ export default function CounselorPage() {
   const handleSaveIndividualFollowup = async (followupNum: 1 | 2 | 3) => {
     if (!selectedLead) return;
 
+    if (statusSelect === "New") {
+      showToast("Cannot set follow-up date for leads in New status.", "error");
+      return;
+    }
+
     try {
       setSavingFollowup(followupNum);
       const pb = createPocketBaseClient();
@@ -1140,6 +1145,14 @@ export default function CounselorPage() {
 
   const handleSaveFollowupCompletion = async (followupNum: 1 | 2 | 3) => {
     if (!selectedLead) return;
+
+    if (statusSelect === "New") {
+      showToast(
+        "Cannot toggle follow-up completion for leads in New status.",
+        "error",
+      );
+      return;
+    }
 
     try {
       setSavingFollowup(followupNum);
