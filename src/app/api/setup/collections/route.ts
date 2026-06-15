@@ -654,7 +654,12 @@ export async function POST(request: NextRequest) {
         sectionKey: "user_update_registered_lost",
         displayName: "Set Terminal Statuses",
         targetPage: "user",
-        allowedRoles: ["super-admin", "admin", "admissions-head"],
+        allowedRoles: [
+          "super-admin",
+          "admin",
+          "admissions-head",
+          "student-counsellor",
+        ],
         allowedUsers: [],
         deniedUsers: [],
         enabled: true,

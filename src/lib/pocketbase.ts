@@ -724,7 +724,12 @@ export async function setupPocketBaseCollections(): Promise<void> {
         sectionKey: "user_update_registered_lost",
         displayName: "Set Terminal Statuses",
         targetPage: "user",
-        allowedRoles: ["super-admin", "admin", "admissions-head"],
+        allowedRoles: [
+          "super-admin",
+          "admin",
+          "admissions-head",
+          "student-counsellor",
+        ],
         allowedUsers: [],
         deniedUsers: [],
         enabled: true,
