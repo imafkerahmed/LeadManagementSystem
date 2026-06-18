@@ -14,7 +14,11 @@ import {
   BarChart3,
   UserCheck,
   Activity,
+  Copy,
+  RefreshCw,
 } from "lucide-react";
+import { toBlob } from "html-to-image";
+import { toast } from "sonner";
 
 type LeadRecord = {
   id?: string;
@@ -238,6 +242,8 @@ export default function AdminDashboard() {
   const [selectedCounselor, setSelectedCounselor] = useState("");
   const [selectedMonth, setSelectedMonth] = useState("");
   const [activityPage, setActivityPage] = useState(1);
+  const [isCopying, setIsCopying] = useState(false);
+
 
   const fetchStats = useCallback(async () => {
     try {
@@ -291,10 +297,12 @@ export default function AdminDashboard() {
         ]);
 
       const userLookup = new Map<string, string>();
+      const activeUserIds = new Set<string>();
       if (userResponse.ok) {
         const users = (await userResponse.json()) as UserLookupRecord[];
         users.forEach((user) => {
           userLookup.set(user.id, user.name || user.email || user.id);
+          activeUserIds.add(user.id);
         });
       }
 
@@ -303,6 +311,7 @@ export default function AdminDashboard() {
           const admins = (await adminResponse.json()) as UserLookupRecord[];
           admins.forEach((a) => {
             userLookup.set(a.id, a.name || a.email || a.id);
+            activeUserIds.add(a.id);
           });
         } catch {
           // ignore parse errors
@@ -320,6 +329,7 @@ export default function AdminDashboard() {
           // ignore
         }
       }
+
 
       const leadRecords = leads as LeadRecord[];
 
@@ -468,9 +478,10 @@ export default function AdminDashboard() {
         }
       });
 
-      const counselorStats = Object.values(grouped).sort((left, right) =>
-        left.name.localeCompare(right.name),
-      );
+      const counselorStats = Object.entries(grouped)
+        .filter(([key]) => key === "Unassigned" || activeUserIds.has(key))
+        .map(([, stat]) => stat)
+        .sort((left, right) => left.name.localeCompare(right.name));
 
       const monthlyStatusStats = Object.values(monthlyGrouped).sort(
         (left, right) => monthSort(left.month, right.month),
@@ -479,11 +490,13 @@ export default function AdminDashboard() {
       const monthlyCounselorStats = Object.fromEntries(
         Object.entries(monthlyCounselorGrouped).map(([month, counselors]) => [
           month,
-          Object.values(counselors).sort((left, right) =>
-            left.name.localeCompare(right.name),
-          ),
+          Object.entries(counselors)
+            .filter(([key]) => key === "Unassigned" || activeUserIds.has(key))
+            .map(([, stat]) => stat)
+            .sort((left, right) => left.name.localeCompare(right.name)),
         ]),
       );
+
 
       const recentActivity = (history as HistoryRecord[])
         .slice(0, 20)
@@ -582,10 +595,58 @@ export default function AdminDashboard() {
     }
   }, []);
 
+  const handleCopyWidget = async () => {
+    const element = document.getElementById("counselor-lead-stats-widget");
+    if (!element) {
+      toast.error("Widget element not found");
+      return;
+    }
+
+    setIsCopying(true);
+    const copyPromise = new Promise<void>(async (resolve, reject) => {
+      try {
+        await new Promise((r) => setTimeout(r, 100));
+
+        const blob = await toBlob(element, {
+          backgroundColor: "#ffffff",
+          style: {
+            transform: "scale(1)",
+            transformOrigin: "top left",
+          },
+          filter: (node) => {
+            if (node instanceof HTMLElement && node.getAttribute("data-capture-ignore") === "true") {
+              return false;
+            }
+            return true;
+          },
+        });
+
+        if (!blob) {
+          throw new Error("Failed to generate image blob");
+        }
+
+        const data = [new ClipboardItem({ [blob.type]: blob })];
+        await navigator.clipboard.write(data);
+        resolve();
+      } catch (err) {
+        reject(err);
+      }
+    });
+
+    toast.promise(copyPromise, {
+      loading: "Generating widget image...",
+      success: "Widget image copied to clipboard!",
+      error: (err) => `Failed to copy: ${err instanceof Error ? err.message : String(err)}`,
+    });
+
+    setIsCopying(false);
+  };
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchStats();
   }, [fetchStats]);
+
 
   useEffect(() => {
     const pb = createPocketBaseClient();
@@ -1065,23 +1126,45 @@ export default function AdminDashboard() {
 
       <div className="flex flex-col gap-8">
         {/* Lead Stats Table Widget */}
-        <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-6 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:scale-[1.005] group">
+        <div
+          id="counselor-lead-stats-widget"
+          className="bg-white border border-slate-100 shadow-sm rounded-2xl p-6 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:scale-[1.005] group"
+        >
           <div className="flex flex-col gap-4 mb-6 pb-4 border-b border-slate-50">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-indigo-50 rounded-xl text-indigo-600">
-                <UserCheck className="h-5 w-5" />
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-50 rounded-xl text-indigo-600">
+                  <UserCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-800">
+                    Counselor Lead Stats
+                  </h3>
+                  <p className="text-sm text-slate-400">
+                    Filter counselors and review their lead status breakdown.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-lg font-semibold text-slate-800">
-                  Counselor Lead Stats
-                </h3>
-                <p className="text-sm text-slate-400">
-                  Filter counselors and review their lead status breakdown.
-                </p>
+
+              <div className="flex items-center gap-2" data-capture-ignore="true">
+                <button
+                  type="button"
+                  onClick={handleCopyWidget}
+                  disabled={isCopying}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  title="Copy widget as image"
+                >
+                  {isCopying ? (
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin text-slate-400" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5 text-slate-500" />
+                  )}
+                  {isCopying ? "Copying..." : "Copy Image"}
+                </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2" data-capture-ignore="true">
               <div>
                 <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
                   Counselor
