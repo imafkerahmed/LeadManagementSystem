@@ -172,13 +172,7 @@ export async function POST(request: NextRequest) {
       .collection(AUTH_COLLECTION)
       .getOne(userId)) as ManagedUserRecord;
 
-    if (normalizeStatus(user.accountStatus) === "disabled") {
-      return NextResponse.json({
-        success: true,
-        message: "User is already disabled",
-        transferredCount: 0,
-      });
-    }
+    const isAlreadyDisabled = normalizeStatus(user.accountStatus) === "disabled";
 
     const assignmentFilter = buildAssigneeFilter(user);
     const assignedLeads = (await pb.collection("leads").getFullList({
@@ -192,6 +186,16 @@ export async function POST(request: NextRequest) {
       selectedStatuses && Array.isArray(selectedStatuses)
         ? assignedLeads.filter((lead) => selectedStatuses.includes(lead.status || "New"))
         : assignedLeads;
+
+    if (isAlreadyDisabled && leadsToTransfer.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: "User is already disabled and has no matching leads to transfer",
+        transferredCount: 0,
+        assignedLeadCount: assignedLeads.length,
+        matchingLeadCount: 0,
+      });
+    }
 
     if (leadsToTransfer.length > 0 && targetUserIds.length === 0) {
       return NextResponse.json(
@@ -275,13 +279,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    await pb.collection(AUTH_COLLECTION).update(userId, {
-      accountStatus: "disabled",
-    });
+    if (!isAlreadyDisabled) {
+      await pb.collection(AUTH_COLLECTION).update(userId, {
+        accountStatus: "disabled",
+      });
+    }
 
     return NextResponse.json({
       success: true,
-      message: "User disabled successfully",
+      message: isAlreadyDisabled ? "Leads transferred successfully" : "User disabled successfully",
       transferredCount,
       assignedLeadCount: assignedLeads.length,
       matchingLeadCount: leadsToTransfer.length,

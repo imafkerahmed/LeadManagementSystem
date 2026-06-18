@@ -391,6 +391,8 @@ export default function AdminUsers() {
     openDisableDialog(user);
   };
 
+  const isSelectedUserDisabled = selectedUser?.accountStatus === "disabled";
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-100">
@@ -691,6 +693,14 @@ export default function AdminUsers() {
                             >
                               Reset Password
                             </button>
+                            {!isEnabled && user.assignedLeadCount > 0 && (
+                              <button
+                                onClick={() => openDisableDialog(user)}
+                                className="ml-2 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-sm transition-all cursor-pointer"
+                              >
+                                Transfer Leads
+                              </button>
+                            )}
                           </>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-[11px] text-slate-450 font-semibold italic text-slate-400">
@@ -711,13 +721,25 @@ export default function AdminUsers() {
         <AlertDialogContent size="3xl">
           <AlertDialogHeader className="border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-rose-50 rounded-xl text-rose-600">
-                <UserMinus className="h-5 w-5 animate-pulse" />
-              </div>
+              {isSelectedUserDisabled ? (
+                <div className="p-2 bg-indigo-50 rounded-xl text-indigo-600">
+                  <UsersRound className="h-5 w-5 animate-pulse" />
+                </div>
+              ) : (
+                <div className="p-2 bg-rose-50 rounded-xl text-rose-600">
+                  <UserMinus className="h-5 w-5 animate-pulse" />
+                </div>
+              )}
               <div className="text-left">
-                <AlertDialogTitle className="text-base font-bold text-slate-800">Disable User Account</AlertDialogTitle>
+                <AlertDialogTitle className="text-base font-bold text-slate-800">
+                  {isSelectedUserDisabled ? "Transfer Leads" : "Disable User Account"}
+                </AlertDialogTitle>
                 <AlertDialogDescription className="text-xs text-slate-400 mt-0.5">
-                  {selectedUser ? `${selectedUser.name} (${selectedUser.email})` : "This user"} will lose access immediately.
+                  {selectedUser 
+                    ? isSelectedUserDisabled 
+                      ? `${selectedUser.name} (${selectedUser.email}) is currently disabled.` 
+                      : `${selectedUser.name} (${selectedUser.email}) will lose access immediately.`
+                    : "This user will lose access immediately."}
                 </AlertDialogDescription>
               </div>
             </div>
@@ -735,7 +757,9 @@ export default function AdminUsers() {
                 <div className="flex items-start gap-2.5 bg-amber-50/70 border border-amber-200/60 rounded-xl p-3 text-amber-900 text-xs">
                   <ShieldAlert className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
                   <div className="space-y-0.5">
-                    <p className="font-bold text-amber-950">Active Leads Transfer Required</p>
+                    <p className="font-bold text-amber-950">
+                      {isSelectedUserDisabled ? "Residual Leads Transfer" : "Active Leads Transfer Required"}
+                    </p>
                     <p className="text-amber-800 leading-relaxed font-medium">
                       This counsellor has <span className="font-bold">{selectedUser.assignedLeadCount}</span> assigned leads. 
                       Configure status filters and choose target counsellors to distribute these leads.
@@ -933,7 +957,13 @@ export default function AdminUsers() {
                 void disableUser();
               }}
             >
-              {isSubmitting ? "Disabling..." : "Confirm Disable"}
+              {isSubmitting 
+                ? isSelectedUserDisabled 
+                  ? "Transferring..." 
+                  : "Disabling..." 
+                : isSelectedUserDisabled 
+                  ? "Confirm Transfer" 
+                  : "Confirm Disable"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
