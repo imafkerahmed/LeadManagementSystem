@@ -11,6 +11,7 @@ import {
   LogOut,
   ListTodo,
   Shield,
+  Award,
 } from "lucide-react";
 import AdminDashboard from "@/components/admin/Dashboard";
 import AdminLeads from "@/components/admin/Leads";
@@ -18,6 +19,7 @@ import AdminTasks from "@/components/admin/Tasks";
 import BulkUpload from "@/components/admin/BulkUpload";
 import AdminSettings from "@/components/admin/Settings";
 import AdminReports from "@/components/admin/Reports";
+import AdminKPIManager from "@/components/admin/KPIManager";
 import { createPocketBaseClient } from "@/lib/pocketbase";
 import AppShell from "@/components/layout/AppShell";
 import AdminSidebarHeader from "@/components/layout/AdminSidebarHeader";
@@ -38,6 +40,7 @@ type AdminTab =
   | "tasks"
   | "bulk"
   | "reports"
+  | "kpi"
   | "settings";
 
 const tabs: Array<{
@@ -50,6 +53,7 @@ const tabs: Array<{
   { id: "tasks", label: "Tasks", icon: ListTodo },
   { id: "bulk", label: "Bulk Upload", icon: UploadCloud },
   { id: "reports", label: "Reports", icon: BarChart3 },
+  { id: "kpi", label: "KPI & Performance", icon: Award },
   { id: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
@@ -62,6 +66,7 @@ const tabKeys: Record<AdminTab, string> = {
   tasks: "admin_tasks",
   bulk: "admin_bulk",
   reports: "admin_reports",
+  kpi: "admin_kpi",
   settings: "admin_settings",
 };
 
@@ -363,6 +368,8 @@ export default function AdminPage() {
               {currentTab === "bulk" && "Upload CSV file for batch imports"}
               {currentTab === "reports" &&
                 "Query performance stats and visual charts"}
+              {currentTab === "kpi" &&
+                "Manual adjustment scorecard & counselor leaderboard"}
               {currentTab === "settings" &&
                 "Manage administrators, credentials, and settings"}
             </p>
@@ -384,6 +391,9 @@ export default function AdminPage() {
             )}
             {currentTab === "reports" && allowedTabs.includes("reports") && (
               <AdminReports />
+            )}
+            {currentTab === "kpi" && allowedTabs.includes("kpi") && (
+              <AdminKPIManager />
             )}
             {currentTab === "settings" && allowedTabs.includes("settings") && (
               <AdminSettings />

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import AppShell from "@/components/layout/AppShell";
 import StaffTasks from "@/components/staff/Tasks";
+import StaffKPIScorecard from "@/components/staff/KPIScorecard";
 import { createPocketBaseClient } from "@/lib/pocketbase";
 import {
   LEAD_SOURCE_OPTIONS,
@@ -205,14 +206,16 @@ export default function CounselorPage() {
   const leadsEnabled = getPolicyAccess("user_leads", true);
   const tasksEnabled = getPolicyAccess("user_tasks", true);
   const canAddLead = getPolicyAccess("user_add_lead", true);
-  const [activeTab, setActiveTab] = useState<"leads" | "tasks">("leads");
+  const [activeTab, setActiveTab] = useState<"leads" | "tasks" | "kpi">("leads");
   const tabRestoredRef = useRef(false);
 
   useEffect(() => {
     if (authChecked && authUser && !isAccessLoading && !tabRestoredRef.current) {
-      const savedTab = localStorage.getItem("staff_portal_tab") as "leads" | "tasks" | null;
+      const savedTab = localStorage.getItem("staff_portal_tab") as "leads" | "tasks" | "kpi" | null;
       if (savedTab === "tasks" && tasksEnabled) {
         setActiveTab("tasks");
+      } else if (savedTab === "kpi") {
+        setActiveTab("kpi");
       } else if (savedTab === "leads" && leadsEnabled) {
         setActiveTab("leads");
       } else {
@@ -220,6 +223,8 @@ export default function CounselorPage() {
           setActiveTab("tasks");
         } else if (leadsEnabled) {
           setActiveTab("leads");
+        } else {
+          setActiveTab("kpi");
         }
       }
       tabRestoredRef.current = true;
@@ -1344,32 +1349,46 @@ export default function CounselorPage() {
         </div>
       }
     >
-      {leadsEnabled && tasksEnabled && (
+      {(leadsEnabled || tasksEnabled) && (
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
           <div className="flex bg-slate-100/80 p-1 rounded-xl w-fit border border-slate-200/40 shrink-0">
+            {leadsEnabled && (
+              <button
+                onClick={() => setActiveTab("leads")}
+                className={`px-5 py-2.5 rounded-lg text-xs font-bold transition-all ${
+                  activeTab === "leads"
+                    ? "bg-white text-slate-800 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Leads Management
+              </button>
+            )}
+            {tasksEnabled && (
+              <button
+                onClick={() => setActiveTab("tasks")}
+                className={`px-5 py-2.5 rounded-lg text-xs font-bold transition-all ${
+                  activeTab === "tasks"
+                    ? "bg-white text-slate-800 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                My Tasks
+              </button>
+            )}
             <button
-              onClick={() => setActiveTab("leads")}
+              onClick={() => setActiveTab("kpi")}
               className={`px-5 py-2.5 rounded-lg text-xs font-bold transition-all ${
-                activeTab === "leads"
+                activeTab === "kpi"
                   ? "bg-white text-slate-800 shadow-sm"
                   : "text-slate-500 hover:text-slate-700"
               }`}
             >
-              Leads Management
-            </button>
-            <button
-              onClick={() => setActiveTab("tasks")}
-              className={`px-5 py-2.5 rounded-lg text-xs font-bold transition-all ${
-                activeTab === "tasks"
-                  ? "bg-white text-slate-800 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              My Tasks
+              My Scorecard
             </button>
           </div>
 
-          {activeTab === "tasks" && (
+          {activeTab === "tasks" && tasksEnabled && (
             <div className="relative w-full sm:max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
@@ -2654,6 +2673,8 @@ export default function CounselorPage() {
         </>
       ) : activeTab === "tasks" && tasksEnabled ? (
         <StaffTasks searchTerm={taskSearchTerm} />
+      ) : activeTab === "kpi" ? (
+        <StaffKPIScorecard />
       ) : (
         <div className="mx-auto max-w-md my-16 text-center bg-white border border-slate-100 rounded-3xl p-8 shadow-lg space-y-6">
           <div className="mx-auto w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500 border border-rose-100">

@@ -13,7 +13,7 @@ import {
   AlertDialogTitle,
   AlertDialogDescription,
 } from "@/components/ui/alert-dialog";
-import { Search, Users, UserPlus, Lock } from "lucide-react";
+import { Search, Users, UserPlus, Lock, Loader2, UsersRound, UserMinus, Filter, ShieldAlert } from "lucide-react";
 
 type ManagedUser = {
   id: string;
@@ -63,7 +63,13 @@ export default function AdminUsers() {
 
   const [disableDialogOpen, setDisableDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<ManagedUser | null>(null);
-  const [transferToUserId, setTransferToUserId] = useState("");
+
+  // Enhanced lead reassignment states
+  const [isLoadingStatusCounts, setIsLoadingStatusCounts] = useState(false);
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [transferToUserIds, setTransferToUserIds] = useState<string[]>([]);
+  const [counsellorSearch, setCounsellorSearch] = useState("");
 
   const [resetUser, setResetUser] = useState<ManagedUser | null>(null);
   const [resetPassword, setResetPassword] = useState("");
@@ -271,23 +277,73 @@ export default function AdminUsers() {
     }
   };
 
-  const openDisableDialog = (user: ManagedUser) => {
+  const openDisableDialog = async (user: ManagedUser) => {
     setSelectedUser(user);
-    const firstTarget = users.find(
-      (item) =>
-        item.id !== user.id &&
-        item.role === "student-counsellor" &&
-        item.accountStatus === "enabled",
-    );
-    setTransferToUserId(firstTarget?.id || "");
     setDisableDialogOpen(true);
+    setIsLoadingStatusCounts(true);
+    setStatusCounts({});
+    setSelectedStatuses([]);
+    setTransferToUserIds([]);
+    setCounsellorSearch("");
+
+    try {
+      const response = await fetch(`/api/admin/users/disable?userId=${user.id}`);
+      if (!response.ok) throw new Error("Failed to fetch lead status counts");
+      const data = await response.json();
+      if (data.success) {
+        setStatusCounts(data.statusCounts || {});
+        // Select all statuses with count > 0 by default
+        const initialSelected = Object.keys(data.statusCounts || {}).filter(
+          (status) => (data.statusCounts[status] || 0) > 0
+        );
+        setSelectedStatuses(initialSelected);
+
+        // Auto select first target counselor as default
+        const firstTarget = users.find(
+          (item) =>
+            item.id !== user.id &&
+            item.role === "student-counsellor" &&
+            item.accountStatus === "enabled",
+        );
+        if (firstTarget) {
+          setTransferToUserIds([firstTarget.id]);
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load lead status breakdown");
+    } finally {
+      setIsLoadingStatusCounts(false);
+    }
+  };
+
+  const totalLeadsToTransfer = useMemo(() => {
+    return selectedStatuses.reduce((acc, status) => acc + (statusCounts[status] || 0), 0);
+  }, [selectedStatuses, statusCounts]);
+
+  const filteredCounselorTargets = useMemo(() => {
+    const search = counsellorSearch.trim().toLowerCase();
+    if (!search) return counselorTargets;
+    return counselorTargets.filter(
+      (c) =>
+        c.name.toLowerCase().includes(search) ||
+        c.email.toLowerCase().includes(search)
+    );
+  }, [counsellorSearch, counselorTargets]);
+
+  const selectAllCounsellors = () => {
+    setTransferToUserIds(counselorTargets.map((c) => c.id));
+  };
+
+  const clearCounsellors = () => {
+    setTransferToUserIds([]);
   };
 
   const disableUser = async () => {
     if (!selectedUser) return;
 
-    if (selectedUser.assignedLeadCount > 0 && !transferToUserId) {
-      toast.error("Select a transfer counselor before disabling this user");
+    if (totalLeadsToTransfer > 0 && transferToUserIds.length === 0) {
+      toast.error("Select at least one transfer counselor before disabling this user");
       return;
     }
 
@@ -298,8 +354,8 @@ export default function AdminUsers() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: selectedUser.id,
-          transferToUserId:
-            selectedUser.assignedLeadCount > 0 ? transferToUserId : undefined,
+          transferToUserIds: totalLeadsToTransfer > 0 ? transferToUserIds : undefined,
+          selectedStatuses: totalLeadsToTransfer > 0 ? selectedStatuses : undefined,
           adminId,
           adminName,
         }),
@@ -310,10 +366,12 @@ export default function AdminUsers() {
         throw new Error(body.error || "Failed to disable user");
       }
 
-      toast.success(`${selectedUser.name} disabled`);
+      toast.success(`${selectedUser.name} disabled successfully`);
       setDisableDialogOpen(false);
       setSelectedUser(null);
-      setTransferToUserId("");
+      setTransferToUserIds([]);
+      setSelectedStatuses([]);
+      setStatusCounts({});
       await loadUsers();
     } catch (error) {
       toast.error(
@@ -650,54 +708,231 @@ export default function AdminUsers() {
       </div>
 
       <AlertDialog open={disableDialogOpen} onOpenChange={setDisableDialogOpen}>
-        <AlertDialogContent size="default" className="max-w-lg sm:max-w-lg">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Disable User</AlertDialogTitle>
-            <AlertDialogDescription>
-              {selectedUser ? `${selectedUser.name}` : "This user"} will lose
-              access immediately.
-            </AlertDialogDescription>
+        <AlertDialogContent size="3xl">
+          <AlertDialogHeader className="border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-rose-50 rounded-xl text-rose-600">
+                <UserMinus className="h-5 w-5 animate-pulse" />
+              </div>
+              <div className="text-left">
+                <AlertDialogTitle className="text-base font-bold text-slate-800">Disable User Account</AlertDialogTitle>
+                <AlertDialogDescription className="text-xs text-slate-400 mt-0.5">
+                  {selectedUser ? `${selectedUser.name} (${selectedUser.email})` : "This user"} will lose access immediately.
+                </AlertDialogDescription>
+              </div>
+            </div>
           </AlertDialogHeader>
 
-          <div className="space-y-3 text-sm">
-            {selectedUser && selectedUser.assignedLeadCount > 0 ? (
-              <>
-                <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                  This user has {selectedUser.assignedLeadCount} assigned leads.
-                  Please choose another enabled student counsellor to transfer
-                  all leads before disabling.
-                </p>
+          <div className="py-2 text-sm text-left">
+            {isLoadingStatusCounts ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-3">
+                <Loader2 className="h-7 w-7 text-blue-600 animate-spin" />
+                <span className="text-xs font-semibold text-slate-400">Loading lead breakdown...</span>
+              </div>
+            ) : selectedUser && selectedUser.assignedLeadCount > 0 ? (
+              <div className="space-y-4">
+                {/* Warning Banner */}
+                <div className="flex items-start gap-2.5 bg-amber-50/70 border border-amber-200/60 rounded-xl p-3 text-amber-900 text-xs">
+                  <ShieldAlert className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <p className="font-bold text-amber-950">Active Leads Transfer Required</p>
+                    <p className="text-amber-800 leading-relaxed font-medium">
+                      This counsellor has <span className="font-bold">{selectedUser.assignedLeadCount}</span> assigned leads. 
+                      Configure status filters and choose target counsellors to distribute these leads.
+                    </p>
+                  </div>
+                </div>
 
-                <label className="block text-gray-700">
-                  Transfer all leads to
-                  <select
-                    value={transferToUserId}
-                    onChange={(event) =>
-                      setTransferToUserId(event.target.value)
-                    }
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
-                  >
-                    <option value="">Select a counselor</option>
-                    {counselorTargets.map((target) => (
-                      <option key={target.id} value={target.id}>
-                        {target.name} ({target.email})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </>
+                {/* Grid columns */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
+                  {/* Column 1: Status selection checkboxes */}
+                  <div className="bg-slate-50/50 border border-slate-100 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      <Filter className="h-3.5 w-3.5 text-slate-400" />
+                      <span>Select Lead Statuses ({totalLeadsToTransfer} selected)</span>
+                    </div>
+
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                      {["New", "Ringing-No-Answer", "Contacted", "Follow-up", "Registered", "Lost"].map((status) => {
+                        const count = statusCounts[status] || 0;
+                        const isChecked = selectedStatuses.includes(status);
+                        const hasLeads = count > 0;
+
+                        return (
+                          <label
+                            key={status}
+                            className={`flex items-center justify-between p-2.5 rounded-lg border transition-all cursor-pointer select-none ${
+                              !hasLeads
+                                ? "opacity-50 bg-slate-100/40 border-slate-100 cursor-not-allowed"
+                                : isChecked
+                                  ? "bg-white border-blue-500 shadow-sm"
+                                  : "bg-white border-slate-200 hover:border-slate-350"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <input
+                                type="checkbox"
+                                disabled={!hasLeads}
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedStatuses([...selectedStatuses, status]);
+                                  } else {
+                                    setSelectedStatuses(selectedStatuses.filter((s) => s !== status));
+                                  }
+                                }}
+                                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
+                              />
+                              <span className={`text-xs font-bold ${isChecked ? "text-slate-800" : "text-slate-600"}`}>
+                                {status.replace(/-/g, " ")}
+                              </span>
+                            </div>
+                            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${isChecked ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-500"}`}>
+                              {count} lead{count !== 1 && "s"}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Column 2: Counsellors list with checkboxes */}
+                  <div className="bg-slate-50/50 border border-slate-100 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        <UsersRound className="h-3.5 w-3.5 text-slate-400" />
+                        <span>Select Targets ({transferToUserIds.length})</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={selectAllCounsellors}
+                          className="text-[10px] font-bold text-blue-600 hover:text-blue-700 transition-colors cursor-pointer"
+                        >
+                          Select All
+                        </button>
+                        <span className="text-[10px] text-slate-300">|</span>
+                        <button
+                          type="button"
+                          onClick={clearCounsellors}
+                          className="text-[10px] font-bold text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Search Field */}
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Search counsellors..."
+                        value={counsellorSearch}
+                        onChange={(e) => setCounsellorSearch(e.target.value)}
+                        className="w-full text-xs rounded-lg border border-slate-200 bg-white pl-8 pr-3 py-2.5 focus:border-blue-500 focus:outline-none transition-all placeholder-slate-400"
+                      />
+                    </div>
+
+                    {/* Target Counsellors List */}
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                      {filteredCounselorTargets.length === 0 ? (
+                        <div className="text-center py-6 text-xs text-slate-450 italic">
+                          {counsellorSearch ? "No matching counsellors found" : "No other counsellors available"}
+                        </div>
+                      ) : (
+                        filteredCounselorTargets.map((target) => {
+                          const isChecked = transferToUserIds.includes(target.id);
+                          return (
+                            <label
+                              key={target.id}
+                              className={`flex items-center justify-between p-2 rounded-lg border transition-all cursor-pointer ${
+                                isChecked
+                                  ? "bg-white border-blue-500 shadow-sm"
+                                  : "bg-white border-slate-200 hover:border-slate-350"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setTransferToUserIds([...transferToUserIds, target.id]);
+                                    } else {
+                                      setTransferToUserIds(transferToUserIds.filter((id) => id !== target.id));
+                                    }
+                                  }}
+                                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 h-3.5 w-3.5 cursor-pointer"
+                                />
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-slate-700 truncate">{target.name}</p>
+                                  <p className="text-[9px] text-slate-400 truncate">{target.email}</p>
+                                </div>
+                              </div>
+                              <span className="text-[9px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full shrink-0">
+                                {target.assignedLeadCount} leads
+                              </span>
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Distribution preview banner */}
+                {totalLeadsToTransfer > 0 && (
+                  <div className={`rounded-xl p-3 border text-xs transition-all duration-300 ${
+                    transferToUserIds.length === 0
+                      ? "bg-rose-50 border-rose-200 text-rose-950"
+                      : "bg-indigo-50/50 border-indigo-200 text-indigo-950"
+                  }`}>
+                    {transferToUserIds.length === 0 ? (
+                      <p className="font-bold flex items-center gap-1">
+                        Select at least one counselor to receive the reassigned leads.
+                      </p>
+                    ) : (
+                      <div className="space-y-1">
+                        <p className="font-bold">Redistribution Summary</p>
+                        <p className="text-[11px] text-slate-600 leading-relaxed font-semibold">
+                          <span className="text-indigo-700 font-extrabold">{totalLeadsToTransfer} leads</span> will be transferred equally. 
+                          Each of the <span className="text-indigo-700 font-extrabold">{transferToUserIds.length}</span> selected counsellors will receive{" "}
+                          <span className="text-indigo-700 font-extrabold">{Math.floor(totalLeadsToTransfer / transferToUserIds.length)} leads</span>.
+                          {totalLeadsToTransfer % transferToUserIds.length > 0 && (
+                            <span>
+                              {" "}(
+                              <span className="font-bold">{totalLeadsToTransfer % transferToUserIds.length}</span> counsellor(s) will receive 1 additional remainder lead).
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             ) : (
-              <p className="text-gray-700">
-                No assigned leads found. You can disable this user directly.
+              <p className="text-slate-500 py-4 text-center italic bg-slate-50 rounded-xl border border-slate-100">
+                No active leads found. You can safely disable this counsellor directly.
               </p>
             )}
           </div>
 
-          <AlertDialogFooter>
+          <AlertDialogFooter className="border-t border-slate-100 pt-3">
             <AlertDialogCancel disabled={isSubmitting}>
               Cancel
             </AlertDialogCancel>
-            <AlertDialogAction onClick={() => void disableUser()}>
+            <AlertDialogAction
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              disabled={isSubmitting || (totalLeadsToTransfer > 0 && transferToUserIds.length === 0)}
+              onClick={(e) => {
+                if (isSubmitting || (totalLeadsToTransfer > 0 && transferToUserIds.length === 0)) {
+                  e.preventDefault();
+                  return;
+                }
+                void disableUser();
+              }}
+            >
               {isSubmitting ? "Disabling..." : "Confirm Disable"}
             </AlertDialogAction>
           </AlertDialogFooter>

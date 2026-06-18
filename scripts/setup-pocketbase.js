@@ -143,6 +143,37 @@ async function setupCollections() {
         { name: "enabled", type: "bool", required: true },
       ],
     },
+    {
+      name: "kpiLedger",
+      displayName: "KPI Ledger",
+      description: "Manual points allocations and appraisals for staff",
+      fields: [
+        {
+          name: "staffId",
+          type: "relation",
+          required: true,
+          options: {
+            collectionId: "_pb_users_auth_",
+            maxSelect: 1,
+            cascadeDelete: true,
+          },
+        },
+        { name: "points", type: "number", required: true },
+        { name: "category", type: "text", required: true },
+        { name: "comments", type: "text" },
+        { name: "date", type: "date" },
+        {
+          name: "awardedBy",
+          type: "relation",
+          required: true,
+          options: {
+            collectionId: "_pb_users_auth_",
+            maxSelect: 1,
+            cascadeDelete: false,
+          },
+        },
+      ],
+    },
   ];
 
   // Create each collection
