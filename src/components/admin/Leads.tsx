@@ -832,8 +832,10 @@ export default function AdminLeads() {
   }, [authReady]);
 
   const fetchLeads = useCallback(
-    async (pageToLoad = 1) => {
-      setIsLoading(true);
+    async (pageToLoad = 1, isBackground = false) => {
+      if (!isBackground) {
+        setIsLoading(true);
+      }
 
       // Cancel any pending requests
       if (abortControllerRef.current) {
@@ -926,8 +928,10 @@ export default function AdminLeads() {
     [statusFilter, counselorFilter, searchTerm, dateFilterField, mapLead],
   );
 
-  const fetchAllLeads = useCallback(async () => {
-    setIsLoading(true);
+  const fetchAllLeads = useCallback(async (isBackground = false) => {
+    if (!isBackground) {
+      setIsLoading(true);
+    }
 
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -1047,7 +1051,7 @@ export default function AdminLeads() {
 
     const pb = createPocketBaseClient();
     pb.collection("leads").subscribe("*", () => {
-      void fetchLeads(page);
+      void fetchLeads(page, true);
     });
 
     return () => {

@@ -245,9 +245,11 @@ export default function AdminDashboard() {
   const [isCopying, setIsCopying] = useState(false);
 
 
-  const fetchStats = useCallback(async () => {
+  const fetchStats = useCallback(async (isBackground = false) => {
     try {
-      setIsLoading(true);
+      if (!isBackground) {
+        setIsLoading(true);
+      }
       const pb = createPocketBaseClient();
 
       const getLeads = async () => {
@@ -652,13 +654,13 @@ export default function AdminDashboard() {
     const pb = createPocketBaseClient();
 
     pb.collection("leads").subscribe("*", () => {
-      void fetchStats();
+      void fetchStats(true);
     });
     pb.collection("leadHistory").subscribe("*", () => {
-      void fetchStats();
+      void fetchStats(true);
     });
     pb.collection("tasks").subscribe("*", () => {
-      void fetchStats();
+      void fetchStats(true);
     });
 
     return () => {

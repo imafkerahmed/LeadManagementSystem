@@ -75,10 +75,10 @@ export default function DailyReports() {
     const pb = createPocketBaseClient();
 
     pb.collection("leads").subscribe("*", () => {
-      void fetchDailyReport(selectedDate);
+      void fetchDailyReport(selectedDate, true);
     });
     pb.collection("leadHistory").subscribe("*", () => {
-      void fetchDailyReport(selectedDate);
+      void fetchDailyReport(selectedDate, true);
     });
 
     return () => {
@@ -87,8 +87,10 @@ export default function DailyReports() {
     };
   }, [selectedDate]);
 
-  async function fetchDailyReport(dateStr: string) {
-    setIsLoading(true);
+  async function fetchDailyReport(dateStr: string, isBackground = false) {
+    if (!isBackground) {
+      setIsLoading(true);
+    }
     try {
       const parts = dateStr.split("-");
       let startParam = "";
