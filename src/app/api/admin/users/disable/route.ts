@@ -244,6 +244,13 @@ export async function POST(request: NextRequest) {
 
         await pb.collection("leads").update(lead.id, {
           assignedTo: targetUser.id,
+          status: "New",
+          followup1Date: null,
+          followup1Completed: false,
+          followup2Date: null,
+          followup2Completed: false,
+          followup3Date: null,
+          followup3Completed: false,
           lastModified: now,
         });
 
@@ -257,8 +264,8 @@ export async function POST(request: NextRequest) {
             oldValue: resolveName(user.id),
             newValue: resolveName(targetUser.id),
             comment: adminName
-              ? `Transferred automatically during account disable by ${adminName}`
-              : "Transferred automatically during account disable",
+              ? `Transferred and reset to New during account disable by ${adminName}`
+              : "Transferred and reset to New during account disable",
           });
         } catch (historyErr) {
           console.error("Failed to write lead history:", historyErr);
