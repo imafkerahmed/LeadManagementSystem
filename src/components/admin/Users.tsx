@@ -70,6 +70,7 @@ export default function AdminUsers() {
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [transferToUserIds, setTransferToUserIds] = useState<string[]>([]);
   const [counsellorSearch, setCounsellorSearch] = useState("");
+  const [disableWithoutTransfer, setDisableWithoutTransfer] = useState(false);
 
   const [resetUser, setResetUser] = useState<ManagedUser | null>(null);
   const [resetPassword, setResetPassword] = useState("");
@@ -285,6 +286,7 @@ export default function AdminUsers() {
     setSelectedStatuses([]);
     setTransferToUserIds([]);
     setCounsellorSearch("");
+    setDisableWithoutTransfer(false);
 
     try {
       const response = await fetch(`/api/admin/users/disable?userId=${user.id}`);
@@ -342,7 +344,7 @@ export default function AdminUsers() {
   const disableUser = async () => {
     if (!selectedUser) return;
 
-    if (totalLeadsToTransfer > 0 && transferToUserIds.length === 0) {
+    if (!disableWithoutTransfer && totalLeadsToTransfer > 0 && transferToUserIds.length === 0) {
       toast.error("Select at least one transfer counselor before disabling this user");
       return;
     }
@@ -354,8 +356,9 @@ export default function AdminUsers() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: selectedUser.id,
-          transferToUserIds: totalLeadsToTransfer > 0 ? transferToUserIds : undefined,
-          selectedStatuses: totalLeadsToTransfer > 0 ? selectedStatuses : undefined,
+          transferToUserIds: !disableWithoutTransfer && totalLeadsToTransfer > 0 ? transferToUserIds : undefined,
+          selectedStatuses: !disableWithoutTransfer && totalLeadsToTransfer > 0 ? selectedStatuses : undefined,
+          disableWithoutTransfer: disableWithoutTransfer,
           adminId,
           adminName,
         }),
@@ -767,8 +770,26 @@ export default function AdminUsers() {
                   </div>
                 </div>
 
+                {/* Disable Without Transferring Checkbox Option */}
+                {!isSelectedUserDisabled && (
+                  <div className="flex items-center gap-2.5 bg-slate-50 border border-slate-200/60 rounded-xl p-3 select-none">
+                    <input
+                      id="disableWithoutTransferCheckbox"
+                      type="checkbox"
+                      checked={disableWithoutTransfer}
+                      onChange={(e) => setDisableWithoutTransfer(e.target.checked)}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 h-4 w-4 cursor-pointer"
+                    />
+                    <label htmlFor="disableWithoutTransferCheckbox" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                      Disable account without transferring leads (leads will remain assigned to this user)
+                    </label>
+                  </div>
+                )}
+ 
                 {/* Grid columns */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
+                <div className={`grid grid-cols-1 md:grid-cols-2 gap-5 items-start transition-all duration-200 ${
+                  disableWithoutTransfer ? "opacity-40 pointer-events-none" : ""
+                }`}>
                   {/* Column 1: Status selection checkboxes */}
                   <div className="bg-slate-50/50 border border-slate-100 rounded-xl p-4 space-y-3">
                     <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -906,7 +927,7 @@ export default function AdminUsers() {
                 </div>
 
                 {/* Distribution preview banner */}
-                {totalLeadsToTransfer > 0 && (
+                {!disableWithoutTransfer && totalLeadsToTransfer > 0 && (
                   <div className={`rounded-xl p-3 border text-xs transition-all duration-300 ${
                     transferToUserIds.length === 0
                       ? "bg-rose-50 border-rose-200 text-rose-950"
@@ -941,16 +962,16 @@ export default function AdminUsers() {
               </p>
             )}
           </div>
-
+ 
           <AlertDialogFooter className="border-t border-slate-100 pt-3">
             <AlertDialogCancel disabled={isSubmitting}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               className="bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              disabled={isSubmitting || (totalLeadsToTransfer > 0 && transferToUserIds.length === 0)}
+              disabled={isSubmitting || (!disableWithoutTransfer && totalLeadsToTransfer > 0 && transferToUserIds.length === 0)}
               onClick={(e) => {
-                if (isSubmitting || (totalLeadsToTransfer > 0 && transferToUserIds.length === 0)) {
+                if (isSubmitting || (!disableWithoutTransfer && totalLeadsToTransfer > 0 && transferToUserIds.length === 0)) {
                   e.preventDefault();
                   return;
                 }

@@ -117,6 +117,7 @@ export async function POST(request: NextRequest) {
       transferToUserId?: string; // legacy single select
       transferToUserIds?: string[]; // new multi select
       selectedStatuses?: string[]; // new status filter
+      disableWithoutTransfer?: boolean;
       adminId?: string;
       adminName?: string;
     };
@@ -197,7 +198,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (leadsToTransfer.length > 0 && targetUserIds.length === 0) {
+    const disableWithoutTransfer = !!body.disableWithoutTransfer;
+
+    if (!disableWithoutTransfer && leadsToTransfer.length > 0 && targetUserIds.length === 0) {
       return NextResponse.json(
         {
           error:
@@ -241,7 +244,7 @@ export async function POST(request: NextRequest) {
     let transferredCount = 0;
     const now = new Date().toISOString();
 
-    if (targetUsers.length > 0 && leadsToTransfer.length > 0) {
+    if (!disableWithoutTransfer && targetUsers.length > 0 && leadsToTransfer.length > 0) {
       for (let i = 0; i < leadsToTransfer.length; i++) {
         const lead = leadsToTransfer[i];
         const targetUser = targetUsers[i % targetUsers.length];
