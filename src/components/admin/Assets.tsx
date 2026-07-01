@@ -137,6 +137,7 @@ export default function AdminAssets() {
           };
           
           const startScanning = (cameraIdOrConfig: any) => {
+            console.log("Starting scanner with:", cameraIdOrConfig);
             html5QrCode.start(
               cameraIdOrConfig,
               {
@@ -174,35 +175,9 @@ export default function AdminAssets() {
             });
           };
 
-          // Try listing cameras first
-          Html5Qrcode.getCameras()
-            .then((list: any[]) => {
-              if (list && list.length > 0) {
-                setDevices(list);
-                // Prioritize back camera in the list
-                const backCameraIdx = list.findIndex((device) => {
-                  const label = device.label.toLowerCase();
-                  return (
-                    label.includes("back") ||
-                    label.includes("rear") ||
-                    label.includes("environment") ||
-                    label.includes("outline") ||
-                    label.includes("facing camera 0")
-                  );
-                });
-                
-                const selectedIndex = backCameraIdx !== -1 ? backCameraIdx : 0;
-                setActiveDeviceIndex(selectedIndex);
-                startScanning(list[selectedIndex].id);
-              } else {
-                // Fallback to environment configuration
-                startScanning({ facingMode: "environment" });
-              }
-            })
-            .catch(() => {
-              // Query blocked, load with facingMode environment config
-              startScanning({ facingMode: "environment" });
-            });
+          // ALWAYS start with environment (rear) camera configuration first!
+          // This avoids empty label issues of getCameras on first load
+          startScanning({ facingMode: "environment" });
 
         } catch (e) {
           console.error("Failed to load html5-qrcode dynamically:", e);
