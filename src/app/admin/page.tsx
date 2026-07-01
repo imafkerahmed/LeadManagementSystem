@@ -12,10 +12,12 @@ import {
   ListTodo,
   Shield,
   Award,
+  Laptop,
 } from "lucide-react";
 import AdminDashboard from "@/components/admin/Dashboard";
 import AdminLeads from "@/components/admin/Leads";
 import AdminTasks from "@/components/admin/Tasks";
+import AdminAssets from "@/components/admin/Assets";
 import BulkUpload from "@/components/admin/BulkUpload";
 import AdminSettings from "@/components/admin/Settings";
 import AdminReports from "@/components/admin/Reports";
@@ -38,6 +40,7 @@ type AdminTab =
   | "dashboard"
   | "leads"
   | "tasks"
+  | "assets"
   | "bulk"
   | "reports"
   | "kpi"
@@ -51,6 +54,7 @@ const tabs: Array<{
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "leads", label: "All Leads", icon: UsersIcon },
   { id: "tasks", label: "Tasks", icon: ListTodo },
+  { id: "assets", label: "Assets", icon: Laptop },
   { id: "bulk", label: "Bulk Upload", icon: UploadCloud },
   { id: "reports", label: "Reports", icon: BarChart3 },
   { id: "kpi", label: "KPI & Performance", icon: Award },
@@ -64,6 +68,7 @@ const tabKeys: Record<AdminTab, string> = {
   dashboard: "admin_dashboard",
   leads: "admin_leads",
   tasks: "admin_tasks",
+  assets: "admin_assets",
   bulk: "admin_bulk",
   reports: "admin_reports",
   kpi: "admin_kpi",
@@ -365,6 +370,8 @@ export default function AdminPage() {
                 "Search, browse, edit, and filter all leads"}
               {currentTab === "tasks" &&
                 "Monitor, create, and assign staff tasks"}
+              {currentTab === "assets" &&
+                "Manage hardware, peripherals, warranties, and staff assignments"}
               {currentTab === "bulk" && "Upload CSV file for batch imports"}
               {currentTab === "reports" &&
                 "Query performance stats and visual charts"}
@@ -375,7 +382,7 @@ export default function AdminPage() {
             </p>
           </div>
         </header>
-
+ 
         <main className="flex-1 overflow-y-auto px-8 py-8 bg-[#fafbfc]">
           <div className="mx-auto transition-all duration-300 max-w-7xl">
             {currentTab === "dashboard" &&
@@ -385,6 +392,9 @@ export default function AdminPage() {
             )}
             {currentTab === "tasks" && allowedTabs.includes("tasks") && (
               <AdminTasks />
+            )}
+            {currentTab === "assets" && allowedTabs.includes("assets") && (
+              <AdminAssets />
             )}
             {currentTab === "bulk" && allowedTabs.includes("bulk") && (
               <BulkUpload operatorId={adminId} operatorLabel={adminLabel} />

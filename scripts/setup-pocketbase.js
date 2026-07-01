@@ -174,6 +174,79 @@ async function setupCollections() {
         },
       ],
     },
+    {
+      name: "assets",
+      displayName: "Assets",
+      description: "Company hardware and peripheral assets",
+      fields: [
+        { name: "name", type: "text", required: true },
+        {
+          name: "type",
+          type: "select",
+          required: true,
+          options: {
+            values: ["laptop", "phone", "printer", "peripheral", "other"],
+            maxSelect: 1,
+          },
+        },
+        { name: "brand", type: "text", required: true },
+        { name: "model", type: "text" },
+        { name: "serialNumber", type: "text", required: true },
+        {
+          name: "status",
+          type: "select",
+          required: true,
+          options: {
+            values: ["available", "assigned", "maintenance", "retired"],
+            maxSelect: 1,
+          },
+        },
+        {
+          name: "assignedTo",
+          type: "relation",
+          options: {
+            collectionId: "_pb_users_auth_",
+            maxSelect: 1,
+            cascadeDelete: false,
+          },
+        },
+        { name: "assignedAt", type: "date" },
+        { name: "purchaseDate", type: "date" },
+        { name: "purchaseCost", type: "number" },
+        { name: "warrantyExpiry", type: "date" },
+        { name: "notes", type: "text" },
+      ],
+    },
+    {
+      name: "assetHistory",
+      displayName: "Asset History",
+      description: "Audit trail of changes and assignments to company assets",
+      fields: [
+        {
+          name: "assetId",
+          type: "relation",
+          required: true,
+          options: {
+            collectionId: "assets",
+            maxSelect: 1,
+            cascadeDelete: true,
+          },
+        },
+        {
+          name: "changedBy",
+          type: "relation",
+          required: true,
+          options: {
+            collectionId: "_pb_users_auth_",
+            maxSelect: 1,
+            cascadeDelete: false,
+          },
+        },
+        { name: "action", type: "text", required: true },
+        { name: "details", type: "text", required: true },
+        { name: "date", type: "date", required: true },
+      ],
+    },
   ];
 
   // Create each collection

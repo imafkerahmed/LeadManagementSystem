@@ -245,6 +245,58 @@ export async function POST(request: NextRequest) {
       console.error("Failed to secure taskHistory collection rules:", err);
     }
 
+    try {
+      const assetsCol = await pb.collections.getOne("assets");
+      const targetAssetsListRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin"';
+      const targetAssetsViewRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin"';
+      const targetAssetsCreateRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin"';
+      const targetAssetsUpdateRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin"';
+      const targetAssetsDeleteRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin"';
+
+      if (
+        assetsCol.listRule !== targetAssetsListRule ||
+        assetsCol.viewRule !== targetAssetsViewRule ||
+        assetsCol.createRule !== targetAssetsCreateRule ||
+        assetsCol.updateRule !== targetAssetsUpdateRule ||
+        assetsCol.deleteRule !== targetAssetsDeleteRule
+      ) {
+        assetsCol.listRule = targetAssetsListRule;
+        assetsCol.viewRule = targetAssetsViewRule;
+        assetsCol.createRule = targetAssetsCreateRule;
+        assetsCol.updateRule = targetAssetsUpdateRule;
+        assetsCol.deleteRule = targetAssetsDeleteRule;
+        await pb.collections.update("assets", assetsCol);
+      }
+    } catch (err) {
+      console.error("Failed to secure assets collection rules:", err);
+    }
+
+    try {
+      const assetHistoryCol = await pb.collections.getOne("assetHistory");
+      const targetAssetHistoryListRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin"';
+      const targetAssetHistoryViewRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin"';
+      const targetAssetHistoryCreateRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin"';
+      const targetAssetHistoryUpdateRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin"';
+      const targetAssetHistoryDeleteRule = '@request.auth.role = "super-admin" || @request.auth.role = "admin"';
+
+      if (
+        assetHistoryCol.listRule !== targetAssetHistoryListRule ||
+        assetHistoryCol.viewRule !== targetAssetHistoryViewRule ||
+        assetHistoryCol.createRule !== targetAssetHistoryCreateRule ||
+        assetHistoryCol.updateRule !== targetAssetHistoryUpdateRule ||
+        assetHistoryCol.deleteRule !== targetAssetHistoryDeleteRule
+      ) {
+        assetHistoryCol.listRule = targetAssetHistoryListRule;
+        assetHistoryCol.viewRule = targetAssetHistoryViewRule;
+        assetHistoryCol.createRule = targetAssetHistoryCreateRule;
+        assetHistoryCol.updateRule = targetAssetHistoryUpdateRule;
+        assetHistoryCol.deleteRule = targetAssetHistoryDeleteRule;
+        await pb.collections.update("assetHistory", assetHistoryCol);
+      }
+    } catch (err) {
+      console.error("Failed to secure assetHistory collection rules:", err);
+    }
+
     // 2. Create Leads collection
     try {
       await pb.collections.getOne("leads");
@@ -425,6 +477,106 @@ export async function POST(request: NextRequest) {
         ],
       });
     }
+
+    // 6. Create Assets collection
+    try {
+      await pb.collections.getOne("assets");
+    } catch {
+      await pb.collections.create({
+        id: "assets000000001",
+        name: "assets",
+        type: "base",
+        schema: [
+          { name: "name", type: "text", required: true },
+          {
+            name: "type",
+            type: "select",
+            required: true,
+            options: {
+              values: ["laptop", "phone", "printer", "peripheral", "other"],
+              maxSelect: 1,
+            },
+          },
+          { name: "brand", type: "text", required: true },
+          { name: "model", type: "text", required: false },
+          { name: "serialNumber", type: "text", required: true },
+          {
+            name: "status",
+            type: "select",
+            required: true,
+            options: {
+              values: ["available", "assigned", "maintenance", "retired"],
+              maxSelect: 1,
+            },
+          },
+          {
+            name: "assignedTo",
+            type: "relation",
+            required: false,
+            options: {
+              collectionId: "_pb_users_auth_",
+              maxSelect: 1,
+              minSelect: null,
+              cascadeDelete: false,
+            },
+          },
+          { name: "assignedAt", type: "date", required: false },
+          { name: "purchaseDate", type: "date", required: false },
+          { name: "purchaseCost", type: "number", required: false },
+          { name: "warrantyExpiry", type: "date", required: false },
+          { name: "notes", type: "text", required: false },
+        ],
+        listRule: '@request.auth.role = "super-admin" || @request.auth.role = "admin"',
+        viewRule: '@request.auth.role = "super-admin" || @request.auth.role = "admin"',
+        createRule: '@request.auth.role = "super-admin" || @request.auth.role = "admin"',
+        updateRule: '@request.auth.role = "super-admin" || @request.auth.role = "admin"',
+        deleteRule: '@request.auth.role = "super-admin" || @request.auth.role = "admin"',
+      });
+    }
+
+    // 7. Create AssetHistory collection
+    try {
+      await pb.collections.getOne("assetHistory");
+    } catch {
+      await pb.collections.create({
+        id: "assethistory101",
+        name: "assetHistory",
+        type: "base",
+        schema: [
+          {
+            name: "assetId",
+            type: "relation",
+            required: true,
+            options: {
+              collectionId: "assets000000001",
+              maxSelect: 1,
+              minSelect: null,
+              cascadeDelete: true,
+            },
+          },
+          {
+            name: "changedBy",
+            type: "relation",
+            required: true,
+            options: {
+              collectionId: "_pb_users_auth_",
+              maxSelect: 1,
+              minSelect: null,
+              cascadeDelete: false,
+            },
+          },
+          { name: "action", type: "text", required: true },
+          { name: "details", type: "text", required: true },
+          { name: "date", type: "date", required: true },
+        ],
+        listRule: '@request.auth.role = "super-admin" || @request.auth.role = "admin"',
+        viewRule: '@request.auth.role = "super-admin" || @request.auth.role = "admin"',
+        createRule: '@request.auth.role = "super-admin" || @request.auth.role = "admin"',
+        updateRule: '@request.auth.role = "super-admin" || @request.auth.role = "admin"',
+        deleteRule: '@request.auth.role = "super-admin" || @request.auth.role = "admin"',
+      });
+    }
+
     try {
       const acCol = await pb.collections.getOne("accessControl");
       const targetPageField = acCol.schema.find(
@@ -609,6 +761,42 @@ export async function POST(request: NextRequest) {
         displayName: "Delete Task Records",
         targetPage: "admin",
         allowedRoles: ["super-admin", "admin", "admissions-head"],
+        allowedUsers: [],
+        deniedUsers: [],
+        enabled: true,
+      },
+      {
+        sectionKey: "admin_assets",
+        displayName: "Asset Management Tab",
+        targetPage: "admin",
+        allowedRoles: ["super-admin", "admin"],
+        allowedUsers: [],
+        deniedUsers: [],
+        enabled: true,
+      },
+      {
+        sectionKey: "admin_assets_create",
+        displayName: "Create Assets",
+        targetPage: "admin",
+        allowedRoles: ["super-admin", "admin"],
+        allowedUsers: [],
+        deniedUsers: [],
+        enabled: true,
+      },
+      {
+        sectionKey: "admin_assets_edit",
+        displayName: "Edit Assets",
+        targetPage: "admin",
+        allowedRoles: ["super-admin", "admin"],
+        allowedUsers: [],
+        deniedUsers: [],
+        enabled: true,
+      },
+      {
+        sectionKey: "admin_assets_delete",
+        displayName: "Delete Assets",
+        targetPage: "admin",
+        allowedRoles: ["super-admin", "admin"],
         allowedUsers: [],
         deniedUsers: [],
         enabled: true,

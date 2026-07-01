@@ -68,6 +68,12 @@ export default function SetupPage() {
                   <li>
                     <strong>leadHistory</strong> - Audit trail of all changes
                   </li>
+                  <li>
+                    <strong>assets</strong> - Physical/digital hardware and peripherals log
+                  </li>
+                  <li>
+                    <strong>assetHistory</strong> - Audit trail of asset changes and assignments
+                  </li>
                 </ul>
               </div>
 

@@ -155,3 +155,37 @@ export interface DailyReportResponse {
   date: string;
   reports: DailyReportMetrics[];
 }
+
+// Asset Management types
+export type AssetType = "laptop" | "phone" | "printer" | "peripheral" | "other";
+export type AssetStatus = "available" | "assigned" | "maintenance" | "retired";
+
+export interface Asset {
+  id: string;
+  name: string;
+  type: AssetType;
+  brand: string;
+  model?: string;
+  serialNumber: string;
+  status: AssetStatus;
+  assignedTo?: string; // user ID
+  assignedToName?: string; // user name resolved in frontend
+  assignedAt?: string;
+  purchaseDate?: string;
+  purchaseCost?: number;
+  warrantyExpiry?: string;
+  notes?: string;
+  created: string;
+  updated: string;
+}
+
+export interface AssetHistory {
+  id: string;
+  assetId: string;
+  changedBy: string;
+  changedByName?: string;
+  action: string;
+  details: string;
+  date: string;
+  created: string;
+}
