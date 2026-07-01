@@ -147,11 +147,6 @@ export default function AdminAssets() {
                   const boxHeight = Math.floor(height * 0.45);
                   return { width: boxWidth, height: boxHeight };
                 },
-                videoConstraints: {
-                  focusMode: "continuous",
-                  width: { min: 640, ideal: 1280, max: 1920 },
-                  height: { min: 480, ideal: 720, max: 1080 },
-                },
                 experimentalFeatures: {
                   useBarCodeDetectorIfSupported: true
                 }
@@ -256,11 +251,6 @@ export default function AdminAssets() {
             const boxWidth = Math.floor(width * 0.85);
             const boxHeight = Math.floor(height * 0.45);
             return { width: boxWidth, height: boxHeight };
-          },
-          videoConstraints: {
-            focusMode: "continuous",
-            width: { min: 640, ideal: 1280, max: 1920 },
-            height: { min: 480, ideal: 720, max: 1080 },
           },
           experimentalFeatures: {
             useBarCodeDetectorIfSupported: true
