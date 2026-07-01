@@ -86,6 +86,8 @@ export default function AdminAssets() {
 
   // Scanner state
   const [showScanner, setShowScanner] = useState(false);
+  const [devices, setDevices] = useState<any[]>([]);
+  const [activeDeviceIndex, setActiveDeviceIndex] = useState<number>(0);
   const scannerRef = useRef<any>(null);
 
   useEffect(() => {
@@ -108,11 +110,35 @@ export default function AdminAssets() {
             ]
           });
           scannerRef.current = html5QrCode;
+
+          const loadDevicesAndSync = async (activeCameraIdOrConfig: any) => {
+            try {
+              const list = await Html5Qrcode.getCameras();
+              setDevices(list);
+              if (list && list.length > 0) {
+                if (typeof activeCameraIdOrConfig === "string") {
+                  const idx = list.findIndex((d: any) => d.id === activeCameraIdOrConfig);
+                  if (idx !== -1) {
+                    setActiveDeviceIndex(idx);
+                  }
+                } else if (activeCameraIdOrConfig && activeCameraIdOrConfig.facingMode === "environment") {
+                  const backIdx = list.findIndex((d: any) => {
+                    const label = d.label.toLowerCase();
+                    return label.includes("back") || label.includes("rear") || label.includes("environment");
+                  });
+                  if (backIdx !== -1) {
+                    setActiveDeviceIndex(backIdx);
+                  }
+                }
+              }
+            } catch (e) {
+              console.warn("Could not retrieve camera list for switching:", e);
+            }
+          };
           
-          const startScanning = (facingMode: "environment" | "user") => {
-            console.log(`Attempting scanner start with facingMode: ${facingMode}`);
+          const startScanning = (cameraIdOrConfig: any) => {
             html5QrCode.start(
-              { facingMode: facingMode },
+              cameraIdOrConfig,
               {
                 fps: 15, // Higher frame rate for scanning barcodes
                 qrbox: (width: number, height: number) => {
@@ -138,11 +164,14 @@ export default function AdminAssets() {
               () => {
                 // silent frame check errors
               }
-            ).catch((err: any) => {
-              console.error(`Camera start failed for facingMode ${facingMode}:`, err);
-              if (facingMode === "environment") {
+            ).then(() => {
+              // Refresh devices list once permissions are granted
+              loadDevicesAndSync(cameraIdOrConfig);
+            }).catch((err: any) => {
+              console.error(`Camera start failed:`, err);
+              if (cameraIdOrConfig && cameraIdOrConfig.facingMode === "environment") {
                 // Fallback to front camera if environment camera fails
-                startScanning("user");
+                startScanning({ facingMode: "user" });
               } else {
                 toast.error("Could not access camera. Make sure permissions are granted.");
                 setShowScanner(false);
@@ -150,8 +179,35 @@ export default function AdminAssets() {
             });
           };
 
-          // Start scanning immediately with rear camera, handles fallback internally
-          startScanning("environment");
+          // Try listing cameras first
+          Html5Qrcode.getCameras()
+            .then((list: any[]) => {
+              if (list && list.length > 0) {
+                setDevices(list);
+                // Prioritize back camera in the list
+                const backCameraIdx = list.findIndex((device) => {
+                  const label = device.label.toLowerCase();
+                  return (
+                    label.includes("back") ||
+                    label.includes("rear") ||
+                    label.includes("environment") ||
+                    label.includes("outline") ||
+                    label.includes("facing camera 0")
+                  );
+                });
+                
+                const selectedIndex = backCameraIdx !== -1 ? backCameraIdx : 0;
+                setActiveDeviceIndex(selectedIndex);
+                startScanning(list[selectedIndex].id);
+              } else {
+                // Fallback to environment configuration
+                startScanning({ facingMode: "environment" });
+              }
+            })
+            .catch(() => {
+              // Query blocked, load with facingMode environment config
+              startScanning({ facingMode: "environment" });
+            });
 
         } catch (e) {
           console.error("Failed to load html5-qrcode dynamically:", e);
@@ -165,23 +221,73 @@ export default function AdminAssets() {
         if (html5QrCode) {
           try {
             html5QrCode.stop().catch((err: any) => {
-              console.log("Scanner stop error (might not have been running):", err);
+              console.log("Scanner stop error:", err);
             });
           } catch (e) {
             console.error("Error stopping scanner instance:", e);
           }
         }
         scannerRef.current = null;
+        setDevices([]);
+        setActiveDeviceIndex(0);
       };
     }
   }, [showScanner]);
+
+  const handleSwitchCamera = async () => {
+    if (devices.length <= 1 || !scannerRef.current) return;
+
+    const nextIndex = (activeDeviceIndex + 1) % devices.length;
+    const nextDevice = devices[nextIndex];
+
+    try {
+      if (scannerRef.current.isScanning) {
+        await scannerRef.current.stop();
+      }
+
+      setActiveDeviceIndex(nextIndex);
+      toast.loading("Switching camera...", { id: "camera-switch" });
+
+      await scannerRef.current.start(
+        nextDevice.id,
+        {
+          fps: 15,
+          qrbox: (width: number, height: number) => {
+            const boxWidth = Math.floor(width * 0.85);
+            const boxHeight = Math.floor(height * 0.45);
+            return { width: boxWidth, height: boxHeight };
+          },
+          videoConstraints: {
+            focusMode: "continuous",
+            width: { min: 640, ideal: 1280, max: 1920 },
+            height: { min: 480, ideal: 720, max: 1080 },
+          },
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
+          }
+        },
+        (decodedText: string) => {
+          setSerialNumber(decodedText.trim());
+          toast.success(`Code detected: ${decodedText}`);
+          setShowScanner(false);
+        },
+        () => {}
+      );
+      
+      toast.success(`Camera Active: ${nextDevice.label || `Camera ${nextIndex + 1}`}`, { id: "camera-switch" });
+    } catch (err) {
+      console.error("Failed to switch camera:", err);
+      toast.error("Could not switch camera. Resetting scanner...", { id: "camera-switch" });
+      setShowScanner(false);
+      setTimeout(() => setShowScanner(true), 500);
+    }
+  };
 
   const handleFileScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     try {
-      // 1. Stop camera scan if running
       if (scannerRef.current && scannerRef.current.isScanning) {
         await scannerRef.current.stop();
       }
@@ -195,7 +301,6 @@ export default function AdminAssets() {
     } catch (err) {
       console.error("File scanning failed:", err);
       toast.error("Could not detect barcode. Make sure the image is clear and well-lit.");
-      // Restart camera scanning by resetting state
       setShowScanner(false);
       setTimeout(() => setShowScanner(true), 400);
     }
@@ -1274,12 +1379,24 @@ export default function AdminAssets() {
             }
           `}</style>
           <div className="w-full max-w-md bg-white rounded-2xl p-6 shadow-xl border border-slate-100 flex flex-col items-center relative overflow-hidden">
-            <button
-              onClick={() => setShowScanner(false)}
-              className="absolute right-4 top-4 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all font-bold text-lg"
-            >
-              &times;
-            </button>
+            <div className="absolute right-4 top-4 flex items-center gap-1">
+              {devices.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => void handleSwitchCamera()}
+                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all flex items-center justify-center"
+                  title="Switch Camera"
+                >
+                  <RefreshCw className="h-4.5 w-4.5" />
+                </button>
+              )}
+              <button
+                onClick={() => setShowScanner(false)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all font-bold text-lg leading-none"
+              >
+                &times;
+              </button>
+            </div>
             <div className="text-center mb-5">
               <h3 className="font-extrabold text-slate-800 text-base flex items-center justify-center gap-1.5">
                 <QrCode className="h-5 w-5 text-blue-600" />
@@ -1288,6 +1405,11 @@ export default function AdminAssets() {
               <p className="text-xs text-slate-400 mt-0.5">
                 Position the barcode or QR code inside the green scanner zone.
               </p>
+              {devices.length > 1 && (
+                <p className="text-[10px] text-blue-500 font-semibold mt-1">
+                  Active Camera: {devices[activeDeviceIndex]?.label || `Camera ${activeDeviceIndex + 1}`}
+                </p>
+              )}
             </div>
             
             <div className="w-full aspect-square max-w-[280px] rounded-2xl overflow-hidden bg-slate-950 relative border border-slate-800 shadow-inner flex items-center justify-center">
