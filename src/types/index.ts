@@ -9,6 +9,7 @@ export interface User {
   role: UserRole;
   created: string;
   updated: string;
+  accountStatus?: "enabled" | "disabled" | string;
 }
 
 // Task model
@@ -157,20 +158,35 @@ export interface DailyReportResponse {
 }
 
 // Asset Management types
-export type AssetType = "laptop" | "phone" | "printer" | "peripheral" | "other";
+export type AssetType = string;
 export type AssetStatus = "available" | "assigned" | "maintenance" | "retired";
+
+export interface Invoice {
+  id: string;
+  invoiceId?: string;
+  file: string;
+  name: string;
+  created: string;
+  updated: string;
+}
 
 export interface Asset {
   id: string;
+  asset_id: string;
   name: string;
   type: AssetType;
   brand: string;
   model?: string;
+  invoice?: string; // relation to invoices
+  invoiceId?: string; // custom invoice ID resolved in expand
+  invoiceFilename?: string; // resolved in expand
+  invoiceFile?: string; // legacy file string
   serialNumber: string;
   status: AssetStatus;
   assignedTo?: string; // user ID
   assignedToName?: string; // user name resolved in frontend
   assignedAt?: string;
+  assignedLocation?: string;
   purchaseDate?: string;
   purchaseCost?: number;
   warrantyExpiry?: string;

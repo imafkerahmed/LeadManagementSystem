@@ -175,23 +175,36 @@ async function setupCollections() {
       ],
     },
     {
+      name: "invoices",
+      displayName: "Invoices",
+      description: "Aggregated purchase invoice attachments",
+      fields: [
+        { name: "invoiceId", type: "text" },
+        {
+          name: "file",
+          type: "file",
+          required: true,
+          options: {
+            maxSelect: 1,
+            maxSize: 5242880,
+            mimeTypes: ["application/pdf", "image/jpeg", "image/png", "image/webp"],
+          }
+        },
+        { name: "name", type: "text" },
+      ]
+    },
+    {
       name: "assets",
       displayName: "Assets",
       description: "Company hardware and peripheral assets",
       fields: [
+        { name: "asset_id", type: "text", required: true },
+        { name: "assetId", type: "text", required: false },
         { name: "name", type: "text", required: true },
-        {
-          name: "type",
-          type: "select",
-          required: true,
-          options: {
-            values: ["laptop", "phone", "printer", "peripheral", "other"],
-            maxSelect: 1,
-          },
-        },
+        { name: "type", type: "text", required: true },
         { name: "brand", type: "text", required: true },
         { name: "model", type: "text" },
-        { name: "serialNumber", type: "text", required: true },
+        { name: "serialNumber", type: "text", required: false },
         {
           name: "status",
           type: "select",
@@ -211,10 +224,29 @@ async function setupCollections() {
           },
         },
         { name: "assignedAt", type: "date" },
+        { name: "assignedLocation", type: "text" },
         { name: "purchaseDate", type: "date" },
         { name: "purchaseCost", type: "number" },
         { name: "warrantyExpiry", type: "date" },
         { name: "notes", type: "text" },
+        {
+          name: "invoice",
+          type: "relation",
+          options: {
+            collectionId: "invoices",
+            maxSelect: 1,
+            cascadeDelete: false,
+          }
+        },
+        {
+          name: "invoiceFile",
+          type: "file",
+          options: {
+            maxSelect: 1,
+            maxSize: 5242880,
+            mimeTypes: ["application/pdf", "image/jpeg", "image/png", "image/webp"],
+          }
+        },
       ],
     },
     {
@@ -255,8 +287,104 @@ async function setupCollections() {
 
     try {
       // Check if collection already exists
-      await pb.collections.getOne(collection.name);
-      console.log(`   ⚠️  Collection already exists, skipping...`);
+      const existing = await pb.collections.getOne(collection.name);
+      let modified = false;
+
+      // Migrate type and optional serialNumber
+      existing.schema = existing.schema.map((f) => {
+        if (collection.name === "assets" && f.name === "type" && f.type === "select") {
+          modified = true;
+          return { name: "type", type: "text", required: true };
+        }
+        if (collection.name === "assets" && f.name === "serialNumber" && f.required === true) {
+          modified = true;
+          return { ...f, required: false };
+        }
+        return f;
+      });
+
+      if (collection.name === "invoices") {
+        const hasInvoiceId = existing.schema.some((f) => f.name === "invoiceId");
+        if (!hasInvoiceId) {
+          existing.schema.push({ name: "invoiceId", type: "text", required: false });
+          modified = true;
+        }
+      }
+
+      if (collection.name === "assets") {
+        // Ensure assetId is present
+        const hasAssetId = existing.schema.some((f) => f.name === "assetId");
+        if (!hasAssetId) {
+          existing.schema.push({ name: "assetId", type: "text", required: true });
+          modified = true;
+        }
+
+        // Ensure invoiceFile is present
+        const hasInvoiceFile = existing.schema.some((f) => f.name === "invoiceFile");
+        if (!hasInvoiceFile) {
+          existing.schema.push({
+            name: "invoiceFile",
+            type: "file",
+            required: false,
+            options: {
+              maxSelect: 1,
+              maxSize: 5242880,
+              mimeTypes: ["application/pdf", "image/jpeg", "image/png", "image/webp"],
+              thumbs: [],
+              protected: false
+            }
+          });
+          modified = true;
+        }
+        // Ensure assignedLocation is present
+        const hasAssignedLocation = existing.schema.some((f) => f.name === "assignedLocation");
+        if (!hasAssignedLocation) {
+          existing.schema.push({ name: "assignedLocation", type: "text", required: false });
+          modified = true;
+        }
+        // Ensure invoice is present
+        const hasInvoice = existing.schema.some((f) => f.name === "invoice");
+        if (!hasInvoice) {
+          existing.schema.push({
+            name: "invoice",
+            type: "relation",
+            required: false,
+            options: {
+              collectionId: "invoices",
+              maxSelect: 1,
+              cascadeDelete: false,
+            }
+          });
+          modified = true;
+        }
+        if (modified) {
+          console.log(`   🔄 Updating schema definition for "${collection.name}"...`);
+          await pb.collections.update(existing.id, existing);
+        }
+
+        // Backfill and migrate asset_id from serialNumber for existing assets
+        console.log("   🔄 Checking and migrating asset_id for existing assets...");
+        const list = await pb.collection("assets").getFullList();
+        for (let i = 0; i < list.length; i++) {
+          const asset = list[i];
+          const currentSerialNumber = asset.serialNumber || "";
+          
+          if (currentSerialNumber.startsWith("AST-")) {
+            console.log(`      Migrating asset ${asset.id}: moving Asset ID "${currentSerialNumber}" to asset_id and clearing serialNumber.`);
+            await pb.collection("assets").update(asset.id, {
+              asset_id: currentSerialNumber,
+              serialNumber: ""
+            });
+          }
+        }
+      } else {
+        if (modified) {
+          console.log(`   🔄 Updating schema definition for "${collection.name}"...`);
+          await pb.collections.update(existing.id, existing);
+        } else {
+          console.log(`   ⚠️  Collection already exists, skipping...`);
+        }
+      }
     } catch {
       // Collection doesn't exist, create it
       try {
