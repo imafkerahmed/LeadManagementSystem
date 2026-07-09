@@ -1647,7 +1647,7 @@ export default function CounselorPage() {
                                 lead.mobileWithCountry ||
                                   `${lead.countryCode}-${lead.mobile}`,
                               )}`}
-                              className="rounded-full p-1 text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition"
+                              className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-1 text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition shadow-sm"
                               title="Call using mobile"
                             >
                               <Phone className="h-3.5 w-3.5" />
@@ -2214,7 +2214,7 @@ export default function CounselorPage() {
                         selectedLead.mobileWithCountry ||
                           `${selectedLead.countryCode}-${selectedLead.mobile}`,
                       )}`}
-                      className="rounded-full p-1 text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition"
+                      className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-1 text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition shadow-sm"
                       title="Call using mobile"
                     >
                       <Phone className="h-4 w-4" />
