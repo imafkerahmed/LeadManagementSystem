@@ -1180,17 +1180,7 @@ export default function CounselorPage() {
 
       // Only update if date changed
       if ((existingDate || "") !== newDate) {
-        const comment = await requestComment(`Enter a comment for scheduling Follow-up ${followupNum} (required):`);
-        if (comment === null) {
-          // User cancelled
-          return;
-        }
-        const trimmedComment = comment;
-
-        const updateData = {
-          [fieldName]: newDate || null,
-          latestComment: `Follow-up ${followupNum} scheduled: ${trimmedComment}`,
-        };
+        const updateData = { [fieldName]: newDate || null };
         await pb.collection("leads").update(selectedLead.id, updateData);
 
         // Create history entry
@@ -1203,15 +1193,6 @@ export default function CounselorPage() {
             oldValue: existingDate || "Not set",
             newValue: newDate || "Cleared",
             field: fieldName,
-            created: now,
-          });
-
-          await pb.collection("leadHistory").create({
-            leadId: selectedLead.id,
-            eventType: "Comment",
-            changedBy: counselorId,
-            oldValue: trimmedComment,
-            newValue: trimmedComment,
             created: now,
           });
         } catch (err) {
