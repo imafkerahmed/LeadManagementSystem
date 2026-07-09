@@ -22,7 +22,7 @@ function normalizeLeadStatus(value: string | undefined): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { leadId, newStatus, comment, counselorId } = body;
+    const { leadId, newStatus, comment, counselorId, followupDate } = body;
 
     if (!leadId || !newStatus) {
       return NextResponse.json(
@@ -152,6 +152,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if there are any pending scheduled follow-ups
+    const hasPendingFollowup =
+      (lead.followup1Date && !lead.followup1Completed) ||
+      (lead.followup2Date && !lead.followup2Completed) ||
+      (lead.followup3Date && !lead.followup3Completed);
+
+    if (oldStatus !== normalizedNewStatus && hasPendingFollowup) {
+      return NextResponse.json(
+        { error: "All scheduled follow-ups must be marked as completed before changing the status." },
+        { status: 400 },
+      );
+    }
+
     if (normalizedNewStatus !== oldStatus && !trimmedComment) {
       return NextResponse.json(
         { error: "A comment is required for every status change" },
@@ -167,16 +180,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (normalizedNewStatus === "Follow-up" && !lead.followup1Date) {
-      return NextResponse.json(
-        {
-          error:
-            "Set the first follow-up date before moving the lead to Follow-up",
-        },
-        { status: 400 },
-      );
-    }
-
     // Update the lead: allow same-status updates (for comments) or forward moves
     const updatePayload: Record<string, unknown> = {
       latestComment: trimmedComment || "",
@@ -185,6 +188,33 @@ export async function POST(request: NextRequest) {
 
     if (oldStatus !== normalizedNewStatus) {
       updatePayload.status = normalizedNewStatus;
+    }
+
+    if (normalizedNewStatus === "Follow-up" && oldStatus !== normalizedNewStatus) {
+      let slotToUse: 1 | 2 | 3 | null = null;
+      if (!lead.followup1Date) {
+        slotToUse = 1;
+      } else if (!lead.followup2Date && lead.followup1Completed) {
+        slotToUse = 2;
+      } else if (!lead.followup3Date && lead.followup2Completed) {
+        slotToUse = 3;
+      }
+
+      if (slotToUse === null) {
+        return NextResponse.json(
+          { error: "All 3 follow-up slots have already been scheduled." },
+          { status: 400 },
+        );
+      }
+
+      if (!followupDate) {
+        return NextResponse.json(
+          { error: "A follow-up date must be set when status is Follow-up." },
+          { status: 400 },
+        );
+      }
+
+      updatePayload[`followup${slotToUse}Date`] = followupDate;
     }
 
     await pb.collection("leads").update(lead.id, updatePayload);
@@ -202,6 +232,25 @@ export async function POST(request: NextRequest) {
         oldValue: oldStatus,
         newValue: normalizedNewStatus,
         comment: trimmedComment || "",
+      });
+    }
+
+    if (normalizedNewStatus === "Follow-up" && oldStatus !== normalizedNewStatus && followupDate) {
+      let slotToUse = 1;
+      if (!lead.followup1Date) slotToUse = 1;
+      else if (!lead.followup2Date && lead.followup1Completed) slotToUse = 2;
+      else if (!lead.followup3Date && lead.followup2Completed) slotToUse = 3;
+
+      historyEntries.push({
+        timeStamp: now,
+        created: now,
+        leadId: lead.id,
+        studentName: lead.id,
+        eventType: "Follow-up Scheduled",
+        changedBy: counselorId,
+        oldValue: "Not set",
+        newValue: followupDate,
+        field: `followup${slotToUse}Date`,
       });
     }
 

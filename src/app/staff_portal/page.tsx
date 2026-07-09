@@ -275,9 +275,46 @@ export default function CounselorPage() {
     selectedLeadIdRef.current = selectedLead?.id;
   }, [selectedLead]);
 
+  const [commentModalOpen, setCommentModalOpen] = useState(false);
+  const [commentModalVisible, setCommentModalVisible] = useState(false);
+  const [commentModalTitle, setCommentModalTitle] = useState("");
+  const [commentModalValue, setCommentModalValue] = useState("");
+  const commentModalResolveRef = useRef<((value: string | null) => void) | null>(null);
+
+  const requestComment = (title: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      setCommentModalTitle(title);
+      setCommentModalValue("");
+      commentModalResolveRef.current = resolve;
+      setCommentModalOpen(true);
+    });
+  };
+
+  const handleCommentModalCancel = () => {
+    setCommentModalOpen(false);
+    if (commentModalResolveRef.current) {
+      commentModalResolveRef.current(null);
+      commentModalResolveRef.current = null;
+    }
+  };
+
+  const handleCommentModalSubmit = () => {
+    const trimmed = commentModalValue.trim();
+    if (!trimmed) {
+      toast.error("A comment is required.");
+      return;
+    }
+    setCommentModalOpen(false);
+    if (commentModalResolveRef.current) {
+      commentModalResolveRef.current(trimmed);
+      commentModalResolveRef.current = null;
+    }
+  };
+
   // Form states
   const [statusSelect, setStatusSelect] = useState("");
   const [commentBox, setCommentBox] = useState("");
+  const [followupDateInput, setFollowupDateInput] = useState("");
   const [newName, setNewName] = useState("");
   const [newCountryCode, setNewCountryCode] = useState("+94");
   const [newMobile, setNewMobile] = useState("");
@@ -363,6 +400,18 @@ export default function CounselorPage() {
 
     if (!currentStatus || currentStatus.trim() === "") return allowedFlow;
     const normalizedCurrentStatus = normalizeLeadStatus(currentStatus);
+
+    if (selectedLead) {
+      const hasPendingFollowup =
+        (selectedLead.followup1Date && !selectedLead.followup1Completed) ||
+        (selectedLead.followup2Date && !selectedLead.followup2Completed) ||
+        (selectedLead.followup3Date && !selectedLead.followup3Completed);
+
+      if (hasPendingFollowup) {
+        return [normalizedCurrentStatus];
+      }
+    }
+
     const currentIndex = allowedFlow.indexOf(normalizedCurrentStatus);
     if (currentIndex === -1) {
       // If current status is terminal but we can't update terminal states,
@@ -515,6 +564,16 @@ export default function CounselorPage() {
     return () => window.clearTimeout(timer);
   }, [duplicateWarningOpen]);
 
+  useEffect(() => {
+    if (commentModalOpen) {
+      const timer = window.setTimeout(() => setCommentModalVisible(true), 0);
+      return () => window.clearTimeout(timer);
+    }
+
+    const timer = window.setTimeout(() => setCommentModalVisible(false), 180);
+    return () => window.clearTimeout(timer);
+  }, [commentModalOpen]);
+
   const groupHistoryEntries = (entries: HistoryEntry[]) => {
     const grouped: Array<{
       entries: HistoryEntry[];
@@ -540,9 +599,9 @@ export default function CounselorPage() {
         }
       };
 
-      // Check if current is Status Change and next is Comment (within time window, same user)
+      // Check if current is non-Comment and next is Comment (within time window, same user)
       if (
-        current.eventType === "Status Change" &&
+        current.eventType !== "Comment" &&
         next &&
         next.eventType === "Comment" &&
         isWithinTimeWindow(current.created, next.created) &&
@@ -557,22 +616,22 @@ export default function CounselorPage() {
         processed.add(next.id);
         i++; // Skip the comment entry as it's grouped
       }
-      // Check if current is Comment and next is Status Change (within time window, same user)
+      // Check if current is Comment and next is non-Comment (within time window, same user)
       else if (
         current.eventType === "Comment" &&
         next &&
-        next.eventType === "Status Change" &&
+        next.eventType !== "Comment" &&
         isWithinTimeWindow(current.created, next.created) &&
         current.changedBy === next.changedBy
       ) {
         grouped.push({
-          entries: [next, current], // Put Status Change first
+          entries: [next, current], // Put the non-Comment first
           timestamp: current.created,
           changedBy: current.changedBy,
         });
         processed.add(current.id);
         processed.add(next.id);
-        i++; // Skip the status change entry as it's grouped
+        i++; // Skip the non-Comment entry as it's grouped
       } else {
         grouped.push({
           entries: [current],
@@ -785,6 +844,7 @@ export default function CounselorPage() {
       if (!preserveStatusSelect) {
         setStatusSelect(getDefaultModalStatus(nextLead.status));
       }
+      setFollowupDateInput("");
       setEditedName(latestLead.studentName || "");
       setEditedCourse(latestLead.course || latestLead.courseName || "");
       setEditedEmail(latestLead.email || "");
@@ -868,12 +928,18 @@ export default function CounselorPage() {
       return;
     }
 
-    if (statusSelect === "Follow-up" && !selectedLead.followup1Date) {
-      showToast(
-        "Set the first follow-up date before moving the lead to Follow-up",
-        "error",
-      );
-      return;
+    const oldStatus = normalizeLeadStatus(selectedLead.status);
+    const newStatus = normalizeLeadStatus(statusSelect);
+
+    if (newStatus === "Follow-up" && oldStatus !== "Follow-up") {
+      if (!trimmedComment) {
+        showToast("A comment is required to schedule a follow-up.", "error");
+        return;
+      }
+      if (!followupDateInput) {
+        showToast("A follow-up date must be set when status is Follow-up.", "error");
+        return;
+      }
     }
 
     try {
@@ -887,6 +953,7 @@ export default function CounselorPage() {
           comment: trimmedComment,
           counselorName,
           counselorId,
+          followupDate: newStatus === "Follow-up" && oldStatus !== "Follow-up" ? followupDateInput : undefined,
         }),
       });
 
@@ -894,8 +961,6 @@ export default function CounselorPage() {
       if (result.success) {
         showToast("Updated successfully!", "success");
         setCommentBox("");
-        setTablePage(1);
-        setStatusFilter(null);
         if (result.updatedStatus) {
           setStatusSelect(result.updatedStatus);
         }
@@ -1115,7 +1180,17 @@ export default function CounselorPage() {
 
       // Only update if date changed
       if ((existingDate || "") !== newDate) {
-        const updateData = { [fieldName]: newDate || null };
+        const comment = await requestComment(`Enter a comment for scheduling Follow-up ${followupNum} (required):`);
+        if (comment === null) {
+          // User cancelled
+          return;
+        }
+        const trimmedComment = comment;
+
+        const updateData = {
+          [fieldName]: newDate || null,
+          latestComment: `Follow-up ${followupNum} scheduled: ${trimmedComment}`,
+        };
         await pb.collection("leads").update(selectedLead.id, updateData);
 
         // Create history entry
@@ -1128,6 +1203,15 @@ export default function CounselorPage() {
             oldValue: existingDate || "Not set",
             newValue: newDate || "Cleared",
             field: fieldName,
+            created: now,
+          });
+
+          await pb.collection("leadHistory").create({
+            leadId: selectedLead.id,
+            eventType: "Comment",
+            changedBy: counselorId,
+            oldValue: trimmedComment,
+            newValue: trimmedComment,
             created: now,
           });
         } catch (err) {
@@ -1175,8 +1259,21 @@ export default function CounselorPage() {
       const fieldName = `followup${followupNum}Completed`;
       const newCompleted = !completedMap[followupNum];
 
+      let comment = "";
+      if (newCompleted) {
+        const userInput = await requestComment(`Enter a completion comment for Follow-up ${followupNum} (required):`);
+        if (userInput === null) {
+          // User cancelled
+          return;
+        }
+        comment = userInput;
+      }
+
       // Update the completion status in database
-      const updateData = { [fieldName]: newCompleted };
+      const updateData = {
+        [fieldName]: newCompleted,
+        ...(newCompleted ? { latestComment: `Follow-up ${followupNum} completed: ${comment}` } : {}),
+      };
       await pb.collection("leads").update(selectedLead.id, updateData);
 
       // Update local state
@@ -1200,6 +1297,17 @@ export default function CounselorPage() {
           field: fieldName,
           created: now,
         });
+
+        if (newCompleted && comment) {
+          await pb.collection("leadHistory").create({
+            leadId: selectedLead.id,
+            eventType: "Comment",
+            changedBy: counselorId,
+            oldValue: comment,
+            newValue: comment,
+            created: now,
+          });
+        }
       } catch (err) {
         console.error("History logging failed:", err);
       }
@@ -1224,6 +1332,11 @@ export default function CounselorPage() {
   // Filter leads by status if a status filter is selected
   const [searchTerm, setSearchTerm] = useState("");
   const [taskSearchTerm, setTaskSearchTerm] = useState("");
+
+  // Reset table page to 1 when filters or search change
+  useEffect(() => {
+    setTablePage(1);
+  }, [statusFilter, searchTerm]);
 
   const filteredLeads = (
     statusFilter ? leads.filter((lead) => lead.status === statusFilter) : leads
@@ -2253,6 +2366,20 @@ export default function CounselorPage() {
                       </select>
                     </div>
 
+                    {statusSelect === "Follow-up" && selectedLead && normalizeLeadStatus(selectedLead.status) !== "Follow-up" && (
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                          Next Follow-up Date
+                        </label>
+                        <input
+                          type="date"
+                          value={followupDateInput}
+                          onChange={(e) => setFollowupDateInput(e.target.value)}
+                          className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+                        />
+                      </div>
+                    )}
+
                     <div className="sm:col-span-2">
                       <label className="mb-1 block text-sm font-medium text-slate-700">
                         Add Comment
@@ -2375,6 +2502,15 @@ export default function CounselorPage() {
                             Boolean(followup.requiresPrevious) ||
                             isCounselorModifyingExisting;
 
+                          const targetSlotNum = !selectedLead.followup1Date ? 1 :
+                            (!selectedLead.followup2Date && selectedLead.followup1Completed) ? 2 :
+                            (!selectedLead.followup3Date && selectedLead.followup2Completed) ? 3 : null;
+
+                          const isSlotBeingScheduledInStatusForm =
+                            statusSelect === "Follow-up" &&
+                            normalizeLeadStatus(selectedLead.status) !== "Follow-up" &&
+                            followup.num === targetSlotNum;
+
                           // Check if date has been saved to the database
                           const isDateSaved =
                             followup.date ===
@@ -2406,59 +2542,67 @@ export default function CounselorPage() {
                                 )}
                               </div>
                               <div className="flex gap-2">
-                                <input
-                                  type="date"
-                                  value={followup.date}
-                                  onChange={(e) =>
-                                    followup.setDate(e.target.value)
-                                  }
-                                  disabled={isUpdating || isDisabled}
-                                  className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-400 focus:ring-2 focus:ring-slate-200 disabled:opacity-50"
-                                />
-                                {hasUnsavedDate ? (
-                                  <button
-                                    onClick={() =>
-                                      handleSaveIndividualFollowup(
-                                        followup.num as 1 | 2 | 3,
-                                      )
-                                    }
-                                    disabled={
-                                      savingFollowup ===
-                                      (followup.num as 1 | 2 | 3)
-                                    }
-                                    className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
-                                  >
-                                    {savingFollowup ===
-                                    (followup.num as 1 | 2 | 3)
-                                      ? "Setting..."
-                                      : "Set"}
-                                  </button>
+                                {isSlotBeingScheduledInStatusForm ? (
+                                  <div className="flex-1 text-sm italic text-slate-500 py-1.5 px-3 border border-dashed border-slate-200 rounded-md bg-slate-50/50">
+                                    Scheduling via Next Follow-up Date above
+                                  </div>
                                 ) : (
-                                  <button
-                                    onClick={() =>
-                                      handleSaveFollowupCompletion(
-                                        followup.num as 1 | 2 | 3,
-                                      )
-                                    }
-                                    disabled={
-                                      !followup.savedDate ||
-                                      savingFollowup ===
-                                        (followup.num as 1 | 2 | 3) ||
-                                      followup.completed
-                                    }
-                                    className={`rounded-md px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
-                                      followup.completed
-                                        ? "bg-green-600 text-white cursor-not-allowed"
-                                        : "border border-slate-300 text-slate-700 hover:bg-slate-100"
-                                    }`}
-                                  >
-                                    {savingFollowup ===
-                                    (followup.num as 1 | 2 | 3)
-                                      ? "Saving..."
-                                      : followup.completed
-                                        ? "✓ Done"
-                                        : "Mark done"}
-                                  </button>
+                                  <>
+                                    <input
+                                      type="date"
+                                      value={followup.date}
+                                      onChange={(e) =>
+                                        followup.setDate(e.target.value)
+                                      }
+                                      disabled={isUpdating || isDisabled}
+                                      className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-400 focus:ring-2 focus:ring-slate-200 disabled:opacity-50"
+                                    />
+                                    {hasUnsavedDate ? (
+                                      <button
+                                        onClick={() =>
+                                          handleSaveIndividualFollowup(
+                                            followup.num as 1 | 2 | 3,
+                                          )
+                                        }
+                                        disabled={
+                                          savingFollowup ===
+                                          (followup.num as 1 | 2 | 3)
+                                        }
+                                        className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 whitespace-nowrap"
+                                      >
+                                        {savingFollowup ===
+                                        (followup.num as 1 | 2 | 3)
+                                          ? "Setting..."
+                                          : "Set"}
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() =>
+                                          handleSaveFollowupCompletion(
+                                            followup.num as 1 | 2 | 3,
+                                          )
+                                        }
+                                        disabled={
+                                          !followup.savedDate ||
+                                          savingFollowup ===
+                                            (followup.num as 1 | 2 | 3) ||
+                                          followup.completed
+                                        }
+                                        className={`rounded-md px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 whitespace-nowrap ${
+                                          followup.completed
+                                            ? "bg-green-600 text-white cursor-not-allowed"
+                                            : "border border-slate-300 text-slate-700 hover:bg-slate-100"
+                                        }`}
+                                      >
+                                        {savingFollowup ===
+                                        (followup.num as 1 | 2 | 3)
+                                          ? "Saving..."
+                                          : followup.completed
+                                            ? "✓ Done"
+                                            : "Mark done"}
+                                      </button>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             </div>
@@ -2501,7 +2645,7 @@ export default function CounselorPage() {
                               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                                 <span className="font-medium text-slate-700">
                                   {group.entries.length > 1
-                                    ? "Status Change + Comment"
+                                    ? `${group.entries[0].eventType} + Comment`
                                     : group.entries[0].eventType}
                                 </span>
                                 <span>
@@ -2671,6 +2815,69 @@ export default function CounselorPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {commentModalVisible && (
+        <div
+          className={`fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 backdrop-blur-sm px-0 transition-opacity duration-200 ease-out sm:items-center sm:px-4 ${
+            commentModalOpen ? "opacity-100" : "pointer-events-none opacity-0"
+          }`}
+          onClick={handleCommentModalCancel}
+        >
+          <div
+            className={`w-full max-w-md rounded-t-2xl bg-white shadow-2xl transition-all duration-200 ease-out sm:rounded-2xl ${
+              commentModalOpen
+                ? "translate-y-0 scale-100 opacity-100"
+                : "translate-y-3 scale-95 opacity-0"
+            }`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-4 py-4 sm:px-6">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  Comment Required
+                </h2>
+              </div>
+              <button
+                onClick={handleCommentModalCancel}
+                className="rounded-md border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"
+                aria-label="Close comment modal"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="px-4 py-4 sm:px-6 space-y-3">
+              <p className="text-sm text-slate-600 font-medium leading-relaxed">
+                {commentModalTitle}
+              </p>
+              <div>
+                <textarea
+                  value={commentModalValue}
+                  onChange={(e) => setCommentModalValue(e.target.value)}
+                  placeholder="Enter your comment here..."
+                  className="w-full min-h-24 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition-all resize-none"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-4 py-3 sm:px-6 bg-slate-50/50 rounded-b-2xl">
+              <button
+                onClick={handleCommentModalCancel}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCommentModalSubmit}
+                className="rounded-xl bg-slate-900 px-4.5 py-2 text-xs font-bold text-white hover:bg-slate-800 transition-all shadow-sm"
+              >
+                Submit
+              </button>
             </div>
           </div>
         </div>

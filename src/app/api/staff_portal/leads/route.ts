@@ -145,6 +145,12 @@ export async function GET(request: NextRequest) {
       assignedTo: lead.assignedTo || counselorId || "",
       nextFollowupDate: getNextFollowup(lead)?.date || "",
       nextFollowupCompleted: getNextFollowup(lead)?.completed || false,
+      followup1Date: lead.followup1Date || "",
+      followup1Completed: lead.followup1Completed || false,
+      followup2Date: lead.followup2Date || "",
+      followup2Completed: lead.followup2Completed || false,
+      followup3Date: lead.followup3Date || "",
+      followup3Completed: lead.followup3Completed || false,
     }));
 
     return NextResponse.json(formattedLeads);

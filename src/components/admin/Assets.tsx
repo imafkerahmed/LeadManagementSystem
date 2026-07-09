@@ -2165,6 +2165,7 @@ export default function AdminAssets() {
                       />
                     ) : isImage ? (
                       <div className="p-4 overflow-auto max-h-[50vh] w-full flex items-center justify-center">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={fileUrl}
                           className="max-w-full max-h-[48vh] object-contain rounded-xl"
