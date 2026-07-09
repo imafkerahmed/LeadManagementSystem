@@ -101,6 +101,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (newCounselor) {
+      if (oldStatus === "Registered" && newCounselor !== oldCounselor) {
+        return NextResponse.json(
+          { error: "Registered leads cannot be reassigned or transferred" },
+          { status: 400 },
+        );
+      }
       updates.assignedTo = newCounselor;
     }
 

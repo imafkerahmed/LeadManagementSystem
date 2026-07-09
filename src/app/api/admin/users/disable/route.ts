@@ -183,10 +183,11 @@ export async function POST(request: NextRequest) {
 
     // Filter leads to reassign based on selectedStatuses
     const selectedStatuses = body.selectedStatuses;
-    const leadsToTransfer =
+    const leadsToTransfer = (
       selectedStatuses && Array.isArray(selectedStatuses)
         ? assignedLeads.filter((lead) => selectedStatuses.includes(lead.status || "New"))
-        : assignedLeads;
+        : assignedLeads
+    ).filter((lead) => (lead.status || "").trim().toLowerCase() !== "registered");
 
     if (isAlreadyDisabled && leadsToTransfer.length === 0) {
       return NextResponse.json({
