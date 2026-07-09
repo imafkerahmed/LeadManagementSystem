@@ -17,6 +17,7 @@ import {
   AlertCircle,
   Shield,
   Search,
+  Phone,
 } from "lucide-react";
 import AppShell from "@/components/layout/AppShell";
 import StaffTasks from "@/components/staff/Tasks";
@@ -1634,10 +1635,24 @@ export default function CounselorPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-slate-700">
-                          {formatPhoneNumber(
-                            lead.mobileWithCountry ||
-                              `${lead.countryCode}-${lead.mobile}`,
-                          )}
+                          <div className="flex items-center gap-1.5">
+                            <span>
+                              {formatPhoneNumber(
+                                lead.mobileWithCountry ||
+                                  `${lead.countryCode}-${lead.mobile}`,
+                              )}
+                            </span>
+                            <a
+                              href={`tel:${formatPhoneNumber(
+                                lead.mobileWithCountry ||
+                                  `${lead.countryCode}-${lead.mobile}`,
+                              )}`}
+                              className="rounded-full p-1 text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition"
+                              title="Call using mobile"
+                            >
+                              <Phone className="h-3.5 w-3.5" />
+                            </a>
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-slate-700">
                           {lead.course}
@@ -2187,11 +2202,23 @@ export default function CounselorPage() {
                   <div className="text-xs uppercase tracking-wide text-slate-500">
                     Mobile
                   </div>
-                  <div className="mt-1 font-medium text-slate-900">
-                    {formatPhoneNumber(
-                      selectedLead.mobileWithCountry ||
-                        `${selectedLead.countryCode}-${selectedLead.mobile}`,
-                    )}
+                  <div className="mt-1 flex items-center gap-2 text-slate-900">
+                    <span className="font-medium">
+                      {formatPhoneNumber(
+                        selectedLead.mobileWithCountry ||
+                          `${selectedLead.countryCode}-${selectedLead.mobile}`,
+                      )}
+                    </span>
+                    <a
+                      href={`tel:${formatPhoneNumber(
+                        selectedLead.mobileWithCountry ||
+                          `${selectedLead.countryCode}-${selectedLead.mobile}`,
+                      )}`}
+                      className="rounded-full p-1 text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition"
+                      title="Call using mobile"
+                    >
+                      <Phone className="h-4 w-4" />
+                    </a>
                   </div>
                 </div>
 
