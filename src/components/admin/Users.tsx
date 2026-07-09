@@ -294,9 +294,11 @@ export default function AdminUsers() {
       const data = await response.json();
       if (data.success) {
         setStatusCounts(data.statusCounts || {});
-        // Select all statuses with count > 0 by default
         const initialSelected = Object.keys(data.statusCounts || {}).filter(
-          (status) => (data.statusCounts[status] || 0) > 0
+          (status) =>
+            (data.statusCounts[status] || 0) > 0 &&
+            status !== "Registered" &&
+            status !== "Lost"
         );
         setSelectedStatuses(initialSelected);
 
@@ -798,7 +800,7 @@ export default function AdminUsers() {
                     </div>
 
                     <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                      {["New", "Ringing-No-Answer", "Contacted", "Follow-up", "Registered", "Lost"].map((status) => {
+                      {["New", "Ringing-No-Answer", "Contacted", "Follow-up"].map((status) => {
                         const count = statusCounts[status] || 0;
                         const isChecked = selectedStatuses.includes(status);
                         const hasLeads = count > 0;

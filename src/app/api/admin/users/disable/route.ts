@@ -88,18 +88,20 @@ export async function GET(request: NextRequest) {
       "Ringing-No-Answer": 0,
       "Contacted": 0,
       "Follow-up": 0,
-      "Registered": 0,
-      "Lost": 0,
     };
 
+    let activeLeadCount = 0;
     assignedLeads.forEach((lead) => {
       const status = lead.status || "New";
-      statusCounts[status] = (statusCounts[status] || 0) + 1;
+      if (status !== "Registered" && status !== "Lost") {
+        statusCounts[status] = (statusCounts[status] || 0) + 1;
+        activeLeadCount += 1;
+      }
     });
 
     return NextResponse.json({
       success: true,
-      assignedLeadCount: assignedLeads.length,
+      assignedLeadCount: activeLeadCount,
       statusCounts,
     });
   } catch (error) {
@@ -187,7 +189,11 @@ export async function POST(request: NextRequest) {
       selectedStatuses && Array.isArray(selectedStatuses)
         ? assignedLeads.filter((lead) => selectedStatuses.includes(lead.status || "New"))
         : assignedLeads
-    ).filter((lead) => (lead.status || "").trim().toLowerCase() !== "registered");
+    ).filter(
+      (lead) =>
+        (lead.status || "").trim().toLowerCase() !== "registered" &&
+        (lead.status || "").trim().toLowerCase() !== "lost"
+    );
 
     if (isAlreadyDisabled && leadsToTransfer.length === 0) {
       return NextResponse.json({
