@@ -2125,6 +2125,7 @@ export default function CounselorPage() {
                 <p className="text-sm text-slate-500">{selectedLead.leadId}</p>
               </div>
               <button
+                type="button"
                 onClick={() => setModalOpen(false)}
                 className="rounded-md border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"
                 aria-label="Close lead details"
@@ -2140,6 +2141,7 @@ export default function CounselorPage() {
                     Lead Information
                   </h3>
                   <button
+                    type="button"
                     onClick={() => {
                       if (isEditingLeadDetails) {
                         setIsEditingLeadDetails(false);
@@ -2274,6 +2276,7 @@ export default function CounselorPage() {
                 {isEditingLeadDetails && (
                   <div className="flex gap-2 pt-2">
                     <button
+                      type="button"
                       onClick={handleSaveLeadDetails}
                       disabled={isUpdating}
                       className="flex-1 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
@@ -2281,6 +2284,7 @@ export default function CounselorPage() {
                       {isUpdating ? "Saving..." : "Save"}
                     </button>
                     <button
+                      type="button"
                       onClick={() => {
                         setIsEditingLeadDetails(false);
                         setEditedName(selectedLead.name);
@@ -2299,6 +2303,7 @@ export default function CounselorPage() {
                   selectedLead.countryCode ||
                   selectedLead.mobile) && (
                   <button
+                    type="button"
                     onClick={() =>
                       window.open(
                         `https://wa.me/${formatPhoneNumber(
@@ -2375,6 +2380,7 @@ export default function CounselorPage() {
 
                     <div className="sm:col-span-2 flex flex-col gap-2 sm:flex-row">
                       <button
+                        type="button"
                         onClick={handleSubmitForm}
                         disabled={
                           isUpdating ||
@@ -2387,6 +2393,7 @@ export default function CounselorPage() {
                         {isUpdating ? "Updating..." : "Update Lead"}
                       </button>
                       <button
+                        type="button"
                         onClick={() => openLeadDetails(selectedLead, true)}
                         disabled={historyLoading}
                         className="inline-flex flex-1 items-center justify-center rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
@@ -2540,6 +2547,7 @@ export default function CounselorPage() {
                                     />
                                     {hasUnsavedDate ? (
                                       <button
+                                        type="button"
                                         onClick={() =>
                                           handleSaveIndividualFollowup(
                                             followup.num as 1 | 2 | 3,
@@ -2558,6 +2566,7 @@ export default function CounselorPage() {
                                       </button>
                                     ) : (
                                       <button
+                                        type="button"
                                         onClick={() =>
                                           handleSaveFollowupCompletion(
                                             followup.num as 1 | 2 | 3,
@@ -2848,12 +2857,14 @@ export default function CounselorPage() {
 
             <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-4 py-3 sm:px-6 bg-slate-50/50 rounded-b-2xl">
               <button
+                type="button"
                 onClick={handleCommentModalCancel}
                 className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleCommentModalSubmit}
                 className="rounded-xl bg-slate-900 px-4.5 py-2 text-xs font-bold text-white hover:bg-slate-800 transition-all shadow-sm"
               >
