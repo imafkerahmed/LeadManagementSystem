@@ -970,7 +970,7 @@ export default function AdminUsers() {
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
               disabled={isSubmitting || (!disableWithoutTransfer && totalLeadsToTransfer > 0 && transferToUserIds.length === 0)}
               onClick={(e) => {
                 if (isSubmitting || (!disableWithoutTransfer && totalLeadsToTransfer > 0 && transferToUserIds.length === 0)) {
@@ -980,15 +980,37 @@ export default function AdminUsers() {
                 void disableUser();
               }}
             >
-              {isSubmitting 
-                ? isSelectedUserDisabled 
-                  ? "Transferring..." 
-                  : "Disabling..." 
-                : isSelectedUserDisabled 
-                  ? "Confirm Transfer" 
-                  : "Confirm Disable"}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin text-white" />
+                  {isSelectedUserDisabled ? "Transferring..." : "Disabling..."}
+                </>
+              ) : isSelectedUserDisabled ? (
+                "Confirm Transfer"
+              ) : (
+                "Confirm Disable"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
+
+          {isSubmitting && (
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center z-50 rounded-2xl animate-in fade-in duration-200">
+              <div className="bg-white rounded-3xl p-6 max-w-xs w-full mx-4 shadow-2xl border border-slate-100 flex flex-col items-center text-center gap-3 animate-in zoom-in-95 duration-300">
+                <div className="relative flex items-center justify-center">
+                  <div className="h-12 w-12 rounded-full border-4 border-blue-50 border-t-blue-600 animate-spin" />
+                  <Loader2 className="absolute h-5 w-5 text-blue-600 animate-pulse" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-bold text-slate-800 text-sm">
+                    {isSelectedUserDisabled ? "Transferring Leads..." : "Disabling Account..."}
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-semibold">
+                    Applying modifications to database. Please wait...
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </AlertDialogContent>
       </AlertDialog>
 

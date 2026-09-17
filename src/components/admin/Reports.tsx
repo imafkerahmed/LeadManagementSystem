@@ -12,7 +12,8 @@ import {
   Table, 
   ArrowLeft, 
   ListTodo, 
-  BarChart3 
+  BarChart3,
+  Laptop
 } from "lucide-react";
 import { createPocketBaseClient } from "@/lib/pocketbase";
 
@@ -156,9 +157,9 @@ const PRESET_RANGES: PresetRange[] = [
   },
 ];
 export default function AdminReports() {
-  const [reportsView, _setReportsView] = useState<"menu" | "leads" | "tasks">("menu");
+  const [reportsView, _setReportsView] = useState<"menu" | "leads" | "tasks" | "assets">("menu");
 
-  const setReportsView = (view: "menu" | "leads" | "tasks") => {
+  const setReportsView = (view: "menu" | "leads" | "tasks" | "assets") => {
     _setReportsView(view);
     try {
       localStorage.setItem("admin_reports_view", view);
@@ -179,14 +180,14 @@ export default function AdminReports() {
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
-      let view = params.get("sub") as "menu" | "leads" | "tasks" | null;
+      let view = params.get("sub") as "menu" | "leads" | "tasks" | "assets" | null;
       if (!view) {
-        const saved = localStorage.getItem("admin_reports_view") as "menu" | "leads" | "tasks" | null;
-        if (saved === "menu" || saved === "leads" || saved === "tasks") {
+        const saved = localStorage.getItem("admin_reports_view") as "menu" | "leads" | "tasks" | "assets" | null;
+        if (saved === "menu" || saved === "leads" || saved === "tasks" || saved === "assets") {
           view = saved;
         }
       }
-      if (view === "leads" || view === "tasks" || view === "menu") {
+      if (view === "leads" || view === "tasks" || view === "assets" || view === "menu") {
         _setReportsView(view || "menu");
         
         const params = new URLSearchParams(window.location.search);
@@ -232,6 +233,19 @@ export default function AdminReports() {
   const [hasGeneratedTasks, setHasGeneratedTasks] = useState(false);
   const [taskCurrentPage, setTaskCurrentPage] = useState(1);
 
+  // Asset report state
+  const [assetStartDate, setAssetStartDate] = useState("");
+  const [assetEndDate, setAssetEndDate] = useState("");
+  const [selectedAssetStatus, setSelectedAssetStatus] = useState("all");
+  const [selectedAssetType, setSelectedAssetType] = useState("all");
+  const [assetPreset, setAssetPreset] = useState<string | null>(null);
+  const [assetReportData, setAssetReportData] = useState<any[]>([]);
+  const [assetStats, setAssetStats] = useState<any>(null);
+  const [isAssetLoading, setIsAssetLoading] = useState(false);
+  const [hasGeneratedAssets, setHasGeneratedAssets] = useState(false);
+  const [assetCurrentPage, setAssetCurrentPage] = useState(1);
+  const [uniqueAssetTypes, setUniqueAssetTypes] = useState<string[]>([]);
+
   // Initialize dates on mount
   useEffect(() => {
     const today = new Date();
@@ -240,6 +254,8 @@ export default function AdminReports() {
     setEndDate(formatLocalDate(today));
     setTaskStartDate(formatLocalDate(startOfMonth));
     setTaskEndDate(formatLocalDate(today));
+    setAssetStartDate(formatLocalDate(startOfMonth));
+    setAssetEndDate(formatLocalDate(today));
   }, []);
 
   useEffect(() => {
@@ -260,7 +276,21 @@ export default function AdminReports() {
       }
     };
 
+    const fetchAssetTypes = async () => {
+      try {
+        const pb = createPocketBaseClient();
+        const list = await pb.collection("assets").getFullList({
+          fields: "type",
+        });
+        const types = Array.from(new Set(list.map((item: any) => item.type))).filter(Boolean);
+        setUniqueAssetTypes(types as string[]);
+      } catch (err) {
+        console.error("Failed to fetch asset types:", err);
+      }
+    };
+
     fetchCounselors();
+    fetchAssetTypes();
   }, []);
 
   const getDateDifference = (start: string, end: string) => {
@@ -589,11 +619,200 @@ export default function AdminReports() {
     }
   };
 
+  const handleGenerateAssetReport = async () => {
+    if (!assetStartDate || !assetEndDate) {
+      toast.error("Please select both start and end dates");
+      return;
+    }
+
+    const daysDiff = getDateDifference(assetStartDate, assetEndDate);
+    if (daysDiff > 30) {
+      toast.error("Date range cannot exceed 30 days");
+      return;
+    }
+
+    setIsAssetLoading(true);
+    setAssetCurrentPage(1);
+    try {
+      const pb = createPocketBaseClient();
+      
+      let start: Date;
+      let end: Date;
+
+      const startParts = assetStartDate.split("-");
+      if (startParts.length === 3) {
+        start = new Date(Date.UTC(parseInt(startParts[0]), parseInt(startParts[1]) - 1, parseInt(startParts[2]), 0, 0, 0, 0));
+      } else {
+        start = new Date(assetStartDate);
+        start.setHours(0, 0, 0, 0);
+      }
+
+      const endParts = assetEndDate.split("-");
+      if (endParts.length === 3) {
+        end = new Date(Date.UTC(parseInt(endParts[0]), parseInt(endParts[1]) - 1, parseInt(endParts[2]), 23, 59, 59, 999));
+      } else {
+        end = new Date(assetEndDate);
+        end.setHours(23, 59, 59, 999);
+      }
+
+      const filters: string[] = [];
+      filters.push(`purchaseDate >= "${start.toISOString()}"`);
+      filters.push(`purchaseDate <= "${end.toISOString()}"`);
+
+      if (selectedAssetStatus && selectedAssetStatus !== "all") {
+        filters.push(`status = "${selectedAssetStatus}"`);
+      }
+
+      if (selectedAssetType && selectedAssetType !== "all") {
+        filters.push(`type = "${selectedAssetType}"`);
+      }
+
+      const filter = filters.join(" && ");
+
+      const fetchedAssets = await pb.collection("assets").getFullList({
+        filter,
+        sort: "-created",
+        expand: "assignedTo",
+      });
+
+      const total = fetchedAssets.length;
+      const available = fetchedAssets.filter((a: any) => a.status === "available").length;
+      const assigned = fetchedAssets.filter((a: any) => a.status === "assigned").length;
+      const maintenance = fetchedAssets.filter((a: any) => a.status === "maintenance").length;
+      const retired = fetchedAssets.filter((a: any) => a.status === "retired").length;
+      
+      const totalCost = fetchedAssets.reduce((sum: number, asset: any) => {
+        const cost = typeof asset.purchaseCost === "number" 
+          ? asset.purchaseCost 
+          : parseFloat(asset.purchaseCost) || 0;
+        return sum + cost;
+      }, 0);
+
+      const utilizationRate = total > 0 ? Math.round((assigned / total) * 100) : 0;
+
+      // Group by Type
+      const byType: Record<string, number> = {};
+      // Group by Assignee
+      const byAssignee: Record<string, { total: number; cost: number }> = {};
+
+      fetchedAssets.forEach((asset: any) => {
+        // Group by Type
+        const t = asset.type || "Other";
+        byType[t] = (byType[t] || 0) + 1;
+
+        // Group by Assignee/Location
+        let assignee = "Unassigned";
+        if (asset.assignedTo) {
+          const userObj = asset.expand?.assignedTo;
+          assignee = userObj?.name || userObj?.email || asset.assignedTo;
+        } else if (asset.assignedLocation) {
+          assignee = `Location: ${asset.assignedLocation}`;
+        }
+
+        if (!byAssignee[assignee]) {
+          byAssignee[assignee] = { total: 0, cost: 0 };
+        }
+        byAssignee[assignee].total += 1;
+        const cost = typeof asset.purchaseCost === "number" 
+          ? asset.purchaseCost 
+          : parseFloat(asset.purchaseCost) || 0;
+        byAssignee[assignee].cost += cost;
+      });
+
+      setAssetReportData(fetchedAssets);
+      setAssetStats({
+        total,
+        available,
+        assigned,
+        maintenance,
+        retired,
+        totalCost,
+        utilizationRate,
+        byType,
+        byAssignee,
+      });
+      setHasGeneratedAssets(true);
+      toast.success(`Asset report generated: ${total} assets found`);
+    } catch (error: any) {
+      console.error("Error generating assets report:", error);
+      toast.error(`Failed to generate asset report: ${error.message || String(error)}`);
+    } finally {
+      setIsAssetLoading(false);
+    }
+  };
+
+  const handleExportAssetsToXLSX = () => {
+    if (assetReportData.length === 0 || !assetStats) {
+      toast.error("No asset report data to export");
+      return;
+    }
+
+    try {
+      const wb = XLSX.utils.book_new();
+
+      const excelAssetsData = assetReportData.map((asset) => {
+        const assignee = asset.expand?.assignedTo as any;
+        return {
+          "Asset ID": asset.asset_id || asset.id,
+          Brand: asset.brand,
+          Model: asset.model || "",
+          "Serial Number": asset.serialNumber || "",
+          Type: asset.type,
+          Status: asset.status,
+          Assignee: assignee?.name || assignee?.email || (asset.assignedLocation ? `Location: ${asset.assignedLocation}` : "Unassigned"),
+          "Purchase Date": asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString() : "",
+          "Purchase Cost": asset.purchaseCost || 0,
+          "Warranty Expiry": asset.warrantyExpiry ? new Date(asset.warrantyExpiry).toLocaleDateString() : "",
+          Notes: asset.notes || "",
+        };
+      });
+
+      const assetsSheet = XLSX.utils.json_to_sheet(excelAssetsData);
+      XLSX.utils.book_append_sheet(wb, assetsSheet, "Assets");
+
+      const summaryData = [
+        { Metric: "Total Assets", Value: assetStats.total },
+        { Metric: "Available Assets", Value: assetStats.available },
+        { Metric: "Assigned Assets", Value: assetStats.assigned },
+        { Metric: "Under Maintenance", Value: assetStats.maintenance },
+        { Metric: "Retired Assets", Value: assetStats.retired },
+        { Metric: "Utilization Rate (%)", Value: `${assetStats.utilizationRate}%` },
+        { Metric: "Total Asset Value (Cost)", Value: assetStats.totalCost },
+        { Metric: "Report Period", Value: `${assetStartDate} to ${assetEndDate}` },
+        { Metric: "Generated Date", Value: new Date().toLocaleDateString() },
+      ];
+      const summarySheet = XLSX.utils.json_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(wb, summarySheet, "Summary");
+
+      const typeData = Object.entries(assetStats.byType).map(([type, count]) => ({
+        Type: type,
+        Count: count,
+      }));
+      const typeSheet = XLSX.utils.json_to_sheet(typeData);
+      XLSX.utils.book_append_sheet(wb, typeSheet, "Assets by Type");
+
+      const assigneeData = Object.entries(assetStats.byAssignee).map(([assignee, data]: [string, any]) => ({
+        "Assignee / Location": assignee,
+        "Total Assets": data.total,
+        "Total Cost Value": data.cost,
+      }));
+      const assigneeSheet = XLSX.utils.json_to_sheet(assigneeData);
+      XLSX.utils.book_append_sheet(wb, assigneeSheet, "Assignee Breakdown");
+
+      const filename = `Asset_Report_${assetStartDate}_to_${assetEndDate}.xlsx`;
+      XLSX.writeFile(wb, filename);
+      toast.success("Asset report exported successfully");
+    } catch (error) {
+      console.error("Error exporting assets report:", error);
+      toast.error("Failed to export asset report");
+    }
+  };
+
   if (reportsView === "menu") {
     return (
       <div className="space-y-6 animate-fade-in">
         {/* Menu Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Lead Reports Card */}
           <div
             onClick={() => setReportsView("leads")}
@@ -644,6 +863,33 @@ export default function AdminReports() {
               </h4>
               <p className="text-xs text-slate-400 mt-1 leading-relaxed">
                 Analyze checklist completion rates, track pending/overdue assignments, and export task audit sheets.
+              </p>
+            </div>
+          </div>
+
+          {/* Asset Report Card */}
+          <div
+            onClick={() => setReportsView("assets")}
+            className="group relative overflow-hidden bg-white border border-emerald-100/30 rounded-2xl p-6 shadow-sm hover:shadow-md hover:scale-[1.01] hover:border-emerald-100 transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[160px]"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent rounded-bl-full pointer-events-none opacity-50 transition-opacity group-hover:opacity-80 duration-500" />
+            <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-emerald-500" />
+
+            <div className="flex items-start justify-between relative z-10">
+              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300">
+                <Laptop className="h-5 w-5" />
+              </div>
+              <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50/50 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                Assets
+              </span>
+            </div>
+
+            <div className="relative z-10 mt-4">
+              <h4 className="text-sm font-bold text-slate-800 group-hover:text-emerald-600 transition-colors">
+                Asset Report
+              </h4>
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                Track hardware inventory, utilization metrics, total costs, warranty statuses, and download full logs.
               </p>
             </div>
           </div>
@@ -1460,6 +1706,417 @@ export default function AdminReports() {
                     disabled={
                       taskCurrentPage ===
                       Math.ceil(taskReportData.length / itemsPerPage)
+                    }
+                    className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-600 shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (reportsView === "assets") {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <button
+            onClick={() => setReportsView("menu")}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-800 shadow-sm transition-all"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Reports
+          </button>
+          <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
+            Reports / Asset Reports
+          </div>
+        </div>
+
+        {/* Preset Date Range Buttons */}
+        <div className="flex flex-wrap gap-2">
+          {PRESET_RANGES.map((range) => (
+            <button
+              key={range.id}
+              onClick={() => {
+                const dates = range.getDates();
+                setAssetStartDate(dates.start);
+                setAssetEndDate(dates.end);
+                setAssetPreset(range.id);
+              }}
+              className={`rounded-xl px-4 py-2 text-xs font-bold transition-all shadow-sm ${
+                assetPreset === range.id
+                  ? "bg-blue-600 text-white"
+                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              {range.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Filters Grid */}
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4 bg-white border border-slate-100 shadow-sm rounded-2xl p-5">
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-1.5">
+              Start Purchase Date
+            </label>
+            <input
+              type="date"
+              value={assetStartDate}
+              onChange={(e) => {
+                setAssetStartDate(e.target.value);
+                setAssetPreset(null);
+              }}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-mono"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-1.5">
+              End Purchase Date
+            </label>
+            <input
+              type="date"
+              value={assetEndDate}
+              onChange={(e) => {
+                setAssetEndDate(e.target.value);
+                setAssetPreset(null);
+              }}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-mono"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-1.5">
+              Filter by Status
+            </label>
+            <select
+              value={selectedAssetStatus}
+              onChange={(e) => setSelectedAssetStatus(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+            >
+              <option value="all">All Statuses</option>
+              <option value="available">Available</option>
+              <option value="assigned">Assigned</option>
+              <option value="maintenance">Under Maintenance</option>
+              <option value="retired">Retired</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-1.5">
+              Filter by Asset Type
+            </label>
+            <select
+              value={selectedAssetType}
+              onChange={(e) => setSelectedAssetType(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all capitalize"
+            >
+              <option value="all">All Types</option>
+              {uniqueAssetTypes.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          <button
+            onClick={handleGenerateAssetReport}
+            disabled={isAssetLoading}
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all disabled:opacity-50"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${isAssetLoading ? "animate-spin" : ""}`}
+            />
+            {isAssetLoading ? "Generating..." : "Generate Asset Report"}
+          </button>
+
+          {hasGeneratedAssets && assetReportData.length > 0 && (
+            <button
+              onClick={handleExportAssetsToXLSX}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-600 shadow-sm transition-all"
+            >
+              <Download className="h-4 w-4 text-slate-500" />
+              Export to XLSX
+            </button>
+          )}
+        </div>
+
+        {/* Report Summary */}
+        {hasGeneratedAssets && assetStats && (
+          <div className="space-y-6">
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
+              <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-5 hover:shadow-md transition-all duration-300">
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Total Assets
+                </div>
+                <div className="text-2xl font-black mt-2 text-slate-800">
+                  {assetStats.total}
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-5 hover:shadow-md transition-all duration-300">
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Total Investment Value
+                </div>
+                <div className="text-2xl font-black mt-2 text-indigo-600">
+                  LKR {assetStats.totalCost.toLocaleString()}
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-5 hover:shadow-md transition-all duration-300">
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Utilization Rate
+                </div>
+                <div className="text-2xl font-black mt-2 text-emerald-600">
+                  {assetStats.utilizationRate}%
+                </div>
+                <div className="text-[10px] text-slate-400 font-medium mt-1">
+                  {assetStats.assigned} assigned assets
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-5 hover:shadow-md transition-all duration-300">
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Under Maintenance
+                </div>
+                <div className={`text-2xl font-black mt-2 ${assetStats.maintenance > 0 ? "text-rose-600 animate-pulse" : "text-slate-800"}`}>
+                  {assetStats.maintenance}
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-5 hover:shadow-md transition-all duration-300">
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Report Period
+                </div>
+                <div className="text-xs font-bold text-slate-700 mt-2">
+                  {assetStartDate} to {assetEndDate}
+                </div>
+              </div>
+            </div>
+
+            {/* Breakdowns */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Status Breakdown */}
+              <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-6 hover:shadow-md transition-all duration-300">
+                <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                  <PieChart className="w-4 h-4 text-blue-600" />
+                  Assets by Status
+                </h3>
+                <div className="space-y-2.5">
+                  {[
+                    { status: "Available", count: assetStats.available, color: "bg-slate-100 text-slate-700" },
+                    { status: "Assigned", count: assetStats.assigned, color: "bg-blue-50 text-blue-700" },
+                    { status: "Maintenance", count: assetStats.maintenance, color: "bg-rose-50 text-rose-700" },
+                    { status: "Retired", count: assetStats.retired, color: "bg-red-50 text-red-500" },
+                  ].map((item) => (
+                    <div
+                      key={item.status}
+                      className="flex justify-between items-center p-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100/50 transition-colors"
+                    >
+                      <span className="text-xs font-semibold text-slate-600">
+                        {item.status}
+                      </span>
+                      <span className={`text-xs font-bold ${item.color.split(" ")[1]}`}>
+                        {item.count}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Type Breakdown */}
+              <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-6 hover:shadow-md transition-all duration-300">
+                <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-amber-500" />
+                  Assets by Type
+                </h3>
+                <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
+                  {Object.entries(assetStats.byType).map(([type, count]) => (
+                    <div
+                      key={type}
+                      className="flex justify-between items-center p-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100/50 transition-colors"
+                    >
+                      <span className="text-xs font-semibold text-slate-600 capitalize font-medium">
+                        {type}
+                      </span>
+                      <span className="text-xs font-bold text-slate-800">
+                        {count as number}
+                      </span>
+                    </div>
+                  ))}
+                  {Object.keys(assetStats.byType).length === 0 && (
+                    <p className="text-xs text-slate-400 text-center py-4">No types recorded</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Assignee Breakdown */}
+              <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-6 hover:shadow-md transition-all duration-300">
+                <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                  <Users className="w-4 h-4 text-indigo-600" />
+                  Assets by Assignee / Location
+                </h3>
+                <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1 scrollbar-thin">
+                  {Object.entries(assetStats.byAssignee).map(([assignee, data]: [string, any]) => (
+                    <div
+                      key={assignee}
+                      className="flex justify-between items-center p-3 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100/50 transition-colors"
+                    >
+                      <span className="text-xs font-semibold text-slate-600 truncate max-w-[150px]">
+                        {assignee}
+                      </span>
+                      <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                        <span>{data.total} units</span>
+                        <span className="text-slate-300">|</span>
+                        <span className="text-slate-500 font-medium">LKR {data.cost.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {Object.keys(assetStats.byAssignee).length === 0 && (
+                    <p className="text-xs text-slate-400 text-center py-4">No assignments recorded</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Asset Details Table */}
+            <div className="bg-white border border-slate-100 shadow-sm rounded-2xl p-6 hover:shadow-md transition-all duration-300">
+              <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <Table className="w-4 h-4 text-blue-600" />
+                Asset Details Log
+              </h3>
+              <div className="overflow-x-auto rounded-xl border border-slate-100 bg-white">
+                <table className="w-full border-separate border-spacing-0 text-sm min-w-[800px]">
+                  <thead>
+                    <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100">
+                      <th className="px-4 py-3 font-semibold rounded-l-xl">Asset ID</th>
+                      <th className="px-4 py-3 font-semibold">Model / Name</th>
+                      <th className="px-4 py-3 font-semibold">Type</th>
+                      <th className="px-4 py-3 font-semibold">Brand</th>
+                      <th className="px-4 py-3 font-semibold">Serial Number</th>
+                      <th className="px-4 py-3 font-semibold text-center">Status</th>
+                      <th className="px-4 py-3 font-semibold">Assignee / Location</th>
+                      <th className="px-4 py-3 font-semibold text-right rounded-r-xl">Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {assetReportData
+                      .slice(
+                        (assetCurrentPage - 1) * itemsPerPage,
+                        assetCurrentPage * itemsPerPage,
+                      )
+                      .map((asset) => {
+                        const assignee = asset.expand?.assignedTo as any;
+                        const assigneeText = assignee?.name || assignee?.email || (asset.assignedLocation ? `Location: ${asset.assignedLocation}` : "Unassigned");
+                        const cost = typeof asset.purchaseCost === "number" 
+                          ? asset.purchaseCost 
+                          : parseFloat(asset.purchaseCost) || 0;
+
+                        return (
+                          <tr
+                            key={asset.id}
+                            className="hover:bg-slate-50/30 transition-colors"
+                          >
+                            <td className="px-4 py-3 font-mono text-xs text-slate-400">
+                              {asset.asset_id || asset.id}
+                            </td>
+                            <td className="px-4 py-3 font-semibold text-slate-800">
+                              {asset.model || asset.brand}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600 capitalize">
+                              {asset.type}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {asset.brand}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600 font-mono text-xs">
+                              {asset.serialNumber || "-"}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                asset.status === "available"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : asset.status === "assigned"
+                                    ? "bg-blue-100 text-blue-800"
+                                    : asset.status === "maintenance"
+                                      ? "bg-rose-100 text-rose-800"
+                                      : "bg-slate-100 text-slate-800"
+                              }`}>
+                                {asset.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-slate-500 text-xs font-medium">
+                              {assigneeText}
+                            </td>
+                            <td className="px-4 py-3 text-right text-slate-700 font-bold font-mono">
+                              LKR {cost.toLocaleString()}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mt-5 pt-4 border-t border-slate-50">
+                <div className="text-xs font-semibold text-slate-400">
+                  Showing {(assetCurrentPage - 1) * itemsPerPage + 1} to{" "}
+                  {Math.min(
+                    assetCurrentPage * itemsPerPage,
+                    assetReportData.length,
+                  )}{" "}
+                  of {assetReportData.length} assets
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    onClick={() => setAssetCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={assetCurrentPage === 1}
+                    className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-600 shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({
+                      length: Math.ceil(
+                        assetReportData.length / itemsPerPage,
+                      ),
+                    }).map((_, i) => (
+                      <button
+                        key={i + 1}
+                        onClick={() => setAssetCurrentPage(i + 1)}
+                        className={`w-9 h-9 rounded-xl text-xs font-bold shadow-sm transition-all ${
+                          assetCurrentPage === i + 1
+                            ? "bg-blue-600 text-white"
+                            : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        {i + 1}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() =>
+                      setAssetCurrentPage((p) =>
+                        Math.min(
+                          Math.ceil(assetReportData.length / itemsPerPage),
+                          p + 1,
+                        ),
+                      )
+                    }
+                    disabled={
+                      assetCurrentPage ===
+                      Math.ceil(assetReportData.length / itemsPerPage)
                     }
                     className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-600 shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   >

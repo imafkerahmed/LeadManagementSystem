@@ -11,8 +11,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  UploadCloud,
 } from "lucide-react";
 import { createPocketBaseClient } from "@/lib/pocketbase";
+import BulkUpload from "@/components/admin/BulkUpload";
 import {
   LEAD_SOURCE_OPTIONS,
   getLeadSourceDetailLabel,
@@ -332,10 +334,13 @@ function getFollowupStatus(
 
 export default function AdminLeads() {
   const authModel = createPocketBaseClient().authStore.model as {
+    id?: string;
     name?: string;
     email?: string;
     role?: string;
   } | null;
+  const currentAdminId = authModel?.id || "";
+  const currentAdminLabel = authModel?.email || authModel?.name || "Admin";
   const currentUserName =
     authModel?.name || authModel?.email || "Amazon College Team";
   const isAdmin =
@@ -343,9 +348,63 @@ export default function AdminLeads() {
     authModel?.role === "super-admin" ||
     authModel?.role === "marketing-manager" ||
     authModel?.role === "admissions-head";
+
   const [authReady, setAuthReady] = useState(false);
   const [accessPolicies, setAccessPolicies] = useState<any[]>([]);
   const [isAccessLoading, setIsAccessLoading] = useState(true);
+
+  const getPolicyAccess = useCallback(
+    (sectionKey: string, defaultVal: boolean) => {
+      if (isAccessLoading) return false;
+      const policy = accessPolicies.find((p) => p.sectionKey === sectionKey);
+      if (!policy) return defaultVal;
+      if (policy.enabled === false) return false;
+      const pb = createPocketBaseClient();
+      const userId = pb.authStore.model?.id || "";
+      const userRole = pb.authStore.model?.role || "";
+      const denied = policy.deniedUsers || [];
+      const allowed = policy.allowedUsers || [];
+      const roles = policy.allowedRoles || [];
+      return (
+        !denied.includes(userId) &&
+        (allowed.includes(userId) || roles.includes(userRole))
+      );
+    },
+    [isAccessLoading, accessPolicies],
+  );
+
+  const [activeSubTab, setActiveSubTab] = useState<"database" | "bulk">("database");
+
+  // Sync subtab with URL query parameter
+  useEffect(() => {
+    if (!isAccessLoading) {
+      const params = new URLSearchParams(window.location.search);
+      const sub = params.get("sub");
+      const canBulkUpload = getPolicyAccess("admin_bulk", true);
+      if (sub === "bulk" && canBulkUpload) {
+        setActiveSubTab("bulk");
+      } else {
+        setActiveSubTab("database");
+      }
+    }
+  }, [isAccessLoading, getPolicyAccess]);
+
+  const setSubTab = (sub: "database" | "bulk") => {
+    setActiveSubTab(sub);
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (sub === "bulk") {
+        params.set("sub", "bulk");
+      } else {
+        params.delete("sub");
+      }
+      const newSearch = params.toString();
+      const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : "");
+      window.history.replaceState(null, "", newUrl);
+    } catch {
+      // ignore
+    }
+  };
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [filteredLeads, setFilteredLeads] = useState<Lead[]>([]);
@@ -420,20 +479,6 @@ export default function AdminLeads() {
       unsubscribe();
     };
   }, []);
-
-  const getPolicyAccess = (sectionKey: string, defaultVal: boolean) => {
-    if (isAccessLoading) return false;
-    const policy = accessPolicies.find((p) => p.sectionKey === sectionKey);
-    if (!policy) return defaultVal;
-    if (policy.enabled === false) return false;
-    const pb = createPocketBaseClient();
-    const userId = pb.authStore.model?.id || "";
-    const userRole = pb.authStore.model?.role || "";
-    const denied = policy.deniedUsers || [];
-    const allowed = policy.allowedUsers || [];
-    const roles = policy.allowedRoles || [];
-    return !denied.includes(userId) && (allowed.includes(userId) || roles.includes(userRole));
-  };
 
   const canEditLeads = getPolicyAccess("admin_leads_edit", true);
   const canDeleteLeads = getPolicyAccess("admin_leads_delete", true);
@@ -1723,9 +1768,41 @@ export default function AdminLeads() {
     Lost: "bg-red-100 text-red-800",
   };
 
+  const canBulkUpload = getPolicyAccess("admin_bulk", true);
+
   return (
     <div className="space-y-4">
-      {/* Top Bar with Search & New Button */}
+      {canBulkUpload && (
+        <div className="flex bg-slate-100/80 p-1 rounded-xl w-fit border border-slate-200/40 shrink-0 scrollbar-none whitespace-nowrap mb-2">
+          <button
+            onClick={() => setSubTab("database")}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+              activeSubTab === "database"
+                ? "bg-white text-slate-800 border-slate-200 shadow-sm"
+                : "text-slate-500 border-transparent hover:text-slate-700"
+            }`}
+          >
+            Leads Database
+          </button>
+          <button
+            onClick={() => setSubTab("bulk")}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer border flex items-center gap-1.5 ${
+              activeSubTab === "bulk"
+                ? "bg-white text-slate-800 border-slate-200 shadow-sm"
+                : "text-slate-500 border-transparent hover:text-slate-700"
+            }`}
+          >
+            <UploadCloud className="w-3.5 h-3.5" />
+            Bulk Import
+          </button>
+        </div>
+      )}
+
+      {activeSubTab === "bulk" && canBulkUpload ? (
+        <BulkUpload operatorId={currentAdminId} operatorLabel={currentAdminLabel} />
+      ) : (
+        <>
+          {/* Top Bar with Search & New Button */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
@@ -2080,6 +2157,8 @@ export default function AdminLeads() {
           </button>
         </div>
       </div>
+      </>
+      )}
 
       {/* Sidebar Drawer */}
       {sidebarOpen && (

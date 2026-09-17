@@ -256,7 +256,8 @@ export default function AdminDashboard() {
         try {
           return await pb.collection("leads").getFullList({
             sort: "-created",
-            expand: "assignedTo",
+            fields:
+              "id,studentName,status,leadStatus,assignedTo,created,followup1Date,followup1Completed,followup2Date,followup2Completed,followup3Date,followup3Completed",
           });
         } catch {
           return await pb.collection("leads").getFullList({
@@ -267,14 +268,20 @@ export default function AdminDashboard() {
 
       const getHistory = async () => {
         try {
-          return await pb.collection("leadHistory").getFullList({
+          const res = await pb.collection("leadHistory").getList(1, 20, {
             sort: "-created",
             expand: "changedBy,studentName,leadId",
           });
+          return res.items;
         } catch {
-          return await pb.collection("leadHistory").getFullList({
-            sort: "-created",
-          });
+          try {
+            const res = await pb.collection("leadHistory").getList(1, 20, {
+              sort: "-created",
+            });
+            return res.items;
+          } catch {
+            return [];
+          }
         }
       };
 
@@ -282,6 +289,7 @@ export default function AdminDashboard() {
         try {
           return await pb.collection("tasks").getFullList({
             sort: "-created",
+            fields: "id,status,priority,dueDate",
           });
         } catch {
           return [];

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Papa from "papaparse";
-import { Upload, X } from "lucide-react";
+import { Upload, X, Loader2 } from "lucide-react";
 import { createPocketBaseClient } from "@/lib/pocketbase";
 import { toast } from "sonner";
 
@@ -435,7 +435,24 @@ export default function BulkUpload({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {isUploading && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex flex-col items-center justify-center z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full mx-4 shadow-2xl border border-slate-100 flex flex-col items-center text-center gap-4 animate-in zoom-in-95 duration-300">
+            <div className="relative flex items-center justify-center">
+              <div className="h-16 w-16 rounded-full border-4 border-blue-50 border-t-blue-600 animate-spin" />
+              <Loader2 className="absolute h-6 w-6 text-blue-600 animate-pulse" />
+            </div>
+            <div className="space-y-1 mt-2">
+              <h3 className="font-extrabold text-slate-800 text-lg">Uploading Batch</h3>
+              <p className="text-sm text-slate-400 font-medium">
+                Saving leads to the database. Please do not close or refresh this tab.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* File Upload */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
         <h3 className="text-lg font-bold text-slate-900 mb-4 tracking-tight">
@@ -701,18 +718,43 @@ export default function BulkUpload({
 
           <div className="mt-6 border-t border-gray-200 pt-4">
             <div className="flex items-center justify-between gap-3">
-              <h4 className="font-medium text-gray-900">Active counselors</h4>
-              <button
-                type="button"
-                onClick={() =>
-                  setSelectedCounselorIds(
-                    counselors.map((counselor) => counselor.id),
-                  )
-                }
-                className="text-sm font-medium text-blue-600 hover:text-blue-700"
-              >
-                Select all
-              </button>
+              <div>
+                <h4 className="font-medium text-gray-900">Active counselors</h4>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {selectedCounselorIds.length} of {counselors.length} selected
+                </p>
+              </div>
+              {counselors.length > 0 && (
+                <label className="inline-flex items-center gap-2 cursor-pointer select-none rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 px-3 py-1.5 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={
+                      counselors.length > 0 &&
+                      selectedCounselorIds.length === counselors.length
+                    }
+                    ref={(el) => {
+                      if (el) {
+                        el.indeterminate =
+                          selectedCounselorIds.length > 0 &&
+                          selectedCounselorIds.length < counselors.length;
+                      }
+                    }}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedCounselorIds(
+                          counselors.map((counselor) => counselor.id),
+                        );
+                      } else {
+                        setSelectedCounselorIds([]);
+                      }
+                    }}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span className="text-xs font-semibold text-gray-700">
+                    Select All
+                  </span>
+                </label>
+              )}
             </div>
 
             {counselors.length === 0 ? (
@@ -903,13 +945,18 @@ export default function BulkUpload({
             disabled={isUploading || isBatchUploaded || getUniqueLeads().length === 0 || duplicateScanResult.scanning}
             className="mt-4 w-full px-6 py-3.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 transition shadow-sm font-bold tracking-wide"
           >
-            {isUploading
-              ? "Uploading..."
-              : isBatchUploaded
-                ? "Bulk Upload Completed"
-                : getUniqueLeads().length === 0
-                  ? "No New Leads to Upload"
-                  : "Upload Leads"}
+            {isUploading ? (
+              <span className="flex items-center justify-center gap-2">
+                <Loader2 className="h-4.5 w-4.5 animate-spin text-white" />
+                Uploading Leads...
+              </span>
+            ) : isBatchUploaded ? (
+              "Bulk Upload Completed"
+            ) : getUniqueLeads().length === 0 ? (
+              "No New Leads to Upload"
+            ) : (
+              "Upload Leads"
+            )}
           </button>
         </div>
       )}

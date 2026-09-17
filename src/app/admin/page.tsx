@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users as UsersIcon,
-  UploadCloud,
   BarChart3,
   Settings as SettingsIcon,
   LogOut,
@@ -18,7 +17,6 @@ import AdminDashboard from "@/components/admin/Dashboard";
 import AdminLeads from "@/components/admin/Leads";
 import AdminTasks from "@/components/admin/Tasks";
 import AdminAssets from "@/components/admin/Assets";
-import BulkUpload from "@/components/admin/BulkUpload";
 import AdminSettings from "@/components/admin/Settings";
 import AdminReports from "@/components/admin/Reports";
 import AdminKPIManager from "@/components/admin/KPIManager";
@@ -52,17 +50,16 @@ const tabs: Array<{
   icon: ComponentType<{ className?: string }>;
 }> = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "leads", label: "All Leads", icon: UsersIcon },
+  { id: "leads", label: "Leads", icon: UsersIcon },
   { id: "tasks", label: "Tasks", icon: ListTodo },
   { id: "assets", label: "Assets", icon: Laptop },
-  { id: "bulk", label: "Bulk Upload", icon: UploadCloud },
   { id: "reports", label: "Reports", icon: BarChart3 },
   { id: "kpi", label: "KPI & Performance", icon: Award },
   { id: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
 const isValidTab = (value: string | null): value is AdminTab =>
-  tabs.some((tab) => tab.id === value);
+  tabs.some((tab) => tab.id === value) || value === "bulk";
 
 const tabKeys: Record<AdminTab, string> = {
   dashboard: "admin_dashboard",
@@ -83,7 +80,6 @@ export default function AdminPage() {
 
   const [authChecked, setAuthChecked] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [adminId, setAdminId] = useState("");
   const [adminLabel, setAdminLabel] = useState("Admin");
   const [adminName, setAdminName] = useState("");
   const [adminRole, setAdminRole] = useState("");
@@ -97,14 +93,24 @@ export default function AdminPage() {
       if (tabStr === "users") {
         tabStr = "settings";
       }
+      if (tabStr === "bulk") {
+        tabStr = "leads";
+        params.set("tab", "leads");
+        params.set("sub", "bulk");
+        window.history.replaceState(null, "", window.location.pathname + "?" + params.toString());
+      }
 
       let tab: AdminTab | null = null;
       if (isValidTab(tabStr)) {
         tab = tabStr;
       } else {
         const saved = localStorage.getItem("admin_portal_tab") as AdminTab | null;
-        if (isValidTab(saved)) {
-          tab = saved;
+        let savedTab = saved;
+        if (savedTab === "bulk") {
+          savedTab = "leads";
+        }
+        if (isValidTab(savedTab)) {
+          tab = savedTab;
         }
       }
 
@@ -145,7 +151,6 @@ export default function AdminPage() {
       }
 
       setIsAdmin(true);
-      setAdminId(authUser?.id || "");
       setAdminLabel(authUser?.email || authUser?.name || "Admin");
       setAdminName(authUser?.name || authUser?.email || "Admin");
       setAdminRole(authUser?.role || "Admin");
@@ -230,9 +235,9 @@ export default function AdminPage() {
         const params = new URLSearchParams(window.location.search);
         params.set("tab", currentTab);
         
-        // Clear sub if it doesn't belong to reports or settings
+        // Clear sub if it doesn't belong to reports, settings, or leads
         const sub = params.get("sub");
-        if (sub && currentTab !== "reports" && currentTab !== "settings") {
+        if (sub && currentTab !== "reports" && currentTab !== "settings" && currentTab !== "leads") {
           params.delete("sub");
         }
         
@@ -372,7 +377,6 @@ export default function AdminPage() {
                 "Monitor, create, and assign staff tasks"}
               {currentTab === "assets" &&
                 "Manage hardware, peripherals, warranties, and staff assignments"}
-              {currentTab === "bulk" && "Upload CSV file for batch imports"}
               {currentTab === "reports" &&
                 "Query performance stats and visual charts"}
               {currentTab === "kpi" &&
@@ -395,9 +399,6 @@ export default function AdminPage() {
             )}
             {currentTab === "assets" && allowedTabs.includes("assets") && (
               <AdminAssets />
-            )}
-            {currentTab === "bulk" && allowedTabs.includes("bulk") && (
-              <BulkUpload operatorId={adminId} operatorLabel={adminLabel} />
             )}
             {currentTab === "reports" && allowedTabs.includes("reports") && (
               <AdminReports />

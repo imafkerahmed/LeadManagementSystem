@@ -93,16 +93,22 @@ export async function GET(request: NextRequest) {
       sort: "-created",
     })) as HistoryRecord[];
 
-    // Fetch all counselors (users) for reference
-    const counselors = (await pb
-      .collection("users")
-      .getFullList()) as UserRecord[];
+    // Fetch all users for reference and filter for active accounts
+    const allUsers = (await pb.collection("users").getFullList({
+      sort: "name",
+      fields: "id,name,email,role,accountStatus",
+    })) as (UserRecord & { accountStatus?: string })[];
 
-    // Aggregate metrics - pass allLeads for complete overdue calculation
+    const activeUsers = allUsers.filter((u) => {
+      const status = (u.accountStatus || "enabled").trim().toLowerCase();
+      return status !== "disabled";
+    });
+
+    // Aggregate metrics - pass activeUsers for listing and allLeads for overdue calculation
     const reports = aggregateDailyMetrics(
       leadsCreatedToday,
       history,
-      counselors,
+      activeUsers,
       allLeads,
       leadsUpdatedToday,
     );

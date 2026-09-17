@@ -209,16 +209,39 @@ export function aggregateDailyMetrics(
     }
   });
 
-  // Build list of counselors to report on
-  const allRelevantCounselors = new Set<string>(activeCounselorIds);
+  // Build list of all available users and any active IDs
+  const allRelevantCounselors = new Set<string>();
+
+  // Include ALL available users from the database
+  counselors.forEach((user) => {
+    if (user.id) allRelevantCounselors.add(user.id);
+  });
+
+  // Include any other IDs or assignees with activity
+  activeCounselorIds.forEach((id) => allRelevantCounselors.add(id));
   updatedStatusByCounselor.forEach((_, cid) => allRelevantCounselors.add(cid));
   currentNewByCounselor.forEach((_, cid) => allRelevantCounselors.add(cid));
   overdueFollowupsByCounselor.forEach((_, cid) =>
     allRelevantCounselors.add(cid),
   );
 
+  const userById = new Map<string, UserRecord>();
+  const userByName = new Map<string, UserRecord>();
+  const userByEmail = new Map<string, UserRecord>();
+
+  counselors.forEach((c) => {
+    if (c.id) userById.set(c.id, c);
+    if (c.name) userByName.set(c.name.trim().toLowerCase(), c);
+    if (c.email) userByEmail.set(c.email.trim().toLowerCase(), c);
+  });
+
   allRelevantCounselors.forEach((counselorId) => {
-    const counselor = counselors.find((c) => c.id === counselorId);
+    const user =
+      userById.get(counselorId) ||
+      userByName.get(counselorId.trim().toLowerCase()) ||
+      userByEmail.get(counselorId.trim().toLowerCase());
+
+    const resolvedName = user?.name || user?.email || counselorId || "Unknown";
     const newLeads = newLeadsByCounselor.get(counselorId) || 0;
 
     const cMap = updatedStatusByCounselor.get(counselorId) || new Map();
@@ -233,7 +256,7 @@ export function aggregateDailyMetrics(
 
     metricsMap.set(counselorId, {
       counselorId,
-      counselorName: counselor?.name || counselor?.email || "Unknown",
+      counselorName: resolvedName,
       newLeads,
       statusNew,
       statusRingingNoAnswer,
