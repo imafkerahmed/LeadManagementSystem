@@ -22,6 +22,7 @@ type LeadRecord = {
   status?: string;
   assignedTo?: string;
   comments?: string;
+  latestComment?: string;
   leadStatus?: string;
   courseName?: string;
   leadSourceDetail?: string;
@@ -39,6 +40,47 @@ function escapeFilterValue(value: string) {
   return value.replace(/"/g, '\\"');
 }
 
+let cachedLeadsFields: Set<string> | null = null;
+let lastFieldFetchTime = 0;
+
+async function getLeadsSchemaFields(pb: any): Promise<Set<string>> {
+  const now = Date.now();
+  if (cachedLeadsFields && now - lastFieldFetchTime < 5 * 60 * 1000) {
+    return cachedLeadsFields;
+  }
+  try {
+    const col = await pb.collections.getOne("leads");
+    const fieldNames = (col.schema || []).map((f: { name: string }) => f.name);
+    const fields = new Set<string>([
+      "id",
+      "created",
+      "updated",
+      ...fieldNames,
+    ]);
+    cachedLeadsFields = fields;
+    lastFieldFetchTime = now;
+    return fields;
+  } catch (err) {
+    console.warn("Could not fetch leads collection schema:", err);
+    return (
+      cachedLeadsFields ||
+      new Set([
+        "leadId",
+        "studentName",
+        "countryCode",
+        "mobileWithCountry",
+        "email",
+        "courseName",
+        "leadSource",
+        "leadSourceDetail",
+        "status",
+        "assignedTo",
+        "latestComment",
+      ])
+    );
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const pb = await getPocketBaseAdminClient();
@@ -51,6 +93,8 @@ export async function GET(request: NextRequest) {
     const loadAll = request.nextUrl.searchParams.get("all") === "1";
     const page = request.nextUrl.searchParams.get("page") || "1";
     const limit = request.nextUrl.searchParams.get("limit") || "50";
+
+    const schemaFields = await getLeadsSchemaFields(pb);
 
     const users = (await pb.collection("users").getFullList({
       sort: "name",
@@ -67,10 +111,15 @@ export async function GET(request: NextRequest) {
 
     if (statusFilter) {
       const escapedStatus = escapeFilterValue(statusFilter);
-      filters.push(`status = "${escapedStatus}"`);
+      const statusField = schemaFields.has("status")
+        ? "status"
+        : schemaFields.has("leadStatus")
+          ? "leadStatus"
+          : "status";
+      filters.push(`${statusField} = "${escapedStatus}"`);
     }
 
-    if (counselorFilter) {
+    if (counselorFilter && schemaFields.has("assignedTo")) {
       const resolvedCounselor =
         userById.get(counselorFilter) || userByName.get(counselorFilter);
       const counselorValues = new Set<string>([
@@ -88,29 +137,54 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (searchTerm) {
-      const escapedSearch = escapeFilterValue(searchTerm);
-      filters.push(
-        `(` +
-          `studentName ~ "${escapedSearch}" || ` +
-          `mobile ~ "${escapedSearch}" || ` +
-          `mobileWithCountry ~ "${escapedSearch}" || ` +
-          `email ~ "${escapedSearch}" || ` +
-          `course ~ "${escapedSearch}" || ` +
-          `courseName ~ "${escapedSearch}"` +
-          `)`,
-      );
+    if (searchTerm && searchTerm.trim()) {
+      const escapedSearch = escapeFilterValue(searchTerm.trim());
+      const candidateFields = [
+        "studentName",
+        "leadId",
+        "mobileWithCountry",
+        "mobile",
+        "email",
+        "courseName",
+        "course",
+        "leadSource",
+        "leadSourceDetail",
+        "latestComment",
+        "comments",
+      ];
+
+      const searchParts = candidateFields
+        .filter((field) => schemaFields.has(field))
+        .map((field) => `${field} ~ "${escapedSearch}"`);
+
+      if (searchParts.length > 0) {
+        filters.push(`(${searchParts.join(" || ")})`);
+      }
     }
 
     if (followupFilter === "due") {
       const todayLimit = new Date().toISOString().split("T")[0] + " 23:59:59";
-      filters.push(
-        `(` +
-          `(followup1Date != null && followup1Date != "" && followup1Date <= "${todayLimit}" && followup1Completed != true) || ` +
-          `(followup2Date != null && followup2Date != "" && followup2Date <= "${todayLimit}" && followup2Completed != true) || ` +
-          `(followup3Date != null && followup3Date != "" && followup3Date <= "${todayLimit}" && followup3Completed != true)` +
-          `)`,
-      );
+      const followupParts: string[] = [];
+
+      if (schemaFields.has("followup1Date") && schemaFields.has("followup1Completed")) {
+        followupParts.push(
+          `(followup1Date != null && followup1Date != "" && followup1Date <= "${todayLimit}" && followup1Completed != true)`
+        );
+      }
+      if (schemaFields.has("followup2Date") && schemaFields.has("followup2Completed")) {
+        followupParts.push(
+          `(followup2Date != null && followup2Date != "" && followup2Date <= "${todayLimit}" && followup2Completed != true)`
+        );
+      }
+      if (schemaFields.has("followup3Date") && schemaFields.has("followup3Completed")) {
+        followupParts.push(
+          `(followup3Date != null && followup3Date != "" && followup3Date <= "${todayLimit}" && followup3Completed != true)`
+        );
+      }
+
+      if (followupParts.length > 0) {
+        filters.push(`(${followupParts.join(" || ")})`);
+      }
     }
 
     if (filters.length > 0) {
@@ -159,7 +233,7 @@ export async function GET(request: NextRequest) {
         userByName.get(lead.assignedTo || "")?.email ||
         lead.assignedTo ||
         "",
-      comments: lead.comments,
+      comments: lead.latestComment || lead.comments || "",
       followup1Date: lead.followup1Date || null,
       followup1Completed: lead.followup1Completed || false,
       followup2Date: lead.followup2Date || null,

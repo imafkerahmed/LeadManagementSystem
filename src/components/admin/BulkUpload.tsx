@@ -223,15 +223,37 @@ export default function BulkUpload({
     return String(row[key ?? ""] ?? "").trim();
   };
 
+function normalizeMobileWithCountry(value: string): string {
+  const compact = (value || "").trim().replace(/[^\d+]/g, "");
+  if (!compact) return "";
+
+  if (compact.startsWith("+")) {
+    return `+${compact.replace(/\D/g, "")}`;
+  }
+
+  const digits = compact.replace(/\D/g, "");
+  return digits ? `+${digits}` : "";
+}
+
   const selectedCounselors = counselors.filter((counselor) =>
     selectedCounselorIds.includes(counselor.id),
   );
 
   const getUniqueLeads = () => {
     const duplicateMobiles = new Set(
-      duplicateScanResult.duplicates.map((d) => d.mobileWithCountry)
+      duplicateScanResult.duplicates.map((d) =>
+        normalizeMobileWithCountry(d.mobileWithCountry),
+      ),
     );
-    return leads.filter((lead) => !duplicateMobiles.has(lead.mobileWithCountry));
+    const seen = new Set<string>();
+    return leads.filter((lead) => {
+      const normalized = normalizeMobileWithCountry(lead.mobileWithCountry);
+      if (!normalized) return false;
+      if (duplicateMobiles.has(normalized)) return false;
+      if (seen.has(normalized)) return false;
+      seen.add(normalized);
+      return true;
+    });
   };
 
   const getAssignmentBreakdown = () => {
@@ -349,9 +371,12 @@ export default function BulkUpload({
           );
         };
 
+        const rawMobile = resolveValue("mobileWithCountry");
+        const normalizedMobile = normalizeMobileWithCountry(rawMobile);
+
         return {
           studentName: resolveValue("studentName"),
-          mobileWithCountry: resolveValue("mobileWithCountry"),
+          mobileWithCountry: normalizedMobile || rawMobile,
           email: resolveValue("email"),
           course: resolveValue("course"),
           leadSource: resolveValue("leadSource") || "Bulk Upload",
